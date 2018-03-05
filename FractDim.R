@@ -21,11 +21,14 @@ FractDim<-function(Data,graphon=FALSE) {
     AvgLmk[indk]=mean(Lmk)
     #  err[indk]=sd(log(Lmk))
   }
-  x<-log(kvec);y<-log(AvgLmk);
-  q<-lm(y~x);slope<-summary(q)$coefficients[2,1];
-  yintcept<-summary(q)$coefficients[1,1];q<-NULL;
+  x<-log(kvec)
+  y<-log(AvgLmk)
+  q<-lm(y~x)
+  slope<-q$coefficients[2]
+  yintcept<-q$coefficients[1]
   yfit<-x*slope+yintcept
-  FrDim=-slope
+  FrDim <- -slope
+  avgRes <- mean(abs(q$residuals))
   if(graphon==TRUE)
   {
     plot(x,y,main="If linear then fractal, w/Fr. Dim = (-)slope",xlab="Ln(k)",ylab="Ln(length of curve with interval k)")
@@ -35,5 +38,5 @@ FractDim<-function(Data,graphon=FALSE) {
   #z<-line(x,y);qq=coef(z)
   #yintcept=qq[1]
   #FrDim=-qq[2]
-  return(c(FrDim,yintcept))
+  return(c(FrDim, avgRes, yintcept))
 }
