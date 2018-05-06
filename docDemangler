@@ -1,0 +1,98 @@
+library(tm)
+library(tokenizers)
+# createCorpus <- function(filepath) {
+#   conn <- file(filepath, "r")
+#   fulltext <- readLines(conn)
+#   close(conn)
+#   
+#   vs <- VectorSource(fulltext)
+#   Corpus(vs, readerControl=list(readPlain, language="en", load=TRUE))
+# }
+#corpus <- createCorpus("Corpus State of Union Speeches 1989-2017")
+
+filepath <- "Corpus State of Union Speeches 1989-2017"
+filenames <- list.files(filepath)
+this_filename <- filenames[25]
+this_filename <- paste0("Corpus State of Union Speeches 1989-2017/", this_filename)
+txt <- readLines(this_filename, warn = F)
+
+
+library(quanteda)
+paras <- list()
+n_sent_vec <- c()
+df_list2 <- list()
+for(i in 1:length(txt)){
+  this_para <- txt[i]
+  this_para <- gsub("â€", "", this_para)
+  this_para <- gsub("œ", "", this_para)
+  this_para <- gsub("\u009d", "", this_para)
+  this_para <- gsub("¦", "", this_para)
+  this_para <- gsub("“", "", this_para)
+  this_para <- gsub("™", "", this_para)
+  this_para_tknzd <- quanteda::tokens(this_para, what = "sentence")
+  paras[[i]] <- as.character(this_para_tknzd)
+  n_sent <- length(as.character(this_para_tknzd))
+  n_sent_vec[i] <- n_sent
+  xx <- paste(as.character(this_para_tknzd), collapse = " ")
+  words_in_para <- as.character(tokens(char_tolower(xx), remove_punct = T))
+  para_length_totw <- length(words_in_para)
+  para_length_uniqw <- length(unique(words_in_para))
+  n_words_vec <- c()
+  n_uwords_vec <- c()
+  df_list <- list()
+  for(j in 1:n_sent){
+    this_sent <- as.character(this_para_tknzd)[j]
+    this_sent_tknzd <- as.character(tokens(char_tolower(this_sent), remove_punct = T))
+    n_words <- length(this_sent_tknzd)
+    n_words_vec[j] <- n_words 
+    n_uwords <- length(unique(this_sent_tknzd))
+    n_uwords_vec[j] <- n_uwords
+    word_length <- c()
+    for(k in 1:n_words){
+      word_length[k] <- length(unlist(strsplit(this_sent_tknzd[k], "")))
+    }
+    kvec <- 1:n_words
+    df_list[[j]] <- data.frame(para_ID = i, sent_ID = j, word_ID = kvec, sent_length = n_words,
+                     sent_ulength = n_uwords, word_length = word_length)
+  }
+  #dftest <- do.call(rbind, df_list)
+  df_i <- do.call(rbind, df_list)
+  df_i$para_length_s <- n_sent
+  df_i$para_length_wtot <- para_length_totw
+  df_i$para_length_wuniq <- para_length_uniqw
+  df_list2[[i]] <- df_i
+  print(i)
+}
+df <- do.call(rbind, df_list2)
+df$para_wuniq_To_wtot <- df$para_length_wuniq / df$para_length_wtot
+df$para_w_Per_sent <- df$para_length_wtot / df$para_length_s
+df$sent_wuniq_To_wtot <- df$sent_ulength / df$sent_length
+
+ind <- which(duplicated(df$para_ID) == F)
+df_plot <- df[ind, ]
+library(ggplot2)
+ggplot(df_plot, aes(x = para_ID, y = para_wuniq_To_wtot)) + geom_line()
+ggplot(df_plot, aes(x = para_ID, y = para_w_Per_sent)) + geom_line()
+df_plot$lword_length <- log(df_plot$word_length)
+ggplot(df_plot, aes(x = lword_length)) + geom_density()
+
+
+# df_plot <- subset(df, para_ID == 2)
+# ggplot(df_plot, aes(x = word_ID, y = word_length)) + geom_line()
+# ggplot(df_plot, aes(x = word_ID, y = word_length)) + geom_line()
+#===============================
+
+paraID <- 23
+this_para <- paras[[paraID]]
+this_para[1]
+this_df <- subset(df, para_ID == paraID)
+#ggplot(this_df, aes(x = sent_ID, y = sent_wuniq_To_wtot)) + geom_line() + geom_hline(yintercept = this_df$para_wuniq_To_wtot)
+this_df$para_wordID <- 1:nrow(this_df)
+ggplot(this_df, aes(x = para_wordID, y = word_length)) + geom_line()
+ggplot(this_df, aes(x = word_length)) + geom_density()
+this_df$lword_length <- log(this_df$word_length)
+ggplot(this_df, aes(x = lword_length)) + geom_density()
+ggplot(this_df, aes(x = sent_ID, sent_length)) + geom_line()
+sentID <- 4
+ind_sent <- which(this_df$sent_ID == sentID)
+this_df$word_length[ind_sent]
