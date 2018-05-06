@@ -1,0 +1,54 @@
+options(warn = -1); options(scipen = 999)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(zoo)
+
+
+#data <- read.csv("major crops world production.csv")
+in_data <- read.csv("psd_rice.csv", stringsAsFactors = F)
+df_raw <- in_data[, c("Country", "Year", "Total.Supply", "Ending.Stocks")]
+df_raw$Total.Supply <- gsub(",", "", df_raw$Total.Supply)
+df_raw$Ending.Stocks <- gsub(",", "", df_raw$Ending.Stocks)
+df_raw$Total.Supply <- as.numeric(df_raw$Total.Supply)
+df_raw$Ending.Stocks <- as.numeric(df_raw$Ending.Stocks)
+df <- df_raw
+df$Demand <- df$Total.Supply - df$Ending.Stocks
+df$SUR <- df$Ending.Stocks / df$Demand
+df$StoD <- df$Total.Supply / df$Demand
+df <- subset(df, Country == "Thailand")
+df$Year <- as.integer(gsub(".*/", "", df$Year))
+#--
+in_data_export <- read.csv("FAO thai rice export price data.csv", stringsAsFactors = F)
+df_raw_expt <- in_data_export[, c("Country", "Item", "Element", "Year","Value")]
+df_raw_expt$Item <- as.character(df_raw_expt$Item)
+df_raw_expt$Country <- as.character(df_raw_expt$Country)
+df_xpt <- subset(df_raw_expt, Country == "Thailand")
+df_xpt_wide <- df_xpt %>% spread(Element, Value)
+df_xpt_wide <- df_xpt_wide[, c("Year", "Export Quantity", "Export Value")]
+df_xpt_wide$Price <- 10^3 * df_xpt_wide$`Export Value` / df_xpt_wide$`Export Quantity`
+df_xpt_wide <- df_xpt_wide[, c("Year", "Price")]
+df_xpt_wide$Year <- as.integer(df_xpt_wide$Year)
+
+
+df_merge <- merge(df, df_xpt_wide, by = "Year")
+zdf_merge <- cbind(df_merge[, c(1, 2)], scale(df_merge[, -c(1, 2)]))
+df_plot <- df_merge %>% gather(Var, Value, Total.Supply:Price)
+zdf_plot <- zdf_merge %>% gather(Var, Value, Total.Supply:Price)
+
+gg <- ggplot(zdf_plot, aes(x = Year, y = Value, group = Var, color = Var))
+gg <- gg + geom_line()
+gg
+
+zdf_plot2 <- subset(zdf_plot, Var %in% c("Price", "Total.Supply", "Demand", "SUR", "StoD"))
+gg <- ggplot(zdf_plot2, aes(x = Year, y = Value, group = Var, color = Var))
+gg <- gg + geom_line()
+gg
+
+df_plot_wide <- df_plot %>% spread(Var, Value)
+#gg <- ggplot(df_plot_wide, aes(x = Demand, y = Price))
+#gg <- ggplot(df_plot_wide, aes(x = Total.Supply, y = Price))
+#gg <- ggplot(df_plot_wide, aes(x = SUR, y = Price))
+gg <- ggplot(df_plot_wide, aes(x = Demand, y = Total.Supply))
+gg <- gg + geom_point()
+gg
