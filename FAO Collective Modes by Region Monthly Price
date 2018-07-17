@@ -1,0 +1,230 @@
+setwd('D:/OneDrive - CGIAR/Documents')
+library(stats)
+library(plyr)
+library(ggplot2)
+library(ggrepel)
+library(dplyr)
+library(tidyr)
+library(TSA)
+
+
+#-----------
+#--Africa
+countries_NAfrica <- as.character(unique(read.csv("Country list - Northern Africa.csv")[,"Area"]))
+countries_MAfrica <- as.character(unique(read.csv("Country list - Middle Africa.csv")[,"Area"]))
+countries_WAfrica <- as.character(unique(read.csv("Country list - Western Africa.csv")[,"Area"]))
+countries_EAfrica <- as.character(unique(read.csv("Country list - Eastern Africa.csv")[,"Area"]))
+countries_SAfrica <- as.character(unique(read.csv("Country list - Southern Africa.csv")[,"Area"]))
+#--Americas
+countries_SAmer <- as.character(unique(read.csv("Country list - South America.csv")[,"Area"]))
+countries_CAmer <- as.character(unique(read.csv("Country list - Central America.csv")[,"Area"]))
+countries_Carib <- as.character(unique(read.csv("Country list - Caribbean.csv")[,"Area"]))
+countries_NAmer <- as.character(unique(read.csv("Country list - Northern America.csv")[,"Country"]))
+#--Asia
+countries_EAsia <- as.character(unique(read.csv("Country list - Eastern Asia.csv")[,"Area"]))
+#countries_EAsia <- countries_EAsia[!(countries_EAsia %in% c("China, Hong Kong SAR", "China, Macao SAR"))]
+countries_SEAsia <- as.character(unique(read.csv("Country list - South-Eastern Asia.csv")[,"Area"]))
+countries_SAsia <- as.character(unique(read.csv("Country list - Southern Asia.csv")[,"Area"]))
+countries_WAsia <- as.character(unique(read.csv("Country list - Western Asia.csv")[,"Area"]))
+countries_CAsia <- as.character(unique(read.csv("Country list - Central Asia.csv")[,"Area"]))
+#--Europe
+countries_NEurope <- as.character(unique(read.csv("Country list - Northern Europe.csv")[,"Area"]))
+countries_WEurope <- as.character(unique(read.csv("Country list - Western Europe.csv")[,"Area"]))
+countries_EEurope <- as.character(unique(read.csv("Country list - Eastern Europe.csv")[,"Area"]))
+countries_SEurope <- as.character(unique(read.csv("Country list - Southern Europe.csv")[,"Area"]))
+#--Oceania
+countries_Oceania <- as.character(unique(read.csv("Country list - Oceania.csv")[,"Area"]))
+countries_AusNZea <- c("Australia", "New Zealand")
+countries_PacifIs <- setdiff(countries_Oceania, countries_AusNZea)
+#-----------
+
+Pulses_vec <- c("Beans, dry", "Lentils", "Cow peas, dry", "Broad beans, horse beans, dry", "Chick peas")
+Cereal_vec <- c("Rice, paddy", "Sorghum", "Wheat", "Millet", "Maize", "Rye", "Barley")
+RnT_vec <- c("Cassava", "Potatoes", "Sweet potatoes", "Yams")
+Oil_vec <- c("Soybeans", "Palm kernels", "Cottonseed", "Oil, palm", 
+             "Castor oil seed", "Oil, palm fruit", "Linseed", "Sunflower seed")
+Fruit_vec <- c("Bananas", "Papayas", "Oranges", 
+               "Tangerines, mandarins, clementines, satsumas", "Grapefruit (inc. pomelos)",
+               "Coconuts", "Mangoes, mangosteens, guavas")
+textileIndustrial_vec <- c("Wool, greasy", "Rubber, natural", "Cotton lint", "Sugar cane")
+teaCoffeeCacao_vec <- c("Coffee, green", "Cocoa, beans", "Tea")
+#--
+item_vec <- c(Pulses_vec, Cereal_vec, RnT_vec, Oil_vec, Fruit_vec,
+              textileIndustrial_vec, teaCoffeeCacao_vec)
+#--
+df_raw <- read.csv("Prices_Monthly_E_All_Data.csv", stringsAsFactors = F)
+df_raw$Months.Code <- NULL
+df_raw$Item.Code <- NULL
+df_raw$Area.Code <- NULL
+df_raw$Element.Code <-NULL
+df_raw$Unit <- NULL
+df_raw$Element <- NULL
+df_raw$Item <- as.character(df_raw$Item)
+df_raw$Area <- as.character(df_raw$Area)
+u <- colnames(df_raw)
+df_raw <- df_raw[, -grep("F", u)]
+colnames(df_raw)[4:ncol(df_raw)] <- as.character(c(2010:2015))
+df_raw <- gather(df_raw, Year, Value,`2010`:`2015`)
+rm(u)
+#-------------
+#--Create region groupings
+u <- df_raw$Area
+df_raw$Region <- NA
+df_raw$Region[which(u %in% countries_NAmer)] <- "North America"
+df_raw$Region[which(u %in% countries_SAmer)] <- "South America"
+df_raw$Region[which(u %in% countries_CAmer)] <- "Central America"
+df_raw$Region[which(u %in% countries_Carib)] <- "Caribbean"
+df_raw$Region[which(u %in% countries_NAfrica)] <- "Northern Africa"
+df_raw$Region[which(u %in% countries_SAfrica)] <- "Southern Africa"
+df_raw$Region[which(u %in% countries_WAfrica)] <- "Western Africa"
+df_raw$Region[which(u %in% countries_EAfrica)] <- "Eastern Africa"
+df_raw$Region[which(u %in% countries_MAfrica)] <- "Middle Africa"
+df_raw$Region[which(u %in% countries_CAsia)] <- "Central Asia"
+df_raw$Region[which(u %in% countries_WAsia)] <- "Western Asia"
+df_raw$Region[which(u %in% countries_SAsia)] <- "Southern Asia"
+df_raw$Region[which(u %in% countries_EAsia)] <- "Eastern Asia"
+df_raw$Region[which(u %in% countries_SEAsia)] <- "South-Eastern Asia"
+df_raw$Region[which(u %in% countries_NEurope)] <- "Northern Europe"
+df_raw$Region[which(u %in% countries_SEurope)] <- "Southern Europe"
+df_raw$Region[which(u %in% countries_WEurope)] <- "Western Europe"
+df_raw$Region[which(u %in% countries_EEurope)] <- "Eastern Europe"
+df_raw$Region[which(u %in% countries_PacifIs)] <- "Pacific Islands"
+df_raw$Region[which(u %in% countries_AusNZea)] <- "Australia & New Zealand"
+#--See what countries escaped designation
+#unique(df_raw$Area[which(is.na(df_raw$Region))])
+#--Assign these to their proper regions
+#(Leave out "China" as it is already covered under "China, mainlaind", "Hong Kong", etc.)
+df_raw$Region[which(u %in% c("Åland Islands", "Isle of Man", "Greenland"))] <- "Northern Europe"
+df_raw$Region[which(u %in% c("Anguilla", "Bermuda", "Cayman Islands", "Curaçao"))] <- "Caribbean"
+df_raw$Region[which(u %in% c("Côte d'Ivoire"))] <- "Western Africa"
+df_raw$Region[which(u %in% c("Palau"))] <- "Pacific Islands"
+df_raw$Region[which(u %in% c("Maldives", "Réunion"))] <- "Southern Asia"
+df_raw$Region[which(u %in% c("French Guiana"))] <- "South America"
+df_raw <- df_raw[which(is.na(df_raw$Region) == F),]
+rm(u)
+#--
+LAC <- c("Central America", "Caribbean", "South America")
+Europe_E <- "Eastern Europe"
+Europe_WNS <- c("Southern Europe", "Western Europe", "Northern Europe")
+SSA <- c("Eastern Africa", "Southern Africa", "Western Africa", "Middle Africa")
+ESE_Asia <- c("South-Eastern Asia", "Eastern Asia")
+u <- df_raw$Region
+df_raw$Region[which(u %in% LAC)] <- "LAC"
+df_raw$Region[which(u %in% Europe_E)] <- "E. Europe"
+df_raw$Region[which(u %in% Europe_WNS)] <- "W., N., & S. Europe"
+df_raw$Region[which(u %in% SSA)] <- "Sub-Saharan Africa"
+df_raw$Region[which(u %in% ESE_Asia)] <- "E. & S.E. Asia"
+#--
+df_raw$Group <- NA
+u <- df_raw$Item
+df_raw$Group[which(u %in% Cereal_vec)] <- "Cereals"
+df_raw$Group[which(u %in% RnT_vec)] <- "RnT"
+df_raw$Group[which(u %in% Pulses_vec)] <- "Pulses"
+df_raw$Group[which(u %in% teaCoffeeCacao_vec)] <- "Tea, Coffee, Cacao"
+df_raw$Group[which(u %in% textileIndustrial_vec)] <- "Textiles & Industrial"
+df_raw$Group[which(u %in% Oil_vec)] <- "Oil crops"
+df_raw$Group[which(u %in% Fruit_vec)] <- "Fruit"
+#--
+df <- subset(df_raw, Item %in% item_vec)
+
+df <- df %>% group_by(Region, Area, Year, Item) %>%
+  mutate(nMiss = length(which(is.na(Value))))
+df <- as.data.frame(df)
+length(which(is.na(df$Value)))
+length(which(is.nan(df$Value)))
+length(which(is.infinite(df$Value)))
+df_agg <- df %>% group_by(Region, Item, Year, Months) %>% summarise(Value = mean(Value, na.rm = T))
+length(which(is.na(df_agg$Value)))
+length(which(is.nan(df_agg$Value)))
+length(which(is.infinite(df_agg$Value)))
+df_agg <- df_agg %>% group_by(Region, Year, Item) %>%
+  mutate(nMiss = length(which(is.na(Value) | is.nan(Value))))
+df_agg <- as.data.frame(df_agg)
+#-----
+#unique(df_agg$Region)
+this_region <- "E. & S.E. Asia"
+#-----
+df_a <- subset(df_agg, Region %in% this_region)
+length(which(is.na(df_a$Value)))
+length(which(is.nan(df_a$Value)))
+length(which(is.infinite(df_a$Value)))
+df_group <- df_a
+item_rm <- unique(df_a$Item[which(df_a$nMiss > 5)])
+df_a <- subset(df_a, !(Item %in% items_rm))
+setdiff(item_vec, items_rm)
+# df_group <- subset(df_a, Year == 2015 & Months == "January")
+#   df_group[, c("Group", "Item")]
+# col_order <- df_group$Item
+
+
+
+df_price$nMiss <- NULL
+df_price$Group <- NULL
+df_price$Area <- NULL
+df_price <- as.data.frame(df_price)
+df_mat <- df_price %>% spread(Item, Price)
+colnames(df_mat)
+row.names(df_mat) <- df_mat$Year
+df_mat$Year <- NULL
+colnames(df_mat)
+df_mat <- df_mat[, col_order]
+difflnMat <- diff(as.matrix(log(df_mat)))
+ts_mat <- difflnMat
+cormat <- cor(ts_mat)
+image(cormat)
+#--
+eig_vectors <- -eigen(cormat)$vectors
+lam_cor <- eigen(cormat)$values
+lamcor_max <- max(lam_cor)
+N_t <- nrow(ts_mat)
+N_c <- ncol(ts_mat)
+Q <- N_t / N_c
+s_sq <- 1 - lamcor_max / N_c
+#s_sq <- 1
+lamrand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
+lamrand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
+lam <- seq(lamrand_min, lamrand_max, 0.2)
+dens_rand <- Q / (2 * pi * s_sq) * sqrt((lamrand_max - lam) * (lam - lamrand_min)) / lam
+#--
+df_e <- data.frame(values = lam_cor)
+gg <- ggplot() + geom_density(data = df_e, aes(x = values), color = "blue") + coord_cartesian(xlim = c(0, ceiling(lamcor_max)))
+gg <- gg + geom_line(data = data.frame(x = lam, y = dens_rand), aes(x = x, y = y), linetype = "dotted")
+gg
+#--
+ind_deviating_from_noise <- which(lam_cor > lamrand_max)
+CollectiveModes <- as.matrix(eig_vectors[, ind_deviating_from_noise])
+df_collectiveModes <- as.data.frame(CollectiveModes)
+n_collectiveModes <- ncol(CollectiveModes)
+print(paste("Number of collective modes: ", n_collectiveModes))
+#Contributions of groups to each mode
+n_all_ts <- length(col_order)
+groups <- unique(df_group$Group)
+n_groups <- length(groups)
+N_in_group <- c()
+Pvec_list <- list()
+for(i in 1:n_groups){
+  this_group <- groups[i]
+  Pvec <- rep(0, n_all_ts)
+  ind <- which(df_group$Group == this_group)
+  ts_in_group <- df_group$Item[ind]
+  n_in_group <- length(ts_in_group)
+  Pvec[ind] <- 1 / n_in_group
+  Pvec_list[[i]] <- Pvec
+  N_in_group[i] <- n_in_group
+}
+Pmat <- as.matrix(do.call(cbind, Pvec_list))
+nrow(Pmat)
+nrow(df_collectiveModes)
+Xkl <- t(Pmat) %*% CollectiveModes^2
+#barplot(Xkl[, 9])
+df_contrib <- as.data.frame(Xkl)
+colnames(df_contrib) <- paste("lambda", c(1:n_collectiveModes))
+df_contrib$Group <- groups
+gathercols <- colnames(df_contrib)[1:n_collectiveModes]
+df_contrib <- gather_(df_contrib, "Lambda", "Value", gathercols)
+gg <- ggplot(df_contrib, aes(x = Group, y = Value)) + geom_bar(stat="identity")
+gg <- gg + facet_wrap(~ Lambda, nrow = floor(n_collectiveModes / 2)) + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+gg
+
+
+
