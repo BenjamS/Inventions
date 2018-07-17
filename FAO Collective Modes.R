@@ -1,4 +1,4 @@
-setwd('D:/OneDrive - CGIAR/Documents')
+#setwd('D:/OneDrive - CGIAR/Documents')
 library(stats)
 library(plyr)
 library(ggplot2)
@@ -79,11 +79,13 @@ LAC <- c("Central America", "Caribbean", "South America")
 Europe_E <- "Eastern Europe"
 Europe_WNS <- c("Southern Europe", "Western Europe", "Northern Europe")
 SSA <- c("Eastern Africa", "Southern Africa", "Western Africa", "Middle Africa")
+ESE_Asia <- c("South-Eastern Asia", "Eastern Asia")
 u <- ExportData$Area
 ExportData$Area[which(u %in% LAC)] <- "LAC"
 ExportData$Area[which(u %in% Europe_E)] <- "E. Europe"
 ExportData$Area[which(u %in% Europe_WNS)] <- "W., N., & S. Europe"
 ExportData$Area[which(u %in% SSA)] <- "Sub-Saharan Africa"
+ExportData$Area[which(u %in% ESE_Asia)] <- "E. & S.E. Asia"
 #--
 ExportData <- subset(ExportData, Item %in% item_vec)
 ExportData <- ExportData %>% group_by(Area, Year, Item, Element) %>% summarise(Value = sum(Value))
@@ -103,7 +105,7 @@ ExportData$Value[which(is.na(u) == T | is.nan(u) == T)] <- 0
 #which(is.na(ExportData$Item) == T)
 ExportData <- ExportData %>% group_by(Area, Year, Group, Item, Element) %>% summarise(Value = sum(Value))
 #-----------------------------
-this_region <- "South-Eastern Asia"
+this_region <- "E. & S.E. Asia"
 #this_region <- "World"
 #-----------------------------
 df_price <- ExportData
@@ -152,11 +154,12 @@ row.names(df_mat) <- df_mat$Year
 df_mat$Year <- NULL
 colnames(df_mat)
 df_mat <- df_mat[, col_order]
-ts_mat <- diff(as.matrix(log(df_mat)))
+difflnMat <- diff(as.matrix(log(df_mat)))
+ts_mat <- difflnMat
 cormat <- cor(ts_mat)
 image(cormat)
 #--
-eig_vectors <- eigen(cormat)$vectors
+eig_vectors <- -eigen(cormat)$vectors
 lam_cor <- eigen(cormat)$values
 lamcor_max <- max(lam_cor)
 N_t <- nrow(ts_mat)
@@ -178,7 +181,8 @@ ind_deviating_from_noise <- which(lam_cor > lamrand_max)
 CollectiveModes <- as.matrix(eig_vectors[, ind_deviating_from_noise])
 df_collectiveModes <- as.data.frame(CollectiveModes)
 n_collectiveModes <- ncol(CollectiveModes)
-
+print(paste("Number of collective modes: ", n_collectiveModes))
+#Contributions of groups to each mode
 n_all_ts <- length(col_order)
 groups <- unique(df_group$Group)
 n_groups <- length(groups)
@@ -207,18 +211,69 @@ df_contrib <- gather_(df_contrib, "Lambda", "Value", gathercols)
 gg <- ggplot(df_contrib, aes(x = Group, y = Value)) + geom_bar(stat="identity")
 gg <- gg + facet_wrap(~ Lambda, nrow = floor(n_collectiveModes / 2)) + theme(axis.text.x = element_text(angle = 60, hjust = 1))
 gg
+#Symmetric and Anti-Symmetric Combinations of contributions to modes
+SymmComb <- (CollectiveModes[, 1] + CollectiveModes[, 2]) / sqrt(2)
+AntiSymmComb <- (CollectiveModes[, 1] - CollectiveModes[, 2]) / sqrt(2)
+
+Xkl <- t(Pmat) %*% cbind(SymmComb, AntiSymmComb)^2
+#barplot(Xkl[, 9])
+df_contrib <- as.data.frame(Xkl)
+colnames(df_contrib) <- c("SymmComb12", "AntiSymmComb12")
+df_contrib$Group <- groups
+gathercols <- colnames(df_contrib)[1:n_collectiveModes]
+df_contrib <- gather_(df_contrib, "Lambda", "Value", gathercols)
+gg <- ggplot(df_contrib, aes(x = Group, y = Value)) + geom_bar(stat="identity")
+gg <- gg + facet_wrap(~ Lambda, nrow = floor(n_collectiveModes / 2)) + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+gg
+
+# Collective mode time series
+#ts_Coll_mat <- difflnMat %*% CollectiveModes
+#ts_avg <- difflnMat %*% rep(1, n_all_ts) * 1 / n_all_ts
+#ts_Coll_mat <- as.matrix(df_mat) %*% cbind(CollectiveModes, cbind(SymmComb, AntiSymmComb))
+ts_Coll_mat <- as.matrix(df_mat) %*% CollectiveModes
+#ts_Coll_mat[, 2] <- -ts_Coll_mat[, 2]
+ts_avg <- as.matrix(df_mat) %*% rep(1, n_all_ts) * 1 / n_all_ts
+# class(ts_Coll_mat)
+# class(ts_avg)
+df_plot <- data.frame(Avg = ts_avg, ts_Coll_mat)
+df_plot$Year = as.integer(row.names(df_plot))
+gathercols <- colnames(df_plot[, c(1:(ncol(df_plot) - 1))])
+df_plot <- df_plot %>% gather_("Type", "Value", gathercols)
+zdf_plot <- df_plot %>% group_by(Type) %>% mutate(Value = scale(Value))
+
+gg <- ggplot(zdf_plot, aes(x = Year, y = Value, group = Type, color = Type))
+gg <- gg + geom_line()
+gg
 
 
+library(fractal)
+ts_Coll_mat <- difflnMat %*% CollectiveModes
+DFA(ts_Coll_mat[, 2])
 
-
-
-
-
-
-
-
-
-
+# #===================
+# # Aside:
+# # Reverse engineering a correlation matrix
+# nrow <- 10
+# ncol <- 10
+# Pmat1 <- matrix(rbinom(nrow*ncol, 1, .5), nrow, ncol)
+# n_vec <- as.vector(Pmat1 %*% rep(1, nrow))
+# Pmat1 <- diag(1 / n_vec, nrow, ncol) %*% Pmat1
+# invPmat1 <- solve(Pmat1)
+# n_eigenvecs <- 3
+# xx <- matrix(exp(rnorm(nrow * n_eigenvecs)), nrow, n_eigenvecs) 
+# Contribution_estimated <- sweep(xx, 2, colSums(xx), FUN="/")
+# colSums(Contribution_estimated)
+# #--
+# df_contrib <- as.data.frame(Contribution_estimated)
+# colnames(df_contrib) <- paste("lambda", c(1:n_eigenvecs))
+# df_contrib$Group <- letters[1:ncol]
+# gathercols <- colnames(df_contrib)[1:n_eigenvecs]
+# df_contrib <- gather_(df_contrib, "Lambda", "Value", gathercols)
+# gg <- ggplot(df_contrib, aes(x = Group, y = Value)) + geom_bar(stat="identity")
+# gg <- gg + facet_wrap(~ Lambda, nrow = floor(n_eigenvecs / 2)) + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+# gg
+# eigen_vectors_sq <- invPmat1 %*% Contribution_estimated
+# #=====================
 
 
 
