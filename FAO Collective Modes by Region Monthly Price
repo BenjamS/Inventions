@@ -125,7 +125,260 @@ df_raw$Group[which(u %in% textileIndustrial_vec)] <- "Textiles & Industrial"
 df_raw$Group[which(u %in% Oil_vec)] <- "Oil crops"
 df_raw$Group[which(u %in% Fruit_vec)] <- "Fruit"
 #--
+df_raw$YearMonth <- as.character(paste(df_raw$Year, df_raw$Months))
+df_raw$YearMonth <- as.yearmon(df_raw$YearMonth, format = "%Y %B")
+#library(zoo)
+#--
 df <- subset(df_raw, Item %in% item_vec)
+#--
+#===
+these_regions <- c("E. & S.E. Asia")
+#these_items <- c("Cassava", "Maize", "Wheat", "Rice, paddy")
+these_groups <- c("RnT")
+df_plot <- subset(df, Region %in% these_regions)
+#df_plot <- subset(df_plot, Item %in% these_items)
+df_plot <- subset(df_plot, Group %in% these_groups)
+#unique(df_plot$Area)
+df_plot <- df_plot %>% group_by(Area, Item, Year) %>% mutate(zValue = scale(Value))
+df_plot <- as.data.frame(df_plot)
+gg <- ggplot(df_plot, aes(x = YearMonth, y = zValue, group = Item, color = Item))
+gg <- gg + geom_line() + facet_wrap(~Area, ncol = 2, scales = "free")
+gg
+
+#=============================
+# Interpolate missing data by
+# leveraging inherent periodicity of
+# monthly price data.
+Interpol <- list()
+#=============================
+# Malaysia Cassava
+df_plot2 <- subset(df, Item == "Cassava" & Area == "Malaysia")
+df_plot2 <- df_plot2 %>% group_by(Area, Item, Year) %>% mutate(zValue = scale(Value))
+df_plot2 <- as.data.frame(df_plot2)
+df_plot2 <- df_plot2[, c("YearMonth", "zValue")]
+#diff(which(is.na(df_plot2$zValue) == F))
+#df_plot2 <- df_plot2[which(is.na(df_plot2$zValue) == F), ]
+ggplot(df_plot2, aes(x = YearMonth, y = zValue)) + geom_line()
+#diff(which(is.na(df_plot2$zValue) == F))
+ts <- df_plot2$zValue[which(is.na(df_plot2$zValue) == F)]
+t <- 1:length(ts)
+ssp <- spectrum(ts)
+df_per <- data.frame(per = 1 / ssp$freq, spec = ssp$spec)
+df_per <- df_per[order(df_per$spec, decreasing = T), ]
+df_per
+per1 <- df_per$per[1]
+per2 <- df_per$per[2]
+per3 <- df_per$per[3]
+per4 <- df_per$per[4]
+per5 <- df_per$per[5]
+per6 <- df_per$per[6]
+per7 <- df_per$per[7]
+per8 <- df_per$per[8]
+per9 <- df_per$per[9]
+per10 <- df_per$per[10]
+per11 <- df_per$per[11]
+per12 <- df_per$per[12]
+per13 <- df_per$per[13]
+per14 <- df_per$per[14]
+per15 <- df_per$per[15]
+#--
+reslm <- lm(ts ~ -1 + sin(2 * pi / per1 * t) + cos(2 * pi / per1 * t) +
+              sin(2 * pi / per2 * t) + 
+              sin(2 * pi / per3 * t) +
+              sin(2 * pi / per4 * t) +
+              sin(2 * pi / per5 * t) +
+              sin(2 * pi / per6 * t) +
+              sin(2 * pi / per7 * t) +
+              cos(2 * pi / per8 * t) +
+              cos(2 * pi / per9 * t) +
+              cos(2 * pi / per10 * t) +
+              sin(2 * pi / per12 * t) +
+              sin(2 * pi / per13 * t) + cos(2 * pi / per13 * t) +
+              sin(2 * pi / per14 * t)
+            )
+summary(reslm)
+rg <- diff(range(ts))
+plot(ts~t,ylim=c(min(ts)-0.1*rg,max(ts)+0.1*rg))
+lines(fitted(reslm)~t,col=4,lty=2)   # dashed blue line is sin fit
+#--
+yhat <- fitted(reslm)
+noise <- rnorm(length(yhat), 0, 0.2)
+df_plot3 <- df_plot2
+df_plot3$sinApprox <- NA
+df_plot3$sinApprox[which(is.na(df_plot3$zValue) == F)] <- yhat + noise
+df_plot3 <- df_plot3 %>% gather(Type, ts, zValue:sinApprox)
+gg <- ggplot(df_plot3, aes(x = YearMonth, y = ts, color = Type))
+gg <- gg + geom_line()
+gg
+#--
+df_plot3 <- df_plot2
+df_plot3$sinApprox <- NA
+df_plot3$sinApprox[which(is.na(df_plot3$zValue) == T)] <- yhat + noise
+df_plot3 <- df_plot3 %>% gather(Type, ts, zValue:sinApprox)
+gg <- ggplot(df_plot3, aes(x = YearMonth, y = ts, color = Type))
+gg <- gg + geom_line()
+gg
+#--
+df_plot4 <- df_plot2
+df_plot4$zValue[which(is.na(df_plot2$zValue))] <- yhat + noise
+ggplot(df_plot4, aes(x = YearMonth, y = zValue)) + geom_line()
+Interpol[[1]] <- data.frame(YearMonth = df_plot4$YearMonth, Cassava_Malaysia = df_plot4$zValue)
+#=============================
+# Indonesia Cassava
+df_plot2 <- subset(df, Item == "Cassava" & Area == "Indonesia")
+df_plot2 <- df_plot2 %>% group_by(Area, Item, Year) %>% mutate(zValue = scale(Value))
+df_plot2 <- as.data.frame(df_plot2)
+df_plot2 <- df_plot2[, c("YearMonth", "zValue")]
+#diff(which(is.na(df_plot2$zValue) == F))
+#df_plot2 <- df_plot2[which(is.na(df_plot2$zValue) == F), ]
+ggplot(df_plot2, aes(x = YearMonth, y = zValue)) + geom_line()
+#diff(which(is.na(df_plot2$zValue) == F))
+ts <- df_plot2$zValue[which(is.na(df_plot2$zValue) == F)]
+t <- 1:length(ts)
+ssp <- spectrum(ts)
+df_per <- data.frame(per = 1 / ssp$freq, spec = ssp$spec)
+df_per <- df_per[order(df_per$spec, decreasing = T), ]
+df_per
+per1 <- df_per$per[1]
+per2 <- df_per$per[2]
+# per3 <- df_per$per[3]
+# per4 <- df_per$per[4]
+# per5 <- df_per$per[5]
+# per6 <- df_per$per[6]
+# per7 <- df_per$per[7]
+# per8 <- df_per$per[8]
+# per9 <- df_per$per[9]
+# per10 <- df_per$per[10]
+# per11 <- df_per$per[11]
+# per12 <- df_per$per[12]
+reslm <- lm(ts ~ -1 + sin(2 * pi / per1 * t) + cos(2 * pi / per1 * t) +
+              sin(2 * pi / per2 * t) + cos(2 * pi / per2 * t))
+summary(reslm)
+rg <- diff(range(ts))
+plot(ts~t,ylim=c(min(ts)-0.1*rg,max(ts)+0.1*rg))
+lines(fitted(reslm)~t,col=4,lty=2)   # dashed blue line is sin fit
+#--
+df_plot3 <- df_plot2
+df_plot3$sinApprox <- NA
+df_plot3$sinApprox[which(is.na(df_plot3$zValue) == F)] <- fitted(reslm)
+df_plot3 <- df_plot3 %>% gather(Type, ts, zValue:sinApprox)
+gg <- ggplot(df_plot3, aes(x = YearMonth, y = ts, color = Type))
+gg <- gg + geom_line()
+gg
+#--
+df_plot3 <- df_plot2
+df_plot3$sinApprox <- NA
+df_plot3$sinApprox[which(is.na(df_plot3$zValue) == T)] <- fitted(reslm)
+df_plot3 <- df_plot3 %>% gather(Type, ts, zValue:sinApprox)
+gg <- ggplot(df_plot3, aes(x = YearMonth, y = ts, color = Type))
+gg <- gg + geom_line()
+gg
+#--
+df_plot4 <- df_plot2
+df_plot4$zValue[which(is.na(df_plot4$zValue))] <- fitted(reslm)
+ggplot(df_plot4, aes(x = YearMonth, y = zValue)) + geom_line()
+Interpol[[2]] <- data.frame(YearMonth = df_plot4$YearMonth, Cassava_Malaysia = df_plot4$zValue)
+#=============================
+# Vietnam Maize
+df_plot2 <- subset(df, Item == "Maize" & Area == "Viet Nam")
+df_plot2 <- df_plot2 %>% group_by(Area, Item, Year) %>% mutate(zValue = scale(Value))
+df_plot2 <- as.data.frame(df_plot2)
+df_plot2 <- df_plot2[, c("YearMonth", "zValue")]
+diff(which(is.na(df_plot2$zValue) == F))
+which(is.na(df_plot2$zValue) == F)
+#df_plot2 <- df_plot2[which(is.na(df_plot2$zValue) == F), ]
+ggplot(df_plot2, aes(x = YearMonth, y = zValue)) + geom_line()
+ind <- which(is.na(df_plot2$zValue) == F)
+# ind <- ind[1]:ind[length(ind)]
+# u <- df_plot2$zValue
+# df_plot2$zValue[ind[which(is.na(u[ind]))]] <- 0
+#df_plot2$zValue[ind]
+which(is.na(df_plot2$zValue) == F)
+df_plot2$zValue[c(15, 18, 21)] <- NA
+diff(which(is.na(df_plot2$zValue) == F))
+ts <- df_plot2$zValue[24:60]
+t <- 1:length(ts)
+ssp <- spectrum(ts)
+df_per <- data.frame(per = 1 / ssp$freq, spec = ssp$spec)
+df_per <- df_per[order(df_per$spec, decreasing = T), ]
+df_per
+per1 <- df_per$per[1]
+per2 <- df_per$per[2]
+per3 <- df_per$per[3]
+per4 <- df_per$per[4]
+per5 <- df_per$per[5]
+per6 <- df_per$per[6]
+per7 <- df_per$per[7]
+per8 <- df_per$per[8]
+per9 <- df_per$per[9]
+per10 <- df_per$per[10]
+per11 <- df_per$per[11]
+per12 <- df_per$per[12]
+per13 <- df_per$per[13]
+per14 <- df_per$per[14]
+per15 <- df_per$per[15]
+#--
+reslm <- lm(ts ~ -1 + sin(2 * pi / per1 * t) + cos(2 * pi / per1 * t) +
+              sin(2 * pi / per2 * t) + 
+              sin(2 * pi / per3 * t) + cos(2 * pi / per3 * t) +
+              cos(2 * pi / per4 * t) +
+              sin(2 * pi / per5 * t) + cos(2 * pi / per5 * t) +
+              cos(2 * pi / per6 * t)
+)
+summary(reslm)
+rg <- diff(range(ts))
+plot(ts~t,ylim=c(min(ts)-0.1*rg,max(ts)+0.1*rg))
+lines(fitted(reslm)~t,col=4,lty=2)   # dashed blue line is sin fit
+#--
+yhat <- fitted(reslm)
+noise <- rnorm(length(yhat), 0, 0.2)
+df_plot3 <- df_plot2
+df_plot3$sinApprox <- NA
+df_plot3$sinApprox[which(is.na(df_plot3$zValue) == F)] <- yhat + noise
+df_plot3 <- df_plot3 %>% gather(Type, ts, zValue:sinApprox)
+gg <- ggplot(df_plot3, aes(x = YearMonth, y = ts, color = Type))
+gg <- gg + geom_line()
+gg
+#--
+df_plot3 <- df_plot2
+df_plot3$sinApprox <- NA
+df_plot3$sinApprox[which(is.na(df_plot3$zValue) == T)] <- yhat + noise
+df_plot3 <- df_plot3 %>% gather(Type, ts, zValue:sinApprox)
+gg <- ggplot(df_plot3, aes(x = YearMonth, y = ts, color = Type))
+gg <- gg + geom_line()
+gg
+#--
+df_plot4 <- df_plot2
+df_plot4$zValue[which(is.na(df_plot2$zValue))] <- yhat + noise
+ggplot(df_plot4, aes(x = YearMonth, y = zValue)) + geom_line()
+Interpol[[3]] <- data.frame(YearMonth = df_plot4$YearMonth, Maize_Vietnam = df_plot4$zValue)
+#=============================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 df <- df %>% group_by(Region, Area, Year, Item) %>%
   mutate(nMiss = length(which(is.na(Value))))
