@@ -1,12 +1,11 @@
-setwd('D:/OneDrive - CGIAR/Documents')
+#setwd('D:/OneDrive - CGIAR/Documents')
 library(stats)
 library(plyr)
 library(ggplot2)
 library(ggrepel)
 library(dplyr)
 library(tidyr)
-library(TSA)
-
+library(zoo)
 
 #-----------
 #--Africa
@@ -131,10 +130,49 @@ df_raw$YearMonth <- as.yearmon(df_raw$YearMonth, format = "%Y %B")
 #--
 df <- subset(df_raw, Item %in% item_vec)
 #--
-#===
+#==========
+
 these_regions <- c("E. & S.E. Asia")
 #these_items <- c("Cassava", "Maize", "Wheat", "Rice, paddy")
+#these_groups <- c("Cereals")
 these_groups <- c("RnT")
+#these_groups <- c("Oil crops")
+#these_groups <- c("Textiles & Industrial")
+df_clean <- subset(df, Region %in% these_regions)
+#df_plot <- subset(df_plot, Item %in% these_items)
+df_clean <- subset(df_clean, Group %in% these_groups)
+df_clean <- df_clean %>% group_by(Area, Item, Year) %>% mutate(zValue = scale(Value))
+df_clean <- as.data.frame(df_clean)
+gg <- ggplot(df_clean, aes(x = YearMonth, y = zValue, group = Item, color = Item))
+gg <- gg + geom_line() + facet_wrap(~Area, ncol = 2, scales = "free")
+gg
+months_vec <- unique(df_clean$Months)
+df_clean <- as.data.frame(df_clean %>% group_by(Area, Item, Year) %>%
+  mutate(nMonths = length(Months)))
+df_clean <- subset(df_clean, nMonths == 12)
+unique(df_clean$Area)
+gg <- ggplot(df_clean, aes(x = YearMonth, y = zValue, group = Item, color = Item))
+gg <- gg + geom_line() + facet_wrap(~Area, ncol = 2, scales = "free")
+gg
+df_clean <- as.data.frame(df_clean %>% group_by(Area, Item) %>%
+  mutate(isMiss = ifelse(is.nan(Value) | is.na(Value) | is.infinite(Value), 1, 0)))
+df_clean <- as.data.frame(df_clean %>% group_by(Area, Item) %>%
+  mutate(nMiss = sum(isMiss)))
+df_clean <- subset(df_clean, nMiss <= 20)
+gg <- ggplot(df_clean, aes(x = YearMonth, y = zValue, group = Item, color = Item))
+gg <- gg + geom_line() + facet_wrap(~Area, ncol = 2, scales = "free")
+gg
+
+
+
+
+
+
+#==========
+these_regions <- c("E. & S.E. Asia")
+#these_items <- c("Cassava", "Maize", "Wheat", "Rice, paddy")
+#these_groups <- c("Oil crops")
+these_groups <- c("Textiles & Industrial")
 df_plot <- subset(df, Region %in% these_regions)
 #df_plot <- subset(df_plot, Item %in% these_items)
 df_plot <- subset(df_plot, Group %in% these_groups)
@@ -144,7 +182,13 @@ df_plot <- as.data.frame(df_plot)
 gg <- ggplot(df_plot, aes(x = YearMonth, y = zValue, group = Item, color = Item))
 gg <- gg + geom_line() + facet_wrap(~Area, ncol = 2, scales = "free")
 gg
-
+#=============================
+Philippines_Rubber <- subset(df, Area == "Philippines" & Item == "Rubber, natural")
+China_Sugar <- subset(df, Area == "China, mainland" & Item == "Sugar cane")
+Vietnam_Rubber <- subset(df, Area == "Viet Nam" & Item == "Rubber, natural")
+df_keep <- data.frame(Philippines_Rubber = 
+  
+)
 #=============================
 # Interpolate missing data by
 # leveraging inherent periodicity of
@@ -166,42 +210,66 @@ ssp <- spectrum(ts)
 df_per <- data.frame(per = 1 / ssp$freq, spec = ssp$spec)
 df_per <- df_per[order(df_per$spec, decreasing = T), ]
 df_per
-per1 <- df_per$per[1]
-per2 <- df_per$per[2]
-per3 <- df_per$per[3]
-per4 <- df_per$per[4]
-per5 <- df_per$per[5]
-per6 <- df_per$per[6]
-per7 <- df_per$per[7]
-per8 <- df_per$per[8]
-per9 <- df_per$per[9]
-per10 <- df_per$per[10]
-per11 <- df_per$per[11]
-per12 <- df_per$per[12]
-per13 <- df_per$per[13]
-per14 <- df_per$per[14]
-per15 <- df_per$per[15]
+
+# per1 <- df_per$per[1]
+# per2 <- df_per$per[2]
+# per3 <- df_per$per[3]
+# per4 <- df_per$per[4]
+# per5 <- df_per$per[5]
+# per6 <- df_per$per[6]
+# per7 <- df_per$per[7]
+# per8 <- df_per$per[8]
+# per9 <- df_per$per[9]
+# per10 <- df_per$per[10]
+# per11 <- df_per$per[11]
+# per12 <- df_per$per[12]
+# per13 <- df_per$per[13]
+# per14 <- df_per$per[14]
+# per15 <- df_per$per[15]
+# #--
+# reslm <- lm(ts ~ -1 + sin(2 * pi / per1 * t) + cos(2 * pi / per1 * t) +
+#               sin(2 * pi / per2 * t) + 
+#               sin(2 * pi / per3 * t) +
+#               sin(2 * pi / per4 * t) +
+#               sin(2 * pi / per5 * t) +
+#               sin(2 * pi / per6 * t) +
+#               sin(2 * pi / per7 * t) +
+#               cos(2 * pi / per8 * t) +
+#               cos(2 * pi / per9 * t) +
+#               cos(2 * pi / per10 * t) +
+#               sin(2 * pi / per12 * t) +
+#               sin(2 * pi / per13 * t) + cos(2 * pi / per13 * t) +
+#               sin(2 * pi / per14 * t)
+# )
+# summary(reslm)
+# rg <- diff(range(ts))
+# plot(ts~t,ylim=c(min(ts)-0.1*rg,max(ts)+0.1*rg))
+# lines(fitted(reslm)~t,col=4,lty=2)   # dashed blue line is sin fit
+
+per <- df_per$per
+n_periods <- 14
+regrsrs_sin <- paste0("sin(2 * pi / per[", c(1:n_periods), "] * t)", collapse = " + ")
+regrsrs_cos <- paste0("cos(2 * pi / per[", c(1:n_periods), "] * t)", collapse = " + ")
+regrsrs <- paste(regrsrs_sin, regrsrs_cos, sep = " + ")
+this_formula <- as.formula(paste("ts ~ -1 +", regrsrs)[1])
+linmod <- lm(this_formula)
+summod <- summary(linmod)
+print(summod)
+pvals <- as.numeric(summod$coefficients[, 4])
+ind_rm <- which(pvals > 0.05)
+regrsrs_char <- strsplit(as.character(regrsrs), " \\+ ")[[1]]
+length(regrsrs_char)
+regrsrs_char <- regrsrs_char[-ind_rm]
+length(regrsrs_char)
+regrsrs <- paste(regrsrs_char, collapse = " + ")
+this_formula <- as.formula(paste("ts ~ -1 +", regrsrs)[1])
+linmod <- lm(this_formula)
+summod <- summary(linmod)
+print(summod)
 #--
-reslm <- lm(ts ~ -1 + sin(2 * pi / per1 * t) + cos(2 * pi / per1 * t) +
-              sin(2 * pi / per2 * t) + 
-              sin(2 * pi / per3 * t) +
-              sin(2 * pi / per4 * t) +
-              sin(2 * pi / per5 * t) +
-              sin(2 * pi / per6 * t) +
-              sin(2 * pi / per7 * t) +
-              cos(2 * pi / per8 * t) +
-              cos(2 * pi / per9 * t) +
-              cos(2 * pi / per10 * t) +
-              sin(2 * pi / per12 * t) +
-              sin(2 * pi / per13 * t) + cos(2 * pi / per13 * t) +
-              sin(2 * pi / per14 * t)
-            )
-summary(reslm)
-rg <- diff(range(ts))
-plot(ts~t,ylim=c(min(ts)-0.1*rg,max(ts)+0.1*rg))
-lines(fitted(reslm)~t,col=4,lty=2)   # dashed blue line is sin fit
-#--
-yhat <- fitted(reslm)
+yhat <- fitted(linmod)
+# plot(t, ts)
+# lines(t, yhat)
 noise <- rnorm(length(yhat), 0, 0.2)
 df_plot3 <- df_plot2
 df_plot3$sinApprox <- NA
