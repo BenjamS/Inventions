@@ -1,0 +1,119 @@
+FAOdat_createRegionGroups <- function(df_raw, exclude_these)
+{
+  #=================================
+  #--Africa
+  countries_NAfrica <- as.character(unique(read.csv("Country list - Northern Africa.csv")[,"Area"]))
+  countries_MAfrica <- as.character(unique(read.csv("Country list - Middle Africa.csv")[,"Area"]))
+  countries_WAfrica <- as.character(unique(read.csv("Country list - Western Africa.csv")[,"Area"]))
+  countries_EAfrica <- as.character(unique(read.csv("Country list - Eastern Africa.csv")[,"Area"]))
+  countries_SAfrica <- as.character(unique(read.csv("Country list - Southern Africa.csv")[,"Area"]))
+  #--Americas
+  countries_SAmer <- as.character(unique(read.csv("Country list - South America.csv")[,"Area"]))
+  countries_CAmer <- as.character(unique(read.csv("Country list - Central America.csv")[,"Area"]))
+  countries_Carib <- as.character(unique(read.csv("Country list - Caribbean.csv")[,"Area"]))
+  countries_NAmer <- as.character(unique(read.csv("Country list - Northern America.csv")[,"Country"]))
+  #--Asia
+  countries_EAsia <- as.character(unique(read.csv("Country list - Eastern Asia.csv")[,"Area"]))
+  #countries_EAsia <- countries_EAsia[!(countries_EAsia %in% c("China, Hong Kong SAR", "China, Macao SAR"))]
+  countries_SEAsia <- as.character(unique(read.csv("Country list - South-Eastern Asia.csv")[,"Area"]))
+  countries_SAsia <- as.character(unique(read.csv("Country list - Southern Asia.csv")[,"Area"]))
+  countries_WAsia <- as.character(unique(read.csv("Country list - Western Asia.csv")[,"Area"]))
+  countries_CAsia <- as.character(unique(read.csv("Country list - Central Asia.csv")[,"Area"]))
+  #--Europe
+  countries_NEurope <- as.character(unique(read.csv("Country list - Northern Europe.csv")[,"Area"]))
+  countries_WEurope <- as.character(unique(read.csv("Country list - Western Europe.csv")[,"Area"]))
+  countries_EEurope <- as.character(unique(read.csv("Country list - Eastern Europe.csv")[,"Area"]))
+  countries_SEurope <- as.character(unique(read.csv("Country list - Southern Europe.csv")[,"Area"]))
+  #--Oceania
+  countries_Oceania <- as.character(unique(read.csv("Country list - Oceania.csv")[,"Area"]))
+  countries_AusNZea <- c("Australia", "New Zealand")
+  countries_PacifIs <- setdiff(countries_Oceania, countries_AusNZea)
+  #=================================
+  #--Create region groupings
+  u <- df_raw$Area
+  df_raw$Region <- NA
+  df_raw$Region[which(u %in% countries_NAmer)] <- "North America"
+  df_raw$Region[which(u %in% countries_SAmer)] <- "South America"
+  df_raw$Region[which(u %in% countries_CAmer)] <- "Central America"
+  df_raw$Region[which(u %in% countries_Carib)] <- "Caribbean"
+  df_raw$Region[which(u %in% countries_NAfrica)] <- "Northern Africa"
+  df_raw$Region[which(u %in% countries_SAfrica)] <- "Southern Africa"
+  df_raw$Region[which(u %in% countries_WAfrica)] <- "Western Africa"
+  df_raw$Region[which(u %in% countries_EAfrica)] <- "Eastern Africa"
+  df_raw$Region[which(u %in% countries_MAfrica)] <- "Middle Africa"
+  df_raw$Region[which(u %in% countries_CAsia)] <- "Central Asia"
+  df_raw$Region[which(u %in% countries_WAsia)] <- "Western Asia"
+  df_raw$Region[which(u %in% countries_SAsia)] <- "Southern Asia"
+  df_raw$Region[which(u %in% countries_EAsia)] <- "Eastern Asia"
+  df_raw$Region[which(u %in% countries_SEAsia)] <- "South-Eastern Asia"
+  df_raw$Region[which(u %in% countries_NEurope)] <- "Northern Europe"
+  df_raw$Region[which(u %in% countries_SEurope)] <- "Southern Europe"
+  df_raw$Region[which(u %in% countries_WEurope)] <- "Western Europe"
+  df_raw$Region[which(u %in% countries_EEurope)] <- "Eastern Europe"
+  df_raw$Region[which(u %in% countries_PacifIs)] <- "Pacific Islands"
+  df_raw$Region[which(u %in% countries_AusNZea)] <- "Australia & New Zealand"
+  rm(u)
+  #--------------------
+  #--See what countries escaped designation
+  #unique(df_raw$Area[which(is.na(df_raw$Region))])
+  #--Assign these to their proper regions
+  #(Leave out "China" as it is already covered under "China, mainlaind", "Hong Kong", etc.)
+  u <- df_raw$Area
+  df_raw$Region[which(u %in% c("Åland Islands", "Isle of Man", "Greenland"))] <- "Northern Europe"
+  df_raw$Region[which(u %in% c("Anguilla", "Bermuda", "Cayman Islands", "Curaçao"))] <- "Caribbean"
+  df_raw$Region[which(u %in% c("Côte d'Ivoire"))] <- "Western Africa"
+  df_raw$Region[which(u %in% c("Palau"))] <- "Pacific Islands"
+  df_raw$Region[which(u %in% c("Maldives", "Réunion"))] <- "Southern Asia"
+  df_raw$Region[which(u %in% c("French Guiana"))] <- "South America"
+  df_raw <- df_raw[which(is.na(df_raw$Region) == F),]
+  rm(u)
+  #--
+  df_raw <- subset(df_raw, !(Area %in% exclude_these))
+  #--
+  # LAC <- c("Central America", "Caribbean", "South America")
+  # Europe_E <- "Eastern Europe"
+  # Europe_WNS <- c("Southern Europe", "Western Europe", "Northern Europe")
+  # SSA <- c("Eastern Africa", "Southern Africa", "Western Africa", "Middle Africa")
+  # ESE_Asia <- c("South-Eastern Asia", "Eastern Asia")
+  #--
+  # u <- df_raw$Region
+  # df_raw$Region[which(u %in% LAC)] <- "LAC"
+  # df_raw$Region[which(u %in% Europe_E)] <- "E. Europe"
+  # df_raw$Region[which(u %in% Europe_WNS)] <- "W., N., & S. Europe"
+  # df_raw$Region[which(u %in% SSA)] <- "Sub-Saharan Africa"
+  # df_raw$Region[which(u %in% ESE_Asia)] <- "E. & S.E. Asia"
+  # rm(u)
+  #--
+  return(df_raw)
+}
+# regionGroups_vec <- paste0("countries_",
+#                            #--Africa
+#                            c("NAfrica", "MAfrica",
+#                              "WAfrica", "EAfrica",
+#                              "SAfrica",
+#                              #--Americas
+#                              "SAmer", "CAmer",
+#                              "Carib", "NAmer",
+#                              #--Asia
+#                              "EAsia",
+#                              "SEAsia", "SAsia",
+#                              "WAsia", "CAsia",
+#                              #--Europe
+#                              "NEurope", "EEurope",
+#                              "WEurope", "SEurope",
+#                              #--Oceania
+#                              "Oceania", "AusNZea",
+#                              "PacifIs"))
+# #=================================
+# countries_NAfrica <- as.character(unique(read.csv("Country list - Northern Africa.csv")[,"Area"]))
+# 
+# ind_load <- which(exists(regionGroups_vec[4]) == F)
+# 
+# "Northern Africa"
+# "Middle Africa"
+# "Western Africa"
+# "Eastern Africa"
+# "Southern Africa"
+# #--Americas
+# "South America"
+# "Central America"
