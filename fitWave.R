@@ -64,8 +64,13 @@ fitWave <- function(ts, t, t_proj = NA, n_max_periods = 15, pval_thresh = 0.05, 
     print(summod)
     print(paste("Number periods fitted:", length(fitted_periods)))
     print(fitted_periods)
+    print(df_per[1:n_max_periods, ])
     }
   wavfit <- fitted(linmod)
-  outlist <- list(wavfit, wavproj)
-  return(outlist)
+  if(is.numeric(t_proj)){
+    outlist <- list(wavfit, wavproj)
+    return(outlist)
+  }else{
+    return(wavfit)
+  }
 }
