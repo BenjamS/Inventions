@@ -1,4 +1,4 @@
-#setwd('D:/OneDrive - CGIAR/Documents')
+setwd('D:/OneDrive - CGIAR/Documents')
 library(stats)
 library(plyr)
 library(ggplot2)
@@ -7,9 +7,9 @@ library(dplyr)
 library(tidyr)
 library(zoo)
 library(quantmod)
-source('~/collectiveModes.R')
-source('~/FAOdat_createRegionGroups.R')
-source('~/getSlope.R')
+source('./collectiveModes.R')
+source('./FAOdat_createRegionGroups.R')
+#source('./getSlope.R')
 #=================================
 # Important for collectiveModes()
 crop_vec <- c(cerealPrimary_vec, "Cassava", "Potatoes", "Sweet potatoes",
@@ -18,10 +18,10 @@ crop_vec <- c(cerealPrimary_vec, "Cassava", "Potatoes", "Sweet potatoes",
 #--------------------------
 # Exclude specific areas
 exclude_these <- c("Brunei Darussalam", "China, Hong Kong SAR",
-                  "China, Macao SAR", "China, Taiwan Province of",
-                  "Democratic People's Republic of Korea", "Mongolia",
-                  "Singapore", "Timor-Leste", "Lao People's Democratic Republic",
-                  "Republic of Korea", "Myanmar", "Japan", "Malaysia")
+                   "China, Macao SAR", "China, Taiwan Province of",
+                   "Democratic People's Republic of Korea", "Mongolia",
+                   "Singapore", "Timor-Leste", "Lao People's Democratic Republic",
+                   "Republic of Korea", "Myanmar", "Japan", "Malaysia")
 #==========================================
 # Get export price commodity groups ready
 cerealPrimary_vec <- c("Maize", "Wheat", "Barley", "Rice", "Millet", "Rye", "Sorghum")
@@ -45,8 +45,8 @@ teaCoffeeCacao_vec_ExpPrice <- c("Tea", "Cocoa, butter", "Cocoa, paste", "Cocoa,
 textileIndustrial_vec_ExpPrice <- c("Cotton lint", "Wool, greasy", "Wool, degreased", "Rubber, natural", "Cotton, carded, combed")
 #--------------------------
 item_vec_ExpPrice <- c(Cereal_vec_ExpPrice, RnT_vec_ExpPrice, Oil_vec_ExpPrice, Fruit_vec_ExpPrice,
-              Pulses_vec_ExpPrice, Sugar_vec_ExpPrice, teaCoffeeCacao_vec_ExpPrice,
-              textileIndustrial_vec_ExpPrice)
+                       Pulses_vec_ExpPrice, Sugar_vec_ExpPrice, teaCoffeeCacao_vec_ExpPrice,
+                       textileIndustrial_vec_ExpPrice)
 #==========================================
 # Get SUR item groups ready
 Cereal_vec_FoodBal <- c("Wheat and products", "Rice (Milled Equivalent)",
@@ -64,8 +64,8 @@ teaCoffeeCacao_vec_FoodBal <- c("Coffee and products",
 textileIndustrial_vec_FoodBal <- c()
 #--------------------------
 item_vec_FoodBal <- c(Cereal_vec_FoodBal, RnT_vec_FoodBal, Oil_vec_FoodBal, Fruit_vec_FoodBal,
-                       Pulses_vec_FoodBal, Sugar_vec_FoodBal, teaCoffeeCacao_vec_FoodBal,
-                       textileIndustrial_vec_FoodBal)
+                      Pulses_vec_FoodBal, Sugar_vec_FoodBal, teaCoffeeCacao_vec_FoodBal,
+                      textileIndustrial_vec_FoodBal)
 #==========================================
 #==========================================
 #==========================================
@@ -160,6 +160,25 @@ FoodBal_raw$Group[which(u %in% Pulses_vec_FoodBal)] <- "Pulses"
 FoodBal_raw$Group[which(u %in% teaCoffeeCacao_vec_FoodBal)] <- "Tea, coffee, cacao"
 FoodBal_raw$Group[which(u %in% textileIndustrial_vec_FoodBal)] <- "Industrial (textile, rubber)"
 #------------------------------------------
+# Create stocks-to-use, supply-demand ratios, etc.
+# See FAO documentation for guidance
+# http://www.fao.org/economic/the-statistics-division-ess/methodology/methodology-systems/supply-utilization-accounts-and-food-balance-sheets-background-information-for-your-better-understanding/en/
+# Helpful notes:
+# from stocks + production + imports = exports + feed + seed + waste + processing for food + food + other utilization
+# production + imports = exports + feed + seed + waste + processing for food + food + other utilization + to stocks
+# Where "from stocks" means "carry over"
+# and "to stocks" means "ending stocks"
+# Note also that "Domestic supply quantity" is badly named. Should be called "Domestic demand" or "Domestic use".
+# "Domestic supply quantity" = feed + seed + waste + processing for food + food + other utilization
+# Thus:
+# from stocks + production + imports = exports + Domestic supply quantity
+# production + imports = exports + Domestic supply quantity + to stocks
+#--> Carry over = exports + Domestic supply quantity - production - imports
+#-->? Ending stocks = production + imports - exports - Domestic supply quantity
+# ?And since by definition Supply = Carry over + production + imports, then:
+#-->? Supply = (exports + Domestic supply quantity - production - imports) + production + imports
+# = exports + Domestic supply quantity = Demand
+#----------
 #unique(FoodBal_raw$Element)
 FoodBal_raw <- FoodBal_raw %>% spread(Element, Value)
 FoodBal_raw$Demand <- FoodBal_raw$`Export Quantity` +
@@ -211,9 +230,9 @@ FoodBal <- subset(FoodBal, Year >= start_year)
 # Clean
 FoodBal <- as.data.frame(FoodBal %>% mutate(Value = ifelse(is.nan(Value) | is.na(Value) | is.infinite(Value), NA, Value)))
 FoodBal <- as.data.frame(FoodBal %>% 
-                                    mutate(isMiss = ifelse(is.na(Value), 1, 0)))
+                           mutate(isMiss = ifelse(is.na(Value), 1, 0)))
 FoodBal <- as.data.frame(FoodBal %>% group_by(Area, Item) %>%
-                                    mutate(nMiss = sum(isMiss)))
+                           mutate(nMiss = sum(isMiss)))
 FoodBal <- subset(FoodBal, nMiss <= 9)
 unique(FoodBal$Area)
 #unique(FoodBal$isMiss)
@@ -226,7 +245,7 @@ unique(FoodBal$Area)
 #------------------------------------------
 # Scale
 FoodBal <- as.data.frame(FoodBal %>% group_by(Area, Item) %>%
-                                    mutate(zValue = scale(Value)))
+                           mutate(zValue = scale(Value)))
 #------------------------------------------
 # Visually inspect
 gg <- ggplot(FoodBal, aes(x = Year, y = zValue, group = Item, color = Item))
@@ -299,9 +318,9 @@ colnames(ExportData)[ncol(ExportData)] <- "Value"
 # Clean
 ExportData <- as.data.frame(ExportData %>% mutate(Value = ifelse(is.nan(Value) | is.na(Value) | is.infinite(Value), NA, Value)))
 ExportData <- as.data.frame(ExportData %>% 
-                           mutate(isMiss = ifelse(is.na(Value), 1, 0)))
+                              mutate(isMiss = ifelse(is.na(Value), 1, 0)))
 ExportData <- as.data.frame(ExportData %>% group_by(Area, Item) %>%
-                           mutate(nMiss = sum(isMiss)))
+                              mutate(nMiss = sum(isMiss)))
 ExportData <- subset(ExportData, nMiss <= 5)
 unique(ExportData$Area)
 # Lots of items have 0 variation for most of series. Get rid of these.
@@ -311,11 +330,11 @@ unique(ExportData$Area)
 #------------------------------------------
 # Interpolate remaining missing values
 ExportData <- as.data.frame(ExportData %>% group_by(Area, Item) %>%
-                                    mutate(Value = ifelse(isMiss == 1, mean(Value, na.rm = T), Value)))
+                              mutate(Value = ifelse(isMiss == 1, mean(Value, na.rm = T), Value)))
 #------------------------------------------
 # Scale
 ExportData <- as.data.frame(ExportData %>% group_by(Area, Item) %>%
-                           mutate(zValue = scale(Value)))
+                              mutate(zValue = scale(Value)))
 #------------------------------------------
 # Visually inspect
 gg <- ggplot(ExportData, aes(x = Year, y = zValue, group = Item, color = Item))
@@ -423,7 +442,7 @@ ExportData_clean <- subset(ExportData_clean, Group %in% these_groups)
 unique(ExportData_clean$Item)
 
 ExportData_clean <- as.data.frame(ExportData_clean %>% 
-  mutate(Price = ifelse(is.nan(Price) | is.na(Price) | is.infinite(Price), NA, Price)))
+                                    mutate(Price = ifelse(is.nan(Price) | is.na(Price) | is.infinite(Price), NA, Price)))
 ExportData_clean <- as.data.frame(ExportData_clean %>% 
                                     mutate(isMiss = ifelse(is.na(Price), 1, 0)))
 ExportData_clean <- as.data.frame(ExportData_clean %>% group_by(Area, Item) %>%
@@ -660,16 +679,16 @@ df_clean <- as.data.frame(df_clean)
 # gg
 months_vec <- unique(df_clean$Months)
 df_clean <- as.data.frame(df_clean %>% group_by(Area, Item, Year) %>%
-  mutate(nMonths = length(Months)))
+                            mutate(nMonths = length(Months)))
 df_clean <- subset(df_clean, nMonths == 12)
 unique(df_clean$Area)
 gg <- ggplot(df_clean, aes(x = YearMonth, y = zValue, group = Item, color = Item))
 gg <- gg + geom_line() + facet_wrap(~Area, ncol = 2, scales = "free")
 gg
 df_clean <- as.data.frame(df_clean %>% group_by(Area, Item) %>%
-  mutate(isMiss = ifelse(is.nan(Value) | is.na(Value) | is.infinite(Value), 1, 0)))
+                            mutate(isMiss = ifelse(is.nan(Value) | is.na(Value) | is.infinite(Value), 1, 0)))
 df_clean <- as.data.frame(df_clean %>% group_by(Area, Item) %>%
-  mutate(nMiss = sum(isMiss)))
+                            mutate(nMiss = sum(isMiss)))
 df_clean <- subset(df_clean, nMiss <= 20)
 # gg <- ggplot(df_clean, aes(x = YearMonth, y = zValue, group = Item, color = Item))
 # gg <- gg + geom_line() + facet_wrap(~Area, ncol = 2)
@@ -715,7 +734,7 @@ for(i in 1:length(interpol_for_these)){
     df_clean$zValue[ind_replace_na] <- wavproj
   }
   
-
+  
 }
 
 
