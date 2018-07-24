@@ -1,8 +1,9 @@
 collectiveModes <- function(mat_diff, datevec, df_group = NULL,
-                            Contrib_as_ModeSq = T,
-                            AggregateContributions = T,
-                            plot_eigenportfolios = F){
+                            Contrib_as_ModeSq = F,
+                            AggregateContributions = F,
+                            plot_eigenportfolio_ts = F){
   
+  n_ts <- ncol(mat_diff)
   col_order <- colnames(mat_diff)
   cormat <- cor(mat_diff)
   image(cormat)
@@ -34,7 +35,24 @@ collectiveModes <- function(mat_diff, datevec, df_group = NULL,
   # How many collective modes?
   ind_deviating_from_noise <- which(lam_cor > lamrand_max)
   collModes <- as.matrix(eig_vectors[, ind_deviating_from_noise])
+  noiseModes <- as.matrix(eig_vectors[, -ind_deviating_from_noise])
   n_collModes <- ncol(collModes)
+  #-----------------------------
+  # Set sign of eigenvectors such that they
+  # best conform to the input time series
+  Modes <- mat_diff %*% collModes
+  ts_avg <- mat_diff %*% rep(1, n_ts) * 1 / n_ts
+  for(i in 1:n_collModes){
+    sse <- sum((Modes[, i] - ts_avg)^2)
+    sse_neg <- sum((-Modes[, i] - ts_avg)^2)
+    sse_vec <- c(sse, sse_neg)
+    if(which(sse_vec == min(sse_vec)) == 2){
+      collModes[, i] <- -collModes[, i]
+    }
+  }
+  #-----------------------------
+  n_collModes_really <- n_collModes
+  collModes_really <- collModes
   print(paste("Number of collective modes: ", n_collModes))
   if(ncol(collModes) > 6){
     collModes <- collModes[, 1:6]
@@ -47,19 +65,19 @@ collectiveModes <- function(mat_diff, datevec, df_group = NULL,
   }else{
     Contribution <- collModes
   }
-  df_collModes <- data.frame(ts_id = col_order, Contribution)
+  df_contrib <- data.frame(ts_id = col_order, Contribution)
+  df_contrib <- cbind(df_contrib, df_group[, c(2:ncol(df_group))])
   mode_id <- c(1:n_collModes)
-  colnames(df_collModes)[2:(n_collModes + 1)] <- mode_id
+  colnames(df_contrib)[2:(n_collModes + 1)] <- mode_id
   gathercols <- as.character(mode_id)
-  df_collModes <- gather_(df_collModes, "Mode", "Contribution", gathercols)
-  n_ts <- ncol(mat_diff)
+  df_contrib <- gather_(df_contrib, "Mode", "Contribution", gathercols)
   #-----------------------------
   if(is.null(df_group) == F){
     n_group_types <- ncol(df_group) - 1
     group_types <- colnames(df_group)[2:(n_group_types + 1)]
-    ind_group_types <- (ncol(df_collModes) + 1):(ncol(df_collModes) + n_group_types)
-    df_plot <- cbind(df_collModes, df_group[, c(2:ncol(df_group))])
-    colnames(df_plot)[ind_group_types] <- group_types
+    ind_group_types <- 2:(n_group_types + 1)
+    df_plot <- df_contrib
+    #colnames(df_plot)[ind_group_types] <- group_types
     for(i in 1:n_group_types){
       ind_i <- i + 1
       this_group_label <- colnames(df_group)[ind_i]
@@ -123,7 +141,7 @@ collectiveModes <- function(mat_diff, datevec, df_group = NULL,
     
   }else{
     #-----------------------
-    df_plot <- df_collModes
+    df_plot <- df_contrib
     gg <- ggplot(df_plot, aes_string(x = "ts_id", y = "Contribution")) +
       geom_bar(stat = "identity", position = "dodge") +
       #theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
@@ -144,54 +162,82 @@ collectiveModes <- function(mat_diff, datevec, df_group = NULL,
     abs_colvec <- abs(colvec)
     q <- quantile(abs_colvec, p = p_thresh)
     ind_main <- which(abs_colvec >= q)
-    top_contrib <- sort(abs_colvec[ind_main], decreasing = T)
-    ind_match <- match(top_contrib, abs_colvec)
-    main_contribtrs <- col_order[ind_match]
-    return(main_contribtrs)
+    top_contrib_absval <- sort(abs_colvec[ind_main], decreasing = T)
+    ind_match <- match(top_contrib_absval, abs_colvec)
+    top_contrib_name <- col_order[ind_match]
+    top_contrib_val <- colvec[ind_match]
+    df_out <- data.frame(Top_contributor = top_contrib_name, Eigvec_value = top_contrib_val)
+    return(df_out)
   }
   p_thresh <- .90
-  Main_contributors <- apply(collModes[, 2:ncol(collModes)], 2,
+  mainContrib_list <- apply(collModes[, 2:ncol(collModes)], 2,
                              function(x) select_main_contributors(x, col_order, p_thresh))
+  for(m in 1:(n_collModes - 1)){mainContrib_list[[m]]$Mode <- m + 1}
+  df_mainContributors <- do.call(rbind, mainContrib_list)
   print("Main contributors to each non-leading mode:")
-  print(Main_contributors)
+  print(df_mainContributors)
+  #--
+  df_plot <- df_mainContributors
+  df_plot$Mode <- as.factor(df_plot$Mode)
+  df_plot$Top_contributor <- factor(df_plot$Top_contributor, levels = unique(df_plot$Top_contributor))
+  gg <- ggplot(df_plot, aes(x = Top_contributor, y = Eigvec_value, fill = Mode)) +
+    geom_bar(aes(fill = Mode), position = "dodge", stat = "identity") +
+    theme(axis.text.x = element_text(angle = 60, hjust = 1))
+  print(gg)
   #-----------------------------
-  # Collective mode time series
-  mat_cmts <- mat_diff %*% collModes
-  ts_avg <- mat_diff %*% rep(1, n_ts) * 1 / n_ts
-  # class(mat_cmts)
-  # class(ts_avg)
-  df_plot <- as.data.frame(mat_cmts)
-  colnames(df_plot) <- mode_id
-  df_plot$`ts Avg.` <- ts_avg
-  df_plot$Date <- date_vec
-  if(class(df_plot$Date) == "character"){
-    df_plot$Date <- as.Date(df_plot$Date)
-  }
-  df_cmts <- df_plot
-  gathercols <- colnames(df_plot)[c(1:(ncol(df_plot) - 1))]
-  df_plot <- df_plot %>% gather_("Mode", "Value", gathercols)
-  if(plot_eigenportfolios == T){
-    zdf_plot <- df_plot %>% group_by(Mode) %>% mutate(Value = scale(Value))
+  # Plot collective and noise mode eigenvector densities and compare
+  # to Porter-Thomas density
+  PorterThomas <- rnorm(n_ts)
+  df_plot_signal <- data.frame(collModes, PorterThomas)
+  colnames(df_plot_signal) <- c(as.character(1:n_collModes), "Porter-Thomas")
+  df_plot_signal$Type <- "Signal"
+  gathercols <- colnames(df_plot_signal)[-ncol(df_plot_signal)]
+  df_plot_signal <- df_plot_signal %>% gather_("Mode", "Value", gathercols)
+  #--
+  n_noiseModes <- ncol(noiseModes)
+  ind_randomly_select <- sample.int(n_noiseModes, 5)
+  df_plot_noise <- data.frame(noiseModes[, ind_randomly_select], PorterThomas)
+  colnames(df_plot_noise) <- c(as.character(ind_randomly_select + n_collModes_really), "Porter-Thomas")
+  df_plot_noise$Type <- "Noise"
+  gathercols <- colnames(df_plot_noise)[-ncol(df_plot_noise)]
+  df_plot_noise <- df_plot_noise %>% gather_("Mode", "Value", gathercols)
+  #--
+  df_plot <- rbind(df_plot_signal, df_plot_noise)
+  df_plot$Mode <- as.factor(df_plot$Mode)
+  gg <- ggplot(df_plot, aes(x = Value, group = Mode, color = Mode)) +
+    geom_density() + facet_wrap(~Type, ncol = 2)
+  print(gg)
+  #-----------------------------
+  # Plot Collective mode time series
+  if(plot_eigenportfolio_ts == T){
+    mat_cmts <- mat_diff %*% collModes
+    ts_avg <- mat_diff %*% rep(1, n_ts) * 1 / n_ts
+    # class(mat_cmts)
+    # class(ts_avg)
+    df_plot <- as.data.frame(mat_cmts)
+    colnames(df_plot) <- mode_id
+    df_plot$`ts Avg.` <- ts_avg
+    df_plot$Date <- date_vec
+    if(class(df_plot$Date) == "character"){
+      df_plot$Date <- as.Date(df_plot$Date)
+    }
+    gathercols <- colnames(df_plot)[c(1:(ncol(df_plot) - 1))]
+    df_plot <- df_plot %>% gather_("Mode", "Value", gathercols)
+    zdf_plot <- as.data.frame(df_plot %>% group_by(Mode) %>% mutate(Value = scale(Value)))
     #--
     zdf_plot1 <- subset(zdf_plot, Mode %in% c("1", "ts Avg."))
-    gg <- ggplot(zdf_plot1, aes(x = Date, y = zValue,
+    gg <- ggplot(zdf_plot1, aes(x = Date, y = Value,
                                 group = Mode, color = Mode))
     gg <- gg + geom_line()
     print(gg)
     zdf_plot2 <- subset(zdf_plot, !(Mode %in% c("1", "ts Avg.")))
-    gg <- ggplot(zdf_plot2, aes(x = Date, y = zValue)) + geom_line() +
+    gg <- ggplot(zdf_plot2, aes(x = Date, y = Value)) + geom_line() +
       facet_wrap(~Mode, ncol = 2)
     print(gg)
     
   }
   #-----------------------------
-  ind_avg <- which(df_plot$Mode == "ts Avg.")
-  df_plot$Value[ind_avg] <- rnorm(length(ind_avg))
-  df_plot$Mode[ind_avg] <- "Porter-Thomas"
-  gg <- ggplot(df_plot, aes(x = Value, group = Mode, color = Mode)) +
-    geom_density()
-  print(gg)
-  #-----------------------------
-  outlist <- list(as.data.frame(collModes), df_cmts)
+  lam_signal <- lam_cor[1:n_collModes_really]
+  outlist <- list(collModes_really, lam_signal)
   return(outlist)
 }
