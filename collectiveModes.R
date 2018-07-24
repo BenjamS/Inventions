@@ -1,6 +1,7 @@
 collectiveModes <- function(mat_diff, datevec, df_group = NULL,
                             Contrib_as_ModeSq = T,
-                            AggregateContributions = T){
+                            AggregateContributions = T,
+                            plot_eigenportfolios = F){
   
   col_order <- colnames(mat_diff)
   cormat <- cor(mat_diff)
@@ -148,10 +149,10 @@ collectiveModes <- function(mat_diff, datevec, df_group = NULL,
     main_contribtrs <- col_order[ind_match]
     return(main_contribtrs)
   }
-  p_thresh <- .95
+  p_thresh <- .90
   Main_contributors <- apply(collModes[, 2:ncol(collModes)], 2,
                              function(x) select_main_contributors(x, col_order, p_thresh))
-  print("Main contributors to each mode:")
+  print("Main contributors to each non-leading mode:")
   print(Main_contributors)
   #-----------------------------
   # Collective mode time series
@@ -169,17 +170,26 @@ collectiveModes <- function(mat_diff, datevec, df_group = NULL,
   df_cmts <- df_plot
   gathercols <- colnames(df_plot)[c(1:(ncol(df_plot) - 1))]
   df_plot <- df_plot %>% gather_("Mode", "Value", gathercols)
-  zdf_plot <- df_plot %>% group_by(Mode) %>% mutate(Value = scale(Value))
-  #--
-  zdf_plot1 <- subset(zdf_plot, Mode %in% c("1", "ts Avg."))
-  gg <- ggplot(zdf_plot1, aes(x = Date, y = Value,
-                             group = Mode, color = Mode))
-  gg <- gg + geom_line()
-  print(gg)
-  zdf_plot2 <- subset(zdf_plot, !(Mode %in% c("1", "ts Avg.")))
-  gg <- ggplot(zdf_plot2, aes(x = Date, y = Value)) + geom_line() +
-    facet_wrap(~Mode, ncol = 2)
-  gg <- gg + geom_line()
+  if(plot_eigenportfolios == T){
+    zdf_plot <- df_plot %>% group_by(Mode) %>% mutate(Value = scale(Value))
+    #--
+    zdf_plot1 <- subset(zdf_plot, Mode %in% c("1", "ts Avg."))
+    gg <- ggplot(zdf_plot1, aes(x = Date, y = zValue,
+                                group = Mode, color = Mode))
+    gg <- gg + geom_line()
+    print(gg)
+    zdf_plot2 <- subset(zdf_plot, !(Mode %in% c("1", "ts Avg.")))
+    gg <- ggplot(zdf_plot2, aes(x = Date, y = zValue)) + geom_line() +
+      facet_wrap(~Mode, ncol = 2)
+    print(gg)
+    
+  }
+  #-----------------------------
+  ind_avg <- which(df_plot$Mode == "ts Avg.")
+  df_plot$Value[ind_avg] <- rnorm(length(ind_avg))
+  df_plot$Mode[ind_avg] <- "Porter-Thomas"
+  gg <- ggplot(df_plot, aes(x = Value, group = Mode, color = Mode)) +
+    geom_density()
   print(gg)
   #-----------------------------
   outlist <- list(as.data.frame(collModes), df_cmts)
