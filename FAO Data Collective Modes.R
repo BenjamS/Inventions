@@ -1,4 +1,4 @@
-setwd('D:/OneDrive - CGIAR/Documents')
+#setwd('D:/OneDrive - CGIAR/Documents')
 library(stats)
 library(plyr)
 library(ggplot2)
@@ -180,13 +180,13 @@ FoodBal_raw$Group[which(u %in% textileIndustrial_vec_FoodBal)] <- "Industrial (t
 # = exports + Domestic supply quantity = Demand
 #----------
 #unique(FoodBal_raw$Element)
+FoodBal_raw <- subset(FoodBal_raw, Element %in% c("Stock Variation", "Domestic supply quantity"))
 FoodBal_raw <- FoodBal_raw %>% spread(Element, Value)
-FoodBal_raw$Demand <- FoodBal_raw$`Export Quantity` +
-  FoodBal_raw$Feed + FoodBal_raw$Food + FoodBal_raw$Losses +
-  FoodBal_raw$`Other uses` + FoodBal_raw$Processing +
-  FoodBal_raw$Seed
-FoodBal_raw$SupplyDemandRatio <- FoodBal_raw$`Domestic supply quantity` / 
-  FoodBal_raw$Demand
+FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
+  mutate(x = sum(`Stock Variation`, na.rm = T)))
+FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
+  mutate(Stocks = 1.01 * min(x, na.rm = T) + sum(`Stock Variation`, na.rm = T)))
+
 FoodBal_raw <- FoodBal_raw[, c("Area", "Item", "Year",
                                "Region", "Group",
                                "SupplyDemandRatio")]
@@ -302,7 +302,7 @@ out_cm <- collectiveModes(mat_diff, date_vec, df_group,
 #==========================================
 these_items <- c(RnT_vec_ExpPrice, Cereal_vec_ExpPrice,
                  Sugar_vec_ExpPrice, Oil_vec_ExpPrice)
-these_regions <- c("South-Eastern Asia", "Eastern Asia", "North America")
+these_regions <- c("South-Eastern Asia", "Eastern Asia")#, "North America")
 # these_items <- c(RnT_vec_ExpPrice, Cereal_vec_ExpPrice, Sugar_vec_ExpPrice)
 # these_regions <- c("South-Eastern Asia", "Eastern Asia", "North America", 
 #                    "Northern Europe", "Western Africa", "Southern Africa")
@@ -396,7 +396,8 @@ date_vec <- date_vec[-1]
 nrow(mat_diff) / ncol(mat_diff)
 out_cm <- collectiveModes(mat_diff, date_vec, df_group,
                           Contrib_as_ModeSq = F,
-                          AggregateContributions = F)
+                          AggregateContributions = F,
+                          plot_eigenportfolios = F)
 
 
 
@@ -747,333 +748,3 @@ df_ts <- df_ts %>% spread(`Country-Item`, zValue)
 colnames(df_ts)[1] <- "Date"
 
 out_cm <- collectiveModes(df_ts, df_group)
-
-
-
-
-
-
-
-
-
-
-
-
-
-#==========
-these_regions <- c("E. & S.E. Asia")
-#these_items <- c("Cassava", "Maize", "Wheat", "Rice, paddy")
-#these_groups <- c("Oil crops")
-these_groups <- c("Textiles & Industrial")
-df_plot <- subset(df, Region %in% these_regions)
-#df_plot <- subset(df_plot, Item %in% these_items)
-df_plot <- subset(df_plot, Group %in% these_groups)
-#unique(df_plot$Area)
-df_plot <- df_plot %>% group_by(Area, Item, Year) %>% mutate(zValue = scale(Value))
-df_plot <- as.data.frame(df_plot)
-gg <- ggplot(df_plot, aes(x = YearMonth, y = zValue, group = Item, color = Item))
-gg <- gg + geom_line() + facet_wrap(~Area, ncol = 2, scales = "free")
-gg
-#=============================
-# Philippines_Rubber <- subset(df, Area == "Philippines" & Item == "Rubber, natural")
-# China_Sugar <- subset(df, Area == "China, mainland" & Item == "Sugar cane")
-# Vietnam_Rubber <- subset(df, Area == "Viet Nam" & Item == "Rubber, natural")
-# df_keep <- data.frame(Philippines_Rubber = 
-#   
-# )
-#=============================
-# Interpolate missing data by
-# leveraging inherent periodicity of
-# monthly price data.
-Interpol <- list()
-#=============================
-# Malaysia Cassava
-df_plot2 <- subset(df, Item == "Cassava" & Area == "Malaysia")
-df_plot2 <- df_plot2 %>% group_by(Area, Item, Year) %>% mutate(zValue = scale(Value))
-df_plot2 <- as.data.frame(df_plot2)
-df_plot2 <- df_plot2[, c("YearMonth", "zValue")]
-#diff(which(is.na(df_plot2$zValue) == F))
-#df_plot2 <- df_plot2[which(is.na(df_plot2$zValue) == F), ]
-ggplot(df_plot2, aes(x = YearMonth, y = zValue)) + geom_line()
-#diff(which(is.na(df_plot2$zValue) == F))
-ts <- df_plot2$zValue[which(is.na(df_plot2$zValue) == F)]
-wavfit <- fitWave(ts, n_max_periods = 15, pval_thresh = 0.05, quietly = F)
-noise <- rnorm(length(yhat), 0, 0.2)
-df_plot3 <- df_plot2
-df_plot3$sinApprox <- NA
-df_plot3$sinApprox[which(is.na(df_plot3$zValue) == F)] <- wavfit #+ noise
-df_plot3 <- df_plot3 %>% gather(Type, ts, zValue:sinApprox)
-gg <- ggplot(df_plot3, aes(x = YearMonth, y = ts, color = Type))
-gg <- gg + geom_line()
-gg
-#--
-df_plot3 <- df_plot2
-df_plot3$sinApprox <- NA
-df_plot3$sinApprox[which(is.na(df_plot3$zValue) == T)] <- wavfit #+ noise
-df_plot3 <- df_plot3 %>% gather(Type, ts, zValue:sinApprox)
-gg <- ggplot(df_plot3, aes(x = YearMonth, y = ts, color = Type))
-gg <- gg + geom_line()
-gg
-#--
-df_plot4 <- df_plot2
-df_plot4$zValue[which(is.na(df_plot2$zValue))] <- yhat + noise
-ggplot(df_plot4, aes(x = YearMonth, y = zValue)) + geom_line()
-Interpol[[1]] <- data.frame(YearMonth = df_plot4$YearMonth, Cassava_Malaysia = df_plot4$zValue)
-#=============================
-# Indonesia Cassava
-df_plot2 <- subset(df, Item == "Cassava" & Area == "Indonesia")
-df_plot2 <- df_plot2 %>% group_by(Area, Item, Year) %>% mutate(zValue = scale(Value))
-df_plot2 <- as.data.frame(df_plot2)
-df_plot2 <- df_plot2[, c("YearMonth", "zValue")]
-#diff(which(is.na(df_plot2$zValue) == F))
-#df_plot2 <- df_plot2[which(is.na(df_plot2$zValue) == F), ]
-ggplot(df_plot2, aes(x = YearMonth, y = zValue)) + geom_line()
-#diff(which(is.na(df_plot2$zValue) == F))
-ts <- df_plot2$zValue[which(is.na(df_plot2$zValue) == F)]
-t <- 1:length(ts)
-ssp <- spectrum(ts)
-df_per <- data.frame(per = 1 / ssp$freq, spec = ssp$spec)
-df_per <- df_per[order(df_per$spec, decreasing = T), ]
-df_per
-per1 <- df_per$per[1]
-per2 <- df_per$per[2]
-# per3 <- df_per$per[3]
-# per4 <- df_per$per[4]
-# per5 <- df_per$per[5]
-# per6 <- df_per$per[6]
-# per7 <- df_per$per[7]
-# per8 <- df_per$per[8]
-# per9 <- df_per$per[9]
-# per10 <- df_per$per[10]
-# per11 <- df_per$per[11]
-# per12 <- df_per$per[12]
-reslm <- lm(ts ~ -1 + sin(2 * pi / per1 * t) + cos(2 * pi / per1 * t) +
-              sin(2 * pi / per2 * t) + cos(2 * pi / per2 * t))
-summary(reslm)
-rg <- diff(range(ts))
-plot(ts~t,ylim=c(min(ts)-0.1*rg,max(ts)+0.1*rg))
-lines(fitted(reslm)~t,col=4,lty=2)   # dashed blue line is sin fit
-#--
-df_plot3 <- df_plot2
-df_plot3$sinApprox <- NA
-df_plot3$sinApprox[which(is.na(df_plot3$zValue) == F)] <- fitted(reslm)
-df_plot3 <- df_plot3 %>% gather(Type, ts, zValue:sinApprox)
-gg <- ggplot(df_plot3, aes(x = YearMonth, y = ts, color = Type))
-gg <- gg + geom_line()
-gg
-#--
-df_plot3 <- df_plot2
-df_plot3$sinApprox <- NA
-df_plot3$sinApprox[which(is.na(df_plot3$zValue) == T)] <- fitted(reslm)
-df_plot3 <- df_plot3 %>% gather(Type, ts, zValue:sinApprox)
-gg <- ggplot(df_plot3, aes(x = YearMonth, y = ts, color = Type))
-gg <- gg + geom_line()
-gg
-#--
-df_plot4 <- df_plot2
-df_plot4$zValue[which(is.na(df_plot4$zValue))] <- fitted(reslm)
-ggplot(df_plot4, aes(x = YearMonth, y = zValue)) + geom_line()
-Interpol[[2]] <- data.frame(YearMonth = df_plot4$YearMonth, Cassava_Malaysia = df_plot4$zValue)
-#=============================
-# Vietnam Maize
-df_plot2 <- subset(df, Item == "Maize" & Area == "Viet Nam")
-df_plot2 <- df_plot2 %>% group_by(Area, Item, Year) %>% mutate(zValue = scale(Value))
-df_plot2 <- as.data.frame(df_plot2)
-df_plot2 <- df_plot2[, c("YearMonth", "zValue")]
-diff(which(is.na(df_plot2$zValue) == F))
-which(is.na(df_plot2$zValue) == F)
-#df_plot2 <- df_plot2[which(is.na(df_plot2$zValue) == F), ]
-ggplot(df_plot2, aes(x = YearMonth, y = zValue)) + geom_line()
-ind <- which(is.na(df_plot2$zValue) == F)
-# ind <- ind[1]:ind[length(ind)]
-# u <- df_plot2$zValue
-# df_plot2$zValue[ind[which(is.na(u[ind]))]] <- 0
-#df_plot2$zValue[ind]
-which(is.na(df_plot2$zValue) == F)
-df_plot2$zValue[c(15, 18, 21)] <- NA
-diff(which(is.na(df_plot2$zValue) == F))
-ts <- df_plot2$zValue[24:60]
-t <- 1:length(ts)
-ssp <- spectrum(ts)
-df_per <- data.frame(per = 1 / ssp$freq, spec = ssp$spec)
-df_per <- df_per[order(df_per$spec, decreasing = T), ]
-df_per
-per1 <- df_per$per[1]
-per2 <- df_per$per[2]
-per3 <- df_per$per[3]
-per4 <- df_per$per[4]
-per5 <- df_per$per[5]
-per6 <- df_per$per[6]
-per7 <- df_per$per[7]
-per8 <- df_per$per[8]
-per9 <- df_per$per[9]
-per10 <- df_per$per[10]
-per11 <- df_per$per[11]
-per12 <- df_per$per[12]
-per13 <- df_per$per[13]
-per14 <- df_per$per[14]
-per15 <- df_per$per[15]
-#--
-reslm <- lm(ts ~ -1 + sin(2 * pi / per1 * t) + cos(2 * pi / per1 * t) +
-              sin(2 * pi / per2 * t) + 
-              sin(2 * pi / per3 * t) + cos(2 * pi / per3 * t) +
-              cos(2 * pi / per4 * t) +
-              sin(2 * pi / per5 * t) + cos(2 * pi / per5 * t) +
-              cos(2 * pi / per6 * t)
-)
-summary(reslm)
-rg <- diff(range(ts))
-plot(ts~t,ylim=c(min(ts)-0.1*rg,max(ts)+0.1*rg))
-lines(fitted(reslm)~t,col=4,lty=2)   # dashed blue line is sin fit
-#--
-yhat <- fitted(reslm)
-noise <- rnorm(length(yhat), 0, 0.2)
-df_plot3 <- df_plot2
-df_plot3$sinApprox <- NA
-df_plot3$sinApprox[which(is.na(df_plot3$zValue) == F)] <- yhat + noise
-df_plot3 <- df_plot3 %>% gather(Type, ts, zValue:sinApprox)
-gg <- ggplot(df_plot3, aes(x = YearMonth, y = ts, color = Type))
-gg <- gg + geom_line()
-gg
-#--
-df_plot3 <- df_plot2
-df_plot3$sinApprox <- NA
-df_plot3$sinApprox[which(is.na(df_plot3$zValue) == T)] <- yhat + noise
-df_plot3 <- df_plot3 %>% gather(Type, ts, zValue:sinApprox)
-gg <- ggplot(df_plot3, aes(x = YearMonth, y = ts, color = Type))
-gg <- gg + geom_line()
-gg
-#--
-df_plot4 <- df_plot2
-df_plot4$zValue[which(is.na(df_plot2$zValue))] <- yhat + noise
-ggplot(df_plot4, aes(x = YearMonth, y = zValue)) + geom_line()
-Interpol[[3]] <- data.frame(YearMonth = df_plot4$YearMonth, Maize_Vietnam = df_plot4$zValue)
-#=============================
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-df <- df %>% group_by(Region, Area, Year, Item) %>%
-  mutate(nMiss = length(which(is.na(Value))))
-df <- as.data.frame(df)
-length(which(is.na(df$Value)))
-length(which(is.nan(df$Value)))
-length(which(is.infinite(df$Value)))
-df_agg <- df %>% group_by(Region, Item, Year, Months) %>% summarise(Value = mean(Value, na.rm = T))
-length(which(is.na(df_agg$Value)))
-length(which(is.nan(df_agg$Value)))
-length(which(is.infinite(df_agg$Value)))
-df_agg <- df_agg %>% group_by(Region, Year, Item) %>%
-  mutate(nMiss = length(which(is.na(Value) | is.nan(Value))))
-df_agg <- as.data.frame(df_agg)
-#-----
-#unique(df_agg$Region)
-this_region <- "E. & S.E. Asia"
-#-----
-df_a <- subset(df_agg, Region %in% this_region)
-length(which(is.na(df_a$Value)))
-length(which(is.nan(df_a$Value)))
-length(which(is.infinite(df_a$Value)))
-df_group <- df_a
-item_rm <- unique(df_a$Item[which(df_a$nMiss > 5)])
-df_a <- subset(df_a, !(Item %in% items_rm))
-setdiff(item_vec, items_rm)
-# df_group <- subset(df_a, Year == 2015 & Months == "January")
-#   df_group[, c("Group", "Item")]
-# col_order <- df_group$Item
-
-
-
-df_price$nMiss <- NULL
-df_price$Group <- NULL
-df_price$Area <- NULL
-df_price <- as.data.frame(df_price)
-df_mat <- df_price %>% spread(Item, Price)
-colnames(df_mat)
-row.names(df_mat) <- df_mat$Year
-df_mat$Year <- NULL
-colnames(df_mat)
-df_mat <- df_mat[, col_order]
-difflnMat <- diff(as.matrix(log(df_mat)))
-ts_mat <- difflnMat
-cormat <- cor(ts_mat)
-image(cormat)
-#--
-eig_vectors <- -eigen(cormat)$vectors
-lam_cor <- eigen(cormat)$values
-lamcor_max <- max(lam_cor)
-N_t <- nrow(ts_mat)
-N_c <- ncol(ts_mat)
-Q <- N_t / N_c
-s_sq <- 1 - lamcor_max / N_c
-#s_sq <- 1
-lamrand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
-lamrand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
-lam <- seq(lamrand_min, lamrand_max, 0.2)
-dens_rand <- Q / (2 * pi * s_sq) * sqrt((lamrand_max - lam) * (lam - lamrand_min)) / lam
-#--
-df_e <- data.frame(values = lam_cor)
-gg <- ggplot() + geom_density(data = df_e, aes(x = values), color = "blue") + coord_cartesian(xlim = c(0, ceiling(lamcor_max)))
-gg <- gg + geom_line(data = data.frame(x = lam, y = dens_rand), aes(x = x, y = y), linetype = "dotted")
-gg
-#--
-ind_deviating_from_noise <- which(lam_cor > lamrand_max)
-CollectiveModes <- as.matrix(eig_vectors[, ind_deviating_from_noise])
-df_collectiveModes <- as.data.frame(CollectiveModes)
-n_collectiveModes <- ncol(CollectiveModes)
-print(paste("Number of collective modes: ", n_collectiveModes))
-#Contributions of groups to each mode
-n_all_ts <- length(col_order)
-groups <- unique(df_group$Group)
-n_groups <- length(groups)
-N_in_group <- c()
-Pvec_list <- list()
-for(i in 1:n_groups){
-  this_group <- groups[i]
-  Pvec <- rep(0, n_all_ts)
-  ind <- which(df_group$Group == this_group)
-  ts_in_group <- df_group$Item[ind]
-  n_in_group <- length(ts_in_group)
-  Pvec[ind] <- 1 / n_in_group
-  Pvec_list[[i]] <- Pvec
-  N_in_group[i] <- n_in_group
-}
-Pmat <- as.matrix(do.call(cbind, Pvec_list))
-nrow(Pmat)
-nrow(df_collectiveModes)
-Xkl <- t(Pmat) %*% CollectiveModes^2
-#barplot(Xkl[, 9])
-df_contrib <- as.data.frame(Xkl)
-colnames(df_contrib) <- paste("lambda", c(1:n_collectiveModes))
-df_contrib$Group <- groups
-gathercols <- colnames(df_contrib)[1:n_collectiveModes]
-df_contrib <- gather_(df_contrib, "Lambda", "Value", gathercols)
-gg <- ggplot(df_contrib, aes(x = Group, y = Value)) + geom_bar(stat="identity")
-gg <- gg + facet_wrap(~ Lambda, nrow = floor(n_collectiveModes / 2)) + theme(axis.text.x = element_text(angle = 60, hjust = 1))
-gg
-
-
-
