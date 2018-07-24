@@ -1,4 +1,4 @@
-#setwd('D:/OneDrive - CGIAR/Documents')
+setwd('D:/OneDrive - CGIAR/Documents')
 library(stats)
 library(plyr)
 library(ggplot2)
@@ -9,13 +9,7 @@ library(zoo)
 library(quantmod)
 source('./collectiveModes.R')
 source('./FAOdat_createRegionGroups.R')
-#source('./getSlope.R')
 #=================================
-# Important for collectiveModes()
-crop_vec <- c(cerealPrimary_vec, "Cassava", "Potatoes", "Sweet potatoes",
-              "Soybean", "Cotton", "Linseed", "Coconut", "Sugar", "Palm",
-              "Wool", "Cocoa", "Coffee", "Tea")
-#--------------------------
 # Exclude specific areas
 exclude_these <- c("Brunei Darussalam", "China, Hong Kong SAR",
                    "China, Macao SAR", "China, Taiwan Province of",
@@ -66,11 +60,31 @@ textileIndustrial_vec_FoodBal <- c()
 item_vec_FoodBal <- c(Cereal_vec_FoodBal, RnT_vec_FoodBal, Oil_vec_FoodBal, Fruit_vec_FoodBal,
                       Pulses_vec_FoodBal, Sugar_vec_FoodBal, teaCoffeeCacao_vec_FoodBal,
                       textileIndustrial_vec_FoodBal)
+#--------------------------
+# Important for collectiveModes()
+crop_vec <- c(cerealPrimary_vec, "Cassava", "Potatoes", "Sweet potatoes",
+              "Soybean", "Cotton", "Linseed", "Coconut", "Sugar", "Palm",
+              "Wool", "Cocoa", "Coffee", "Tea", "Olive")
 #==========================================
 #==========================================
 #==========================================
 #==========================================
 # Get raw data sets ready
+#==========================================
+#==========================================
+#==========================================
+# Get oil price from World Bank Pink Sheet
+# Avg. of Brent, WTI, Dubai, nominal $/bbl
+df_in <- read.csv("CMOHistoricalDataAnnual.csv", stringsAsFactors = F)
+df_crudeOilPrice <- df_in[-c(1:8, 67:nrow(df_in)), c(1:2)]
+colnames(df_crudeOilPrice) <- c("Date", "Price")
+df_crudeOilPrice$Price <- as.numeric(df_crudeOilPrice$Price)
+df_crudeOilPrice$Date <- as.integer(df_crudeOilPrice$Date)
+df_crudeOilPrice$zPrice <- scale(df_crudeOilPrice$Price)
+zPriceDiff <- diff(df_crudeOilPrice$zPrice)
+df_crudeOilPrice$`zPriceDiff` <- c(NA, zPriceDiff)
+df_crudeOilPrice <- df_crudeOilPrice[-1, ]
+#==========================================
 #==========================================
 #==========================================
 #==========================================
@@ -183,29 +197,29 @@ FoodBal_raw$Group[which(u %in% textileIndustrial_vec_FoodBal)] <- "Industrial (t
 FoodBal_raw <- subset(FoodBal_raw, Element %in% c("Stock Variation", "Domestic supply quantity"))
 FoodBal_raw <- FoodBal_raw %>% spread(Element, Value)
 FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
-  mutate(x = sum(`Stock Variation`, na.rm = T)))
+                               mutate(x = sum(`Stock Variation`, na.rm = T)))
+
+this_fun <- function(S0, Svar){
+  s <- c()
+  s[1] <- S0
+  for(i in 2:length(Svar)){
+    s[i] <- s[i - 1] + Svar[i] 
+  }
+  return(s)
+}
 FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
-  mutate(Stocks = 1.01 * min(x, na.rm = T) + sum(`Stock Variation`, na.rm = T)))
+                               mutate(Stocks = ifelse(x < 0, this_fun(-x, `Stock Variation`), this_fun(0, `Stock Variation`))))
+FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
+                               mutate(`Stock Variation Check` = c(NA, diff(Stocks, na.rm = T))))
+
+
+
+
 
 FoodBal_raw <- FoodBal_raw[, c("Area", "Item", "Year",
                                "Region", "Group",
                                "SupplyDemandRatio")]
 colnames(FoodBal_raw)[ncol(FoodBal_raw)] <- "Value"
-#==========================================
-#==========================================
-#==========================================
-# Get oil price from World Bank Pink Sheet
-# Avg. of Brent, WTI, Dubai, nominal $/bbl
-df_in <- read.csv("CMOHistoricalDataAnnual.csv", stringsAsFactors = F)
-df_crudeOilPrice <- df_in[-c(1:8, 67:nrow(df_in)), c(1:2)]
-colnames(df_crudeOilPrice) <- c("Date", "Price")
-df_crudeOilPrice$Price <- as.numeric(df_crudeOilPrice$Price)
-df_crudeOilPrice$Date <- as.integer(df_crudeOilPrice$Date)
-df_crudeOilPrice$zPrice <- scale(df_crudeOilPrice$Price)
-zPriceDiff <- diff(df_crudeOilPrice$zPrice)
-df_crudeOilPrice$`zPriceDiff` <- c(NA, zPriceDiff)
-df_crudeOilPrice <- df_crudeOilPrice[-1, ]
-#==========================================
 #==========================================
 #==========================================
 #==========================================
@@ -302,7 +316,7 @@ out_cm <- collectiveModes(mat_diff, date_vec, df_group,
 #==========================================
 these_items <- c(RnT_vec_ExpPrice, Cereal_vec_ExpPrice,
                  Sugar_vec_ExpPrice, Oil_vec_ExpPrice)
-these_regions <- c("South-Eastern Asia", "Eastern Asia")#, "North America")
+these_regions <- c("South-Eastern Asia", "Eastern Asia", "North America")#, "Northern Europe", "Western Europe")
 # these_items <- c(RnT_vec_ExpPrice, Cereal_vec_ExpPrice, Sugar_vec_ExpPrice)
 # these_regions <- c("South-Eastern Asia", "Eastern Asia", "North America", 
 #                    "Northern Europe", "Western Africa", "Southern Africa")
@@ -358,7 +372,7 @@ unique(ExportData$CommodGroup)
 # ExportData$CommodGroup[ind_stillNA] <- ExportData$Item[ind_stillNA]
 #-
 u <- ExportData$CommodGroup
-ind_changeToOil <- which(u %in% c("Coconut", "Cotton", "Palm", "Linseed", "Soybean"))
+ind_changeToOil <- which(u %in% c("Coconut", "Cotton", "Palm", "Linseed", "Soybean", "Olive"))
 ExportData$CommodGroup[ind_changeToOil] <- "Oilcrop"
 unique(ExportData$CommodGroup)
 #------------------------------------------
@@ -378,14 +392,15 @@ ExportData_ts <- ExportData_ts[, c("Date", col_order)]
 # Modify df_group accordingly
 df_ts <- ExportData_ts
 df_ts <- merge(df_ts, df_crudeOilPrice[, c("Date", "zPriceDiff")], by = "Date")
-colnames(df_ts)[ncol(df_ts)] <- "Crude oil"
+colnames(df_ts)[ncol(df_ts)] <- "Crude oil, 1st order"
 df_group <- rbind(df_group, c("World oil, 1st order", "(Crude oil)", "Crude oil, 1st order"))
+col_order <- c(col_order, "Crude oil, 1st order")
 #------------------------------------------
 date_vec <- df_ts$Date
 df_ts$Date <- NULL
 #-this way
-mat_diff <- as.matrix(df_ts)
-mat_diff <- diff(as.matrix(df_ts))
+mat_ts <- as.matrix(df_ts)
+mat_diff <- diff(mat_ts)
 date_vec <- date_vec[-1]
 #-or this way
 # per_ema = 3
@@ -397,16 +412,52 @@ nrow(mat_diff) / ncol(mat_diff)
 out_cm <- collectiveModes(mat_diff, date_vec, df_group,
                           Contrib_as_ModeSq = F,
                           AggregateContributions = F,
-                          plot_eigenportfolios = F)
+                          plot_eigenportfolio_ts = T)
+#------------------------------------------
+#
+n_ts <- ncol(mat_ts)
+ts_avg <- mat_ts %*% rep(1, n_ts) * 1 / n_ts
+ts_avg <- ts_avg[-1]
+mat_sigModes <- out_cm[[1]]
+mat_mode_ts <- mat_ts %*% mat_sigModes
+mat_mode_ts <- mat_mode_ts[-1, ]
+df_mode_ts <- as.data.frame(mat_mode_ts)
+acf(df_mode_ts)
+pacf(df_mode_ts)
+n_sig <- ncol(df_mode_ts)
+colnames(df_mode_ts) <- as.character(1:n_sig)
+df_mode_ts$`ts Avg.` <- ts_avg
+gathercols <- colnames(df_mode_ts)
+df_mode_ts$Date <- date_vec
+df_mode_ts <- df_mode_ts %>% gather_("Mode", "Value", gathercols)
+df_plot <- df_mode_ts
+zdf_plot <- as.data.frame(df_plot %>% group_by(Mode) %>% mutate(Value = scale(Value)))
+ggplot(zdf_plot, aes(x = Date, y = Value, group = Mode, color = Mode)) +
+  geom_line()
+#---
+# Mode decomposition
+mat_mode_ts <- mat_ts %*% diag(mat_sigModes[, 3])
+mat_mode_ts <- mat_mode_ts[-1, ]
+mat_mode_ts <- t(mat_mode_ts)
+df_mode_ts <- as.data.frame(mat_mode_ts)
+df_mode_ts <- cbind(df_mode_ts, df_group)
+#df_mode_ts$Item <- col_order
+
+gathercols <- colnames(df_mode_ts)
+df_mode_ts$Date <- date_vec
+df_mode_ts <- df_mode_ts %>% gather_("Mode", "Value", gathercols)
+df_plot <- df_mode_ts
+gg <- ggplot(df_plot, aes(x = Year, y = Value, group = Item, color = Item))
+gg <- gg + geom_line() + facet_wrap(~Area, ncol = 2, scales = "free")
+gg
 
 
 
 
-
-
-
-
-
+#
+mat_modeVolat <- mat_diff %*% mat_sigModes
+sd_vec <- apply(mat_modeVolat, 2, sd)
+#
 
 
 
