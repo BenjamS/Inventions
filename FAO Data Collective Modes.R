@@ -436,18 +436,25 @@ ggplot(zdf_plot, aes(x = Date, y = Value, group = Mode, color = Mode)) +
   geom_line()
 #---
 # Mode decomposition
+#---
+ExportData_group <- ExportData[, c("Country-Item", "Area", "Item", "Region", "Group", "CommodGroup")]
+ExportData_group <- ExportData_group[-which(duplicated(ExportData_group)), ]
+#ExportData_group$`Country-Item`
+df_group <- rbind(ExportData_group, c("World oil, 1st order", "(Crude oil)", "Crude oil, 1st order"))
+#col_order <- df_group$`Country-Item`
+#---
 mat_mode_ts <- mat_ts %*% diag(mat_sigModes[, 3])
 mat_mode_ts <- mat_mode_ts[-1, ]
 mat_mode_ts <- t(mat_mode_ts)
 df_mode_ts <- as.data.frame(mat_mode_ts)
 df_mode_ts <- cbind(df_mode_ts, df_group)
-#df_mode_ts$Item <- col_order
-
-gathercols <- colnames(df_mode_ts)
-df_mode_ts$Date <- date_vec
-df_mode_ts <- df_mode_ts %>% gather_("Mode", "Value", gathercols)
+colnames(df_mode_ts)[1:ncol(mat_mode_ts)] <- date_vec
+gathercols <- colnames(df_mode_ts[1:ncol(mat_mode_ts)])
+df_mode_ts <- df_mode_ts %>% gather_("Date", "Value", gathercols)
+df_mode_ts$Date <- as.integer(df_mode_ts$Date)
 df_plot <- df_mode_ts
-gg <- ggplot(df_plot, aes(x = Year, y = Value, group = Item, color = Item))
+df_plot <- subset(df_plot, Group == "Cereals")
+gg <- ggplot(df_plot, aes(x = Date, y = Value, group = Item, color = Item))
 gg <- gg + geom_line() + facet_wrap(~Area, ncol = 2, scales = "free")
 gg
 
