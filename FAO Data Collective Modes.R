@@ -195,24 +195,39 @@ FoodBal_raw$Group[which(u %in% textileIndustrial_vec_FoodBal)] <- "Industrial (t
 #----------
 #unique(FoodBal_raw$Element)
 FoodBal_raw <- subset(FoodBal_raw, Element %in% c("Stock Variation", "Domestic supply quantity"))
+colnames(FoodBal_raw)[6] <- "Demand"
 FoodBal_raw <- FoodBal_raw %>% spread(Element, Value)
 FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
-                               mutate(x = sum(`Stock Variation`, na.rm = T)))
-
+                               mutate(sumStockvar = sum(`Stock Variation`, na.rm = T)))
 this_fun <- function(S0, Svar){
   s <- c()
   s[1] <- S0
   for(i in 2:length(Svar)){
-    s[i] <- s[i - 1] + Svar[i] 
+    s[i] <- s[i - 1] + Svar[i]
   }
   return(s)
 }
+
 FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
-                               mutate(Stocks = ifelse(x < 0, this_fun(-x, `Stock Variation`), this_fun(0, `Stock Variation`))))
+                               mutate(Stocks = ifelse(sumStockvar < 0,
+                                                      this_fun(-unique(sumStockvar), `Stock Variation`),
+                                                      this_fun(1, `Stock Variation`))))
+
 FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
                                mutate(`Stock Variation Check` = c(NA, diff(Stocks, na.rm = T))))
 
 
+FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
+                               mutate(Stocks = ifelse(min(Stocks) < 0,
+                                                      this_fun(-min(Stocks), `Stock Variation`),
+                                                      Stocks)))
+
+# FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
+#                                mutate(Stocks = ifelse(sumStockvar < 0,
+#                                this_fun(-sumStockvar, `Stock Variation`),
+#                                this_fun(sumStockvar, `Stock Variation`))))
+FoodBal_raw$Supply <- FoodBal_raw$Demand + FoodBal_raw$Stocks
+FoodBal_raw$Supply_Demand_Ratio <- FoodBal_raw$Supply / FoodBal_raw$Demand
 
 
 
