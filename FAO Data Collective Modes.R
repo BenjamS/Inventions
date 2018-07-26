@@ -195,45 +195,37 @@ FoodBal_raw$Group[which(u %in% textileIndustrial_vec_FoodBal)] <- "Industrial (t
 #----------
 #unique(FoodBal_raw$Element)
 FoodBal_raw <- subset(FoodBal_raw, Element %in% c("Stock Variation", "Domestic supply quantity"))
-colnames(FoodBal_raw)[6] <- "Demand"
 FoodBal_raw <- FoodBal_raw %>% spread(Element, Value)
-FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
-                               mutate(sumStockvar = sum(`Stock Variation`, na.rm = T)))
-this_fun <- function(S0, Svar){
-  s <- c()
-  s[1] <- S0
-  for(i in 2:length(Svar)){
-    s[i] <- s[i - 1] + Svar[i]
-  }
-  return(s)
-}
 
 FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
-                               mutate(Stocks = ifelse(sumStockvar < 0,
-                                                      this_fun(-unique(sumStockvar), `Stock Variation`),
-                                                      this_fun(1, `Stock Variation`))))
+                               mutate(`Stock Variation` = ifelse(is.na(`Stock Variation`) | 
+                                                                is.nan(`Stock Variation`), 0, `Stock Variation`)))
+FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
+                               mutate(Stocks = cumsum(`Stock Variation`)))
+
+#df_xx <- subset(FoodBal_raw, Area == "Afghanistan" & Item == "Barley and products")
+
+FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
+                               mutate(minStock = min(Stocks)))
+
+
+FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
+                               mutate(Stocks = ifelse(minStock < 0,
+                                                      Stocks - 1.01 * minStock, Stocks)))
 
 FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
                                mutate(`Stock Variation Check` = c(NA, diff(Stocks, na.rm = T))))
 
 
-FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
-                               mutate(Stocks = ifelse(min(Stocks) < 0,
-                                                      this_fun(-min(Stocks), `Stock Variation`),
-                                                      Stocks)))
+u <- colnames(FoodBal_raw)
+colnames(FoodBal_raw)[which(u == "Domestic supply quantity")] <- "Demand"
 
-# FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
-#                                mutate(Stocks = ifelse(sumStockvar < 0,
-#                                this_fun(-sumStockvar, `Stock Variation`),
-#                                this_fun(sumStockvar, `Stock Variation`))))
 FoodBal_raw$Supply <- FoodBal_raw$Demand + FoodBal_raw$Stocks
 FoodBal_raw$Supply_Demand_Ratio <- FoodBal_raw$Supply / FoodBal_raw$Demand
 
-
-
 FoodBal_raw <- FoodBal_raw[, c("Area", "Item", "Year",
                                "Region", "Group",
-                               "SupplyDemandRatio")]
+                               "Supply_Demand_Ratio")]
 colnames(FoodBal_raw)[ncol(FoodBal_raw)] <- "Value"
 #==========================================
 #==========================================
@@ -329,9 +321,13 @@ out_cm <- collectiveModes(mat_diff, date_vec, df_group,
 # Export price analysis
 #==========================================
 #==========================================
+# these_items <- c(RnT_vec_ExpPrice, Cereal_vec_ExpPrice,
+#                  Sugar_vec_ExpPrice, Oil_vec_ExpPrice)
 these_items <- c(RnT_vec_ExpPrice, Cereal_vec_ExpPrice,
                  Sugar_vec_ExpPrice, Oil_vec_ExpPrice)
-these_regions <- c("South-Eastern Asia", "Eastern Asia", "North America")#, "Northern Europe", "Western Europe")
+these_regions <- c("South-Eastern Asia", "Eastern Asia", "North America")
+#these_regions <- c("South-Eastern Asia", "Eastern Asia")#, "Northern Europe", "Western Europe")
+# these_regions <- c("South-Eastern Asia", "Eastern Asia", "North America")#, "Northern Europe", "Western Europe")
 # these_items <- c(RnT_vec_ExpPrice, Cereal_vec_ExpPrice, Sugar_vec_ExpPrice)
 # these_regions <- c("South-Eastern Asia", "Eastern Asia", "North America", 
 #                    "Northern Europe", "Western Africa", "Southern Africa")
@@ -340,6 +336,7 @@ start_year <- 1968
 ExportData <- subset(ExportData_raw, Item %in% these_items)
 ExportData <- subset(ExportData, Region %in% these_regions)
 ExportData <- subset(ExportData, Year >= start_year)
+ExportData <- subset(ExportData, !(Item == "Cottonseed" & Area == "Thailand"))
 ExportData$`Export Quantity` <- NULL
 ExportData$`Export Value` <- NULL
 colnames(ExportData)[ncol(ExportData)] <- "Value"
@@ -388,7 +385,11 @@ unique(ExportData$CommodGroup)
 #-
 u <- ExportData$CommodGroup
 ind_changeToOil <- which(u %in% c("Coconut", "Cotton", "Palm", "Linseed", "Soybean", "Olive"))
+ind_changeToPotSweetPot <- which(u %in% c("Potatoes", "Sweet potatoes"))
+ind_changeToCereals <- which(u %in% c("Millet", "Rye", "Sorghum", "Barley", "Maize", "Wheat"))
 ExportData$CommodGroup[ind_changeToOil] <- "Oilcrop"
+ExportData$CommodGroup[ind_changeToPotSweetPot] <- "Potatoes/Sweet potatoes"
+ExportData$CommodGroup[ind_changeToCereals] <- "Cereals"
 unique(ExportData$CommodGroup)
 #------------------------------------------
 # Prepare input for collectiveModes()
@@ -447,8 +448,15 @@ df_mode_ts$Date <- date_vec
 df_mode_ts <- df_mode_ts %>% gather_("Mode", "Value", gathercols)
 df_plot <- df_mode_ts
 zdf_plot <- as.data.frame(df_plot %>% group_by(Mode) %>% mutate(Value = scale(Value)))
-ggplot(zdf_plot, aes(x = Date, y = Value, group = Mode, color = Mode)) +
+df_plot <- subset(zdf_plot, Mode %in% c("ts Avg.", "1"))
+ggplot(df_plot, aes(x = Date, y = Value, group = Mode, color = Mode)) +
   geom_line()
+df_plot <- subset(zdf_plot, !(Mode %in% c("1")))
+ggplot(df_plot, aes(x = Date, y = Value, group = Mode, color = Mode)) +
+  geom_line()
+#---
+
+
 #---
 # Mode decomposition
 #---
