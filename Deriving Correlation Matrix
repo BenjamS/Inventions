@@ -1,0 +1,45 @@
+
+pct_signal <- 0.1
+n_proj <- 20
+
+n_signal <- round(pct_signal * n_proj)
+n_noise <- n_proj - n_signal
+
+eigenvalues_signal <- rnorm(n_signal, 0, 0.25) + exp(2:(2 + n_signal - 1))
+contrib_mat <- replicate(n_signal, rnorm(n_proj, 0, 0.25))
+q_thresh <- as.numeric(quantile(abs(contrib_mat), probs = 0.7))
+this_fun <- function(x, q_thresh){
+  ind <- which(x > q_thresh)
+  x[ind] <- x[ind] * 1.1
+  ind <- which(x < q_thresh)
+  x[ind] <- x[ind] * 0.8
+  return(x)
+}
+contrib_mat <- apply(contrib_mat, 2, this_fun, q_thresh)
+df <- as.data.frame(contrib_mat)
+colnames(df) <- as.character(c(1:n_signal))
+df$Proj <- c(1:n_proj)
+df_plot <- df %>% gather(Type, Value, `1`:`2`)
+ggplot(df_plot, aes(x = Proj, y = Value)) + geom_bar(stat = "identity") +
+  facet_wrap(~Type, ncol = 2)
+ggplot(df_plot, aes(x = Value)) + geom_density() +
+  facet_wrap(~Type, ncol = 2)
+
+# Eigenvectors
+noise_mat <- replicate(n_noise, rnorm(n_proj, 0, 0.25))
+eigenvectors <- cbind(contrib_mat, noise_mat)
+# Eigenvalues
+eigenvalues_noise <- rnorm(n_noise, 0, 0.25)
+Dmat <- diag(c(eigenvalues_signal, eigenvalues_noise))
+
+Cmat <- t(eigenvectors) %*% Dmat %*% eigenvectors
+image(Cmat)
+
+
+
+
+
+
+library(pracma)
+M <- randortho(n_proj, type = c("orthonormal", "unitary"))
+t(M) %*% Dmat  %*% M
