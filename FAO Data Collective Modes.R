@@ -1,4 +1,4 @@
-#setwd('D:/OneDrive - CGIAR/Documents')
+setwd('D:/OneDrive - CGIAR/Documents')
 library(stats)
 library(plyr)
 library(ggplot2)
@@ -261,7 +261,7 @@ unique(FoodBal$Area)
 #                                     mutate(Value = ifelse(isMiss == 1, mean(Value, na.rm = T), Value)))
 # Lots of items have 0 variation for most of series. Get rid of these.
 FoodBal <- as.data.frame(FoodBal %>% group_by(Area, Item) %>%
-                                    mutate(nLowVar = length(which(abs(Value) == 1))))
+                           mutate(nLowVar = length(which(abs(Value) == 1))))
 FoodBal <- subset(FoodBal, nLowVar <= 10)
 #------------------------------------------
 # Scale
@@ -444,6 +444,51 @@ out_cm <- collectiveModes(mat_diff, date_vec, df_group,
                           Contrib_as_ModeSq = F,
                           AggregateContributions = F,
                           plot_eigenportfolio_ts = T)
+#------------------------------------------
+contrib_mat <- out_cm[[1]]
+mat_PC <- mat_ts %*% contrib_mat
+mat_PC_diff <- diff(mat_PC)
+mat_PC_diff <- mat_PC_diff[-1, ]
+#mat_PC_diff <- mat_diff %*% contrib_mat
+cormat <- cor(mat_PC_diff)
+#image(cormat)
+#print(cormat)
+
+eigen(cormat)$values
+
+
+
+
+
+n_t <- 500
+a <- 0
+y <- c()
+last_j <- 50
+n_ts <- ncol(mat_ts)
+for(j in 1:last_j){
+  X <- list()
+  for(i in 1:n_ts){
+    X[[i]] <- coloredNoise(n_t, a, graph = F)
+    
+  }
+  X <- do.call(cbind, X)
+  mat_PC <- X %*% contrib_mat
+  mat_PC_diff <- diff(mat_PC)
+  mat_PC_diff <- mat_PC_diff[-1, ]
+  cormat <- cor(mat_PC_diff)
+  #image(cormat)
+  #print(cormat)
+  y[j] <- cormat[2, 1]
+  
+}
+
+hist(y)
+mu <- mean(y)
+stdev <- sd(y)
+cv <- stdev / mu
+print(mu)
+print(cv)
+
 #------------------------------------------
 mat_diff_ExPrice <- mat_diff
 colnames(mat_diff_ExPrice) <- paste("ExPrice", colnames(mat_diff_ExPrice))
