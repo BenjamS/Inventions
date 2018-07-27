@@ -1,4 +1,4 @@
-setwd('D:/OneDrive - CGIAR/Documents')
+#setwd('D:/OneDrive - CGIAR/Documents')
 library(stats)
 library(plyr)
 library(ggplot2)
@@ -199,7 +199,7 @@ FoodBal_raw <- FoodBal_raw %>% spread(Element, Value)
 
 FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
                                mutate(`Stock Variation` = ifelse(is.na(`Stock Variation`) | 
-                                                                is.nan(`Stock Variation`), 0, `Stock Variation`)))
+                                                                   is.nan(`Stock Variation`), 0, `Stock Variation`)))
 FoodBal_raw <- as.data.frame(FoodBal_raw %>% group_by(Area, Item) %>%
                                mutate(Stocks = cumsum(`Stock Variation`)))
 
@@ -260,9 +260,9 @@ unique(FoodBal$Area)
 # FoodBal <- as.data.frame(FoodBal %>% group_by(Area, Item) %>%
 #                                     mutate(Value = ifelse(isMiss == 1, mean(Value, na.rm = T), Value)))
 # Lots of items have 0 variation for most of series. Get rid of these.
-# FoodBal <- as.data.frame(FoodBal %>% group_by(Area, Item) %>%
-#                                     mutate(nLowVar = length(which(abs(Value) <= 5))))
-# FoodBal <- subset(FoodBal, nLowVar <= 20)
+FoodBal <- as.data.frame(FoodBal %>% group_by(Area, Item) %>%
+                                    mutate(nLowVar = length(which(abs(Value) == 1))))
+FoodBal <- subset(FoodBal, nLowVar <= 10)
 #------------------------------------------
 # Scale
 FoodBal <- as.data.frame(FoodBal %>% group_by(Area, Item) %>%
@@ -287,6 +287,15 @@ unique(FoodBal$CommodGroup)
 ind_stillNA <- which(is.na(FoodBal$CommodGroup))
 unique(FoodBal$Item[ind_stillNA])
 FoodBal$CommodGroup[ind_stillNA] <- FoodBal$Item[ind_stillNA]
+#--
+# u <- FoodBal$CommodGroup
+# ind_changeToOil <- which(u %in% c("Coconut", "Cotton", "Palm", "Linseed", "Soybean", "Olive"))
+# ind_changeToPotSweetPot <- which(u %in% c("Potatoes", "Sweet potatoes"))
+# #ind_changeToCereals <- which(u %in% c("Millet", "Rye", "Sorghum", "Barley", "Maize", "Wheat"))
+# FoodBal$CommodGroup[ind_changeToOil] <- "Oilcrop"
+# FoodBal$CommodGroup[ind_changeToPotSweetPot] <- "Potatoes/Sweet potatoes"
+# FoodBal$CommodGroup[ind_changeToCereals] <- "Cereals"
+# unique(FoodBal$CommodGroup)
 #------------------------------------------
 # Prepare input for collectiveModes()
 FoodBal_group <- FoodBal[, c("Country-Item", "Region", "CommodGroup")]
@@ -298,12 +307,14 @@ FoodBal_ts <- FoodBal[, c("Year", "Country-Item", "zValue")]
 FoodBal_ts <- FoodBal_ts %>% spread(`Country-Item`, zValue)
 colnames(FoodBal_ts)[1] <- "Date"
 FoodBal_ts <- FoodBal_ts[, c("Date", col_order)]
-df_ts <- FoodBal_ts
 #------------------------------------------
 # Merge with oil price series
 # Modify df_group accordingly
+df_ts <- FoodBal_ts
 df_ts <- merge(df_ts, df_crudeOilPrice[, c("Date", "zPriceDiff")], by = "Date")
+colnames(df_ts)[ncol(df_ts)] <- "Crude oil, 1st order"
 df_group <- rbind(df_group, c("World oil, 1st order", "(Crude oil)", "Crude oil, 1st order"))
+col_order <- c(col_order, "Crude oil, 1st order")
 #------------------------------------------
 date_vec <- df_ts$Date
 df_ts$Date <- NULL
@@ -314,6 +325,10 @@ out_cm <- collectiveModes(mat_diff, date_vec, df_group,
                           Contrib_as_ModeSq = F,
                           AggregateContributions = F)
 #------------------------------------------
+mat_diff_SUR <- mat_diff
+colnames(mat_diff_SUR) <- paste("SUR", colnames(mat_diff_SUR))
+df_group_SUR <- df_group
+df_group_SUR$CommodGroup <- paste("SUR", df_group_SUR$CommodGroup)
 #==========================================
 #==========================================
 #==========================================
@@ -430,6 +445,11 @@ out_cm <- collectiveModes(mat_diff, date_vec, df_group,
                           AggregateContributions = F,
                           plot_eigenportfolio_ts = T)
 #------------------------------------------
+mat_diff_ExPrice <- mat_diff
+colnames(mat_diff_ExPrice) <- paste("ExPrice", colnames(mat_diff_ExPrice))
+df_group_ExPrice <- df_group
+df_group_ExPrice$CommodGroup <- paste("Price", df_group_ExPrice$CommodGroup)
+#------------------------------------------
 #
 n_ts <- ncol(mat_ts)
 ts_avg <- mat_ts %*% rep(1, n_ts) * 1 / n_ts
@@ -482,12 +502,51 @@ gg <- gg + geom_line() + facet_wrap(~Area, ncol = 2, scales = "free")
 gg
 
 
-
-
 #
 mat_modeVolat <- mat_diff %*% mat_sigModes
 sd_vec <- apply(mat_modeVolat, 2, sd)
 #
+
+
+
+
+
+
+rowdiff <- abs(nrow(mat_diff_SUR) - nrow(mat_diff_ExPrice))
+mat_diff_ExPrice <- mat_diff_ExPrice[-c(1:rowdiff), ]
+mat_diff <- cbind(mat_diff_ExPrice, mat_diff_SUR)
+mat_diff <- mat_diff[, -ncol(mat_diff)]
+
+df_group <- rbind(df_group_ExPrice, df_group_SUR)
+df_group <- df_group[-nrow(df_group), ]
+nrow(mat_diff) / ncol(mat_diff)
+out_cm <- collectiveModes(mat_diff, date_vec, df_group,
+                          Contrib_as_ModeSq = F,
+                          AggregateContributions = T,
+                          plot_eigenportfolio_ts = T)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
