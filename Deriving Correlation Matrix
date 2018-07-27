@@ -1,3 +1,9 @@
+library(plyr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(pracma)
+
 
 pct_signal <- 0.1
 n_proj <- 20
@@ -17,9 +23,9 @@ this_fun <- function(x, q_thresh){
 }
 contrib_mat <- apply(contrib_mat, 2, this_fun, q_thresh)
 df <- as.data.frame(contrib_mat)
-colnames(df) <- as.character(c(1:n_signal))
 df$Proj <- c(1:n_proj)
-df_plot <- df %>% gather(Type, Value, `1`:`2`)
+gathercols <- colnames(df_Q)[1:n_signal]
+df_plot <- df %>% gather_("Type", "Value", gathercols)
 ggplot(df_plot, aes(x = Proj, y = Value)) + geom_bar(stat = "identity") +
   facet_wrap(~Type, ncol = 2)
 ggplot(df_plot, aes(x = Value)) + geom_density() +
@@ -32,14 +38,67 @@ eigenvectors <- cbind(contrib_mat, noise_mat)
 eigenvalues_noise <- rnorm(n_noise, 0, 0.25)
 Dmat <- diag(c(eigenvalues_signal, eigenvalues_noise))
 
-Cmat <- t(eigenvectors) %*% Dmat %*% eigenvectors
+gs <- gramSchmidt(eigenvectors)
+Q <- gs$Q
+t(Q) %*% Q
+df_Q <- as.data.frame(Q[, 1:n_signal])
+colnames(df_Q) <- as.character(c(1:n_signal))
+df_Q$Proj <- c(1:n_proj)
+gathercols <- colnames(df_Q)[1:n_signal]
+df_plot <- df_Q %>% gather_("Type", "Value", gathercols)
+ggplot(df_plot, aes(x = Proj, y = Value)) + geom_bar(stat = "identity") +
+  facet_wrap(~Type, ncol = 2)
+
+Cmat <- t(Q) %*% Dmat %*% Q
 image(Cmat)
 
 
 
 
+source('./coloredNoise.R')
+
+n_t <- 500
+a <- -1
+ts <- coloredNoise(n_t, a = a, graph = T)
+acf(ts)
 
 
-library(pracma)
-M <- randortho(n_proj, type = c("orthonormal", "unitary"))
-t(M) %*% Dmat  %*% M
+n_t <- 500
+a <- -2
+y <- c()
+last_j <- 50
+for(j in 1:last_j){
+  X <- list()
+  for(i in 1:n_proj){
+    X[[i]] <- coloredNoise(n_t, a, graph = F)
+    
+  }
+  X <- do.call(cbind, X)
+  mat_PC <- X %*% contrib_mat
+  mat_PC_diff <- diff(mat_PC)
+  mat_PC_diff <- mat_PC_diff[-1, ]
+  cormat <- cor(mat_PC_diff)
+  #image(cormat)
+  #print(cormat)
+  y[j] <- cormat[2, 1]
+  
+}
+
+hist(y)
+mu <- mean(y)
+stdev <- sd(y)
+cv <- stdev / mu
+print(mu)
+print(cv)
+
+
+svd_Cmat <- svd(Cmat)
+eig_Cmat <- eigen(Cmat)
+
+image(t(svd_Cmat[[2]]) %*% svd_Cmat[[3]])
+
+
+svd_Cmat[[1]] / eig_Cmat$values
+
+
+
