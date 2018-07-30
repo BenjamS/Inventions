@@ -1,4 +1,4 @@
-setwd('D:/OneDrive - CGIAR/Documents')
+#setwd('D:/OneDrive - CGIAR/Documents')
 library(stats)
 library(plyr)
 library(ggplot2)
@@ -38,9 +38,12 @@ Oil_vec <- c("Soybeans", "Palm kernels", "Cottonseed", "Oil, palm",
 teaCoffeeCacao_vec_ExpPrice <- c("Tea", "Cocoa, butter", "Cocoa, paste", "Cocoa, beans", "Coffee, roasted", "Coffee, green")
 textileIndustrial_vec_ExpPrice <- c("Cotton lint", "Wool, greasy", "Wool, degreased", "Rubber, natural", "Cotton, carded, combed")
 #--------------------------
+generalCategories_vec_ExPrice <- c("Pulses", "Cereals", "Oilseeds")
+#--------------------------
 item_vec_ExpPrice <- c(Cereal_vec_ExpPrice, RnT_vec_ExpPrice, Oil_vec_ExpPrice, Fruit_vec_ExpPrice,
                        Pulses_vec_ExpPrice, Sugar_vec_ExpPrice, teaCoffeeCacao_vec_ExpPrice,
-                       textileIndustrial_vec_ExpPrice)
+                       textileIndustrial_vec_ExpPrice,
+                       generalCategories_vec_ExPrice)
 #==========================================
 # Get SUR item groups ready
 Cereal_vec_FoodBal <- c("Wheat and products", "Rice (Milled Equivalent)",
@@ -57,9 +60,12 @@ teaCoffeeCacao_vec_FoodBal <- c("Coffee and products",
                                 "Tea (including mate)")
 textileIndustrial_vec_FoodBal <- c()
 #--------------------------
+generalCategories_vec_FoodBal <- c("Starchy Roots", "Cereals - Excluding Beer", "Oilcrops")
+#--------------------------
 item_vec_FoodBal <- c(Cereal_vec_FoodBal, RnT_vec_FoodBal, Oil_vec_FoodBal, Fruit_vec_FoodBal,
                       Pulses_vec_FoodBal, Sugar_vec_FoodBal, teaCoffeeCacao_vec_FoodBal,
-                      textileIndustrial_vec_FoodBal)
+                      textileIndustrial_vec_FoodBal,
+                      generalCategories_vec_FoodBal)
 #--------------------------
 # Important for collectiveModes()
 crop_vec <- c(cerealPrimary_vec, "Cassava", "Potatoes", "Sweet potatoes",
@@ -111,7 +117,8 @@ ExportData_raw$Year <- as.integer(ExportData_raw$Year)
 unique(ExportData_raw$Element)
 ExportData_raw <- subset(ExportData_raw, Element %in% c("Export Quantity", "Export Value"))
 #------------------------------------------
-ExportData_raw <- FAOdat_createRegionGroups(ExportData_raw, exclude_these)
+ExportData_raw <- FAOdat_createRegionGroups(ExportData_raw, exclude_these,
+                                            keep_FAOregions = T)
 unique(ExportData_raw$Area[which(is.na(ExportData_raw$Region))])
 # unique(ExportData_raw$Region)
 # unique(ExportData_raw$Area)
@@ -154,7 +161,8 @@ colnames(FoodBal_raw)[4:ncol(FoodBal_raw)] <- as.character(c(1961:2013))
 FoodBal_raw <- gather(FoodBal_raw,Year,Value,`1961`:`2013`)
 FoodBal_raw$Year <- as.integer(FoodBal_raw$Year)
 #------------------------------------------
-FoodBal_raw <- FAOdat_createRegionGroups(FoodBal_raw, exclude_these)
+FoodBal_raw <- FAOdat_createRegionGroups(FoodBal_raw, exclude_these,
+                                         keep_FAOregions = T)
 unique(FoodBal_raw$Area[which(is.na(FoodBal_raw$Region))])
 # unique(FoodBal_raw$Region)
 # unique(FoodBal_raw$Area)
@@ -238,10 +246,15 @@ colnames(FoodBal_raw)[ncol(FoodBal_raw)] <- "Value"
 #==========================================
 # SUR analysis
 #==========================================
-these_items <- c(RnT_vec_FoodBal, Cereal_vec_FoodBal,
-                 Sugar_vec_FoodBal, Oil_vec_FoodBal)
+#generalCategories_vec_FoodBal
+these_items <- c(generalCategories_vec_FoodBal)
 these_regions <- c("Eastern Asia", "South-Eastern Asia",
                    "North America")
+
+# these_items <- c(RnT_vec_FoodBal, Cereal_vec_FoodBal,
+#                  Sugar_vec_FoodBal, Oil_vec_FoodBal)
+# these_regions <- c("Eastern Asia", "South-Eastern Asia",
+#                    "North America")
 start_year <- 1968
 #------------------------------------------
 FoodBal <- subset(FoodBal_raw, Item %in% these_items)
@@ -336,11 +349,16 @@ df_group_SUR$CommodGroup <- paste("SUR", df_group_SUR$CommodGroup)
 # Export price analysis
 #==========================================
 #==========================================
+#generalCategories_vec_ExPrice
+#these_items <- c(setdiff(Cereal_vec_ExpPrice, c(cerealSecondary_vec, "Millet")))
+these_items <- c("Cereals", "Oilcrops", RnT_vec_ExpPrice)
+these_regions <- c("South-Eastern Asia", "Eastern Asia", "North America")
+
 # these_items <- c(RnT_vec_ExpPrice, Cereal_vec_ExpPrice,
 #                  Sugar_vec_ExpPrice, Oil_vec_ExpPrice)
-these_items <- c(RnT_vec_ExpPrice, Cereal_vec_ExpPrice,
-                 Sugar_vec_ExpPrice, Oil_vec_ExpPrice)
-these_regions <- c("South-Eastern Asia", "Eastern Asia", "North America")
+# these_items <- c(RnT_vec_ExpPrice, Cereal_vec_ExpPrice,
+#                  Sugar_vec_ExpPrice, Oil_vec_ExpPrice)
+# these_regions <- c("South-Eastern Asia", "Eastern Asia", "North America")
 #these_regions <- c("South-Eastern Asia", "Eastern Asia")#, "Northern Europe", "Western Europe")
 # these_regions <- c("South-Eastern Asia", "Eastern Asia", "North America")#, "Northern Europe", "Western Europe")
 # these_items <- c(RnT_vec_ExpPrice, Cereal_vec_ExpPrice, Sugar_vec_ExpPrice)
@@ -444,6 +462,41 @@ out_cm <- collectiveModes(mat_diff, date_vec, df_group,
                           Contrib_as_ModeSq = F,
                           AggregateContributions = F,
                           plot_eigenportfolio_ts = T)
+#------------------------------------------
+contrib_mat <- out_cm[[1]]
+mat_PC <- mat_ts %*% contrib_mat
+mat_PC_diff <- diff(mat_PC)
+mat_PC_diff <- mat_PC_diff[-1, ]
+xts_PC_diff <- xts(mat_PC_diff, as.Date(date_vec[-1]))
+colnames(xts_PC_diff) <- as.character(c(1:5))
+xts_PC <- xts(mat_PC, as.Date(date_vec))
+colnames(xts_PC) <- as.character(c(1:5))
+
+this_ts_name <- "1"
+in_ts <- xts_PC[, this_ts_name]
+ts <- in_ts
+# slope_per = 3
+# per_ema = 3
+# ts <- getSlope(in_ts, slope_per, per_ema, Programatic = T)
+# plot(ts)
+#diff(as.matrix(df_ts[, this_ts_name]))
+#df_this_ts <- data.frame(x = ts[-c(1:(slope_per + per_ema))])
+df_this_ts <- fortify(ts)
+df_this_ts$Index <- NULL
+my.w <- analyze.wavelet(df_this_ts, "x",
+                        loess.span = 0,
+                        dt = 1, dj = 1/250,
+                        lowerPeriod = 2^1,
+                        upperPeriod = 2^5,
+                        make.pval = TRUE, n.sim = 10)
+wt.image(my.w, color.key = "quantile", n.levels = 250,
+         legend.params = list(lab = "wavelet power levels", mar = 4.7))
+my.rec <- reconstruct(my.w)
+x.rec <- my.rec$series$x.r  # x: name of original series
+
+
+
+
 #------------------------------------------
 contrib_mat <- out_cm[[1]]
 mat_PC <- mat_ts %*% contrib_mat
@@ -592,16 +645,81 @@ out_cm <- collectiveModes(mat_diff, date_vec, df_group,
 
 
 
-
-
-
-
-
-
-
-
 #==========================================
+# DEMAND CURVE
 #==========================================
+
+df_Demand <- FoodBal[, c("Area", "Item", "Year", "Region", "Value", "zValue")]
+colnames(df_Demand)[which(colnames(df_Demand) == "Value")] <- "Demand"
+colnames(df_Demand)[which(colnames(df_Demand) == "zValue")] <- "zDemand"
+
+df_Price <- ExportData[, c("Area", "Item", "Year", "Region", "Value", "zValue")]
+colnames(df_Price)[which(colnames(df_Price) == "Value")] <- "Price"
+colnames(df_Price)[which(colnames(df_Price) == "zValue")] <- "zPrice"
+
+u <- df_Demand$Item
+df_Demand$Item[grep("Cereals", u, ignore.case = T)] <- "Cereals"
+df_Demand <- subset(df_Demand, Item %in% c("Cereals", "Starchy Roots"))
+
+df_Price <- subset(df_Price, Item %in% c("Cereals", "Cassava dried"))
+u <- df_Price$Item
+df_Price$Item[grep("Cassava", u, ignore.case = T)] <- "Starchy Roots"
+
+# df_Demand$Item[grep("Maize", u, ignore.case = T)] <- "Maize"
+# df_Demand$Item[grep("Wheat", u, ignore.case = T)] <- "Wheat"
+# df_Demand$Item[grep("Rice", u, ignore.case = T)] <- "Rice"
+# df_Demand$Item[grep("Sorghum", u, ignore.case = T)] <- "Sorghum"
+# df_Demand$Item[grep("Rye", u, ignore.case = T)] <- "Rye"
+# df_Demand$Item[grep("Barley", u, ignore.case = T)] <- "Barley"
+# u <- df_Price$Item
+# df_Price$Item[grep("Rice", u, ignore.case = T)] <- "Rice"
+
+unique(df_Price$Item)
+unique(df_Demand$Item)
+
+df_Price <- subset(df_Price, Area == "South-Eastern Asia")
+df_Demand <- subset(df_Demand, Area == "South-Eastern Asia")
+
+unique(df_Price$Area)
+unique(df_Demand$Area)
+
+df_DemandCurve <- merge(df_Demand, df_Price, by = c("Region", "Area", "Item", "Year"))
+df_DemandCurve$lDemand <- log(df_DemandCurve$Demand)
+df_DemandCurve$lPrice <- log(df_DemandCurve$Price)
+
+df_plot <- subset(df_DemandCurve, Item == "Cereals")
+
+gg <- ggplot(df_plot, aes(x = Demand, y = Price, label = Year)) + geom_point()
+gg <- gg + geom_text(aes(label = Year, color = Year))
+gg <- gg + facet_wrap(~Area, ncol = 2, scales = "free")
+gg
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ExportData <- subset(ExportData_raw, Item %in% item_vec)
