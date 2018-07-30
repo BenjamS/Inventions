@@ -1,8 +1,9 @@
-fitWave <- function(ts, t, t_proj = NA, n_max_periods = 15, pval_thresh = 0.05, quietly = T){
+fitWave <- function(ts, t, t_proj = NULL, q_prob = 0.99,
+                    pval_thresh = 0.01, nper_fit = NULL, quietly = T){
   #---------------------
   #Make sure required packages are loaded
   #---------------------
-  required_packages <- c("stats")
+  required_packages <- c("stats", "ggplot2")
   lapply(required_packages, FUN = function(x) {
     if (!require(x, character.only = TRUE)) {
       install.packages(x, dependencies = TRUE)
@@ -10,12 +11,34 @@ fitWave <- function(ts, t, t_proj = NA, n_max_periods = 15, pval_thresh = 0.05, 
     }
   })
   #---------------------
-  ssp <- spectrum(ts)
-  df_per <- data.frame(per = 1 / ssp$freq, spec = ssp$spec)
-  df_per <- df_per[order(df_per$spec, decreasing = T), ]
+  ssp <- spectrum(ts, plot = F)
+  df_per_raw <- data.frame(per = 1 / ssp$freq, spectrum = ssp$spec)
+  df_per_raw <- df_per_raw[order(df_per_raw$spec, decreasing = T), ]
+  #--
+  df_per <- df_per_raw
+  q <- quantile(df_per$spec, probs = q_prob)
+  ind_keep <- which(df_per$spec > q)
+  minspec_keep <- min(df_per$spectrum[ind_keep])
+  df_per <- df_per[ind_keep, ]
+  ind_rm <- which(df_per_raw$per >= length(ts))
+  if(length(ind_rm) != 0){
+    df_per <- df_per[-ind_rm, ]
+  }
+  maxper_keep <- max(df_per$per)
+  #--
+  gg_per <- ggplot(df_per_raw, aes(x = per, y = spectrum)) + geom_line() +
+    geom_vline(xintercept = maxper_keep * 1.2, color = "orange") +
+    geom_hline(yintercept = minspec_keep, color = "orange")
+  print(gg_per)
+  #--
   per <- df_per$per
+  spec <- df_per$spectrum
   #---------------------
-  n_max_periods <- min(length(per), n_max_periods)
+  #n_max_periods <- min(length(per), n_max_periods)
+  n_max_periods <- length(per)
+  if(is.null(nper_fit) == F){
+    n_max_periods <- nper_fit
+  }
   #---------------------
   regrsrs_sin <- paste0("sin(2 * pi / per[", c(1:n_max_periods), "] * t)", collapse = " + ")
   regrsrs_cos <- paste0("cos(2 * pi / per[", c(1:n_max_periods), "] * t)", collapse = " + ")
@@ -54,23 +77,23 @@ fitWave <- function(ts, t, t_proj = NA, n_max_periods = 15, pval_thresh = 0.05, 
     v[i] <- unlist(strsplit(regrsrs_char[i], " "))[5]
     }
   ind_fitted_periods <- as.numeric(gsub("\\D", "", unique(v)))
-  fitted_periods <- sort(round(per[ind_fitted_periods], 2), decreasing = T)
+  # fitted_periods <- sort(round(spec[ind_fitted_periods], 2), decreasing = T)
+  df_per_final <- df_per[ind_fitted_periods, ]
+  n_pers_fitted <- nrow(df_per_final)
   #----------------
-  if(is.numeric(t_proj)){
-      wavproj <- predict(linmod, newdata = data.frame(t = t_proj))
-  }
+  wavfit <- as.numeric(fitted(linmod))
   #----------------
   if(quietly == F){
     print(summod)
-    print(paste("Number periods fitted:", length(fitted_periods)))
-    print(fitted_periods)
-    print(df_per[1:n_max_periods, ])
+    print(paste("Number periods fitted:", n_pers_fitted))
+    print(df_per_final)
     }
-  wavfit <- fitted(linmod)
-  if(is.numeric(t_proj)){
-    outlist <- list(wavfit, wavproj)
-    return(outlist)
+  if(is.null(t_proj) == F){
+    t_future <- length(ts) + t_proj
+    wavproj <- as.numeric(predict(linmod, newdata = data.frame(t = t_future)))
+    outlist <- list(wavfit, df_per_final, n_pers_fitted, wavproj)
   }else{
-    return(wavfit)
+    outlist <- list(wavfit, df_per_final, n_pers_fitted)
   }
+  return(outlist)
 }
