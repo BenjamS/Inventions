@@ -1,4 +1,4 @@
-FAOdat_createRegionGroups <- function(df_raw, exclude_these)
+FAOdat_createRegionGroups <- function(df_raw, exclude_these, keep_FAOregions = F)
 {
   #=================================
   #--Africa
@@ -65,8 +65,17 @@ FAOdat_createRegionGroups <- function(df_raw, exclude_these)
   df_raw$Region[which(u %in% c("Palau"))] <- "Pacific Islands"
   df_raw$Region[which(u %in% c("Maldives", "Réunion"))] <- "Southern Asia"
   df_raw$Region[which(u %in% c("French Guiana"))] <- "South America"
-  df_raw <- df_raw[which(is.na(df_raw$Region) == F),]
   rm(u)
+  #===========================
+  #unique(df_raw$Area[which(is.na(df_raw$Region) == T)])
+  ind_NA <- which(is.na(df_raw$Region) == T)
+  ind_noNA <- which(is.na(df_raw$Region) == F)
+  if(keep_FAOregions == F){
+    df_raw <- df_raw[ind_noNA,]
+  }else{
+    df_raw$Region[ind_NA] <- df_raw$Area[ind_NA] 
+  }
+  #===========================
   #--
   df_raw <- subset(df_raw, !(Area %in% exclude_these))
   #--
