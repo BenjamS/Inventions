@@ -1,4 +1,4 @@
-collectiveModes <- function(mat_diff, datevec, df_group = NULL,
+collectiveModes <- function(mat_diff, date_vec, df_group = NULL,
                             Contrib_as_ModeSq = F,
                             AggregateContributions = F,
                             plot_eigenportfolio_ts = F){
@@ -171,7 +171,7 @@ collectiveModes <- function(mat_diff, datevec, df_group = NULL,
   }
   p_thresh <- .90
   mainContrib_list <- apply(collModes[, 2:ncol(collModes)], 2,
-                             function(x) select_main_contributors(x, col_order, p_thresh))
+                            function(x) select_main_contributors(x, col_order, p_thresh))
   for(m in 1:(n_collModes - 1)){mainContrib_list[[m]]$Mode <- m + 1}
   df_mainContributors <- do.call(rbind, mainContrib_list)
   print("Main contributors to each non-leading mode:")
@@ -210,34 +210,39 @@ collectiveModes <- function(mat_diff, datevec, df_group = NULL,
   #-----------------------------
   # Plot Collective mode time series
   if(plot_eigenportfolio_ts == T){
-    mat_cmts <- mat_diff %*% collModes
+    mat_cmts <- mat_diff %*% collModes_really
+    n_cmts <- ncol(mat_cmts)
+    lam_sigs <- lam_cor[1:n_collModes_really]
+    mat_cmts <- mat_cmts %*% diag(1 / lam_sigs)
     ts_avg <- mat_diff %*% rep(1, n_ts) * 1 / n_ts
-    # class(mat_cmts)
-    # class(ts_avg)
-    df_plot <- as.data.frame(mat_cmts)
-    colnames(df_plot) <- mode_id
-    df_plot$`ts Avg.` <- ts_avg
-    df_plot$Date <- date_vec
-    if(class(df_plot$Date) == "character"){
-      df_plot$Date <- as.Date(df_plot$Date)
+    df_cmts <- as.data.frame(mat_cmts)
+    colnames(df_cmts) <- c(1:n_collModes_really) #mode_id
+    df_cmts$`ts Avg.` <- ts_avg
+    df_cmts$Date <- date_vec
+    if(class(df_cmts$Date) == "character"){
+      df_cmts$Date <- as.Date(df_cmts$Date)
     }
-    gathercols <- colnames(df_plot)[c(1:(ncol(df_plot) - 1))]
-    df_plot <- df_plot %>% gather_("Mode", "Value", gathercols)
-    zdf_plot <- as.data.frame(df_plot %>% group_by(Mode) %>% mutate(Value = scale(Value)))
-    #--
-    zdf_plot1 <- subset(zdf_plot, Mode %in% c("1", "ts Avg."))
-    gg <- ggplot(zdf_plot1, aes(x = Date, y = Value,
-                                group = Mode, color = Mode))
+    df_cmts <- df_cmts[-nrow(df_cmts), ]
+    df_cmts_wide <- df_cmts
+    gathercols <- colnames(df_cmts)[c(1:(ncol(df_cmts) - 1))]
+    df_cmts <- df_cmts %>% gather_("Mode", "Value", gathercols)
+    #--------------------------------
+    df_plot <- subset(df_cmts, Mode %in% c("1", "ts Avg."))
+    gg <- ggplot(df_plot, aes(x = Date, y = Value,
+                              group = Mode, color = Mode))
     gg <- gg + geom_line()
     print(gg)
-    zdf_plot2 <- subset(zdf_plot, !(Mode %in% c("1", "ts Avg.")))
-    gg <- ggplot(zdf_plot2, aes(x = Date, y = Value)) + geom_line() +
-      facet_wrap(~Mode, ncol = 2)
+    #--------------------------------
+    omit <- as.character(c(1, 5:n_collModes_really))
+    omit <- c(omit, "ts Avg.")
+    df_plot <- subset(df_cmts, !(Mode %in% omit))
+    gg <- ggplot(df_plot, aes(x = Date, y = Value,
+                              group = Mode, color = Mode))
+    gg <- gg + geom_line()
     print(gg)
-    
   }
   #-----------------------------
   lam_signal <- lam_cor[1:n_collModes_really]
-  outlist <- list(collModes_really, lam_signal)
+  outlist <- list(collModes_really, lam_signal, df_cmts_wide)
   return(outlist)
 }
