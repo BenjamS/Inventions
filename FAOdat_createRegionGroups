@@ -1,4 +1,5 @@
-FAOdat_createRegionGroups <- function(df_raw, exclude_these, keep_FAOregions = F)
+FAOdat_createRegionGroups <- function(df_raw, exclude_these, keep_FAOregions = F,
+                                      df_is_trade_matrix = F)
 {
   #=================================
   #--Africa
@@ -30,7 +31,11 @@ FAOdat_createRegionGroups <- function(df_raw, exclude_these, keep_FAOregions = F
   countries_PacifIs <- setdiff(countries_Oceania, countries_AusNZea)
   #=================================
   #--Create region groupings
-  u <- df_raw$Area
+  if(df_is_trade_matrix){
+    u <- df_raw$Partner.Countries
+  }else{
+    u <- df_raw$Area
+  }
   df_raw$Region <- NA
   df_raw$Region[which(u %in% countries_NAmer)] <- "North America"
   df_raw$Region[which(u %in% countries_SAmer)] <- "South America"
@@ -58,7 +63,11 @@ FAOdat_createRegionGroups <- function(df_raw, exclude_these, keep_FAOregions = F
   #unique(df_raw$Area[which(is.na(df_raw$Region))])
   #--Assign these to their proper regions
   #(Leave out "China" as it is already covered under "China, mainlaind", "Hong Kong", etc.)
-  u <- df_raw$Area
+  if(df_is_trade_matrix){
+    u <- df_raw$Partner.Countries
+  }else{
+    u <- df_raw$Area
+  }
   df_raw$Region[which(u %in% c("Åland Islands", "Isle of Man", "Greenland"))] <- "Northern Europe"
   df_raw$Region[which(u %in% c("Anguilla", "Bermuda", "Cayman Islands", "Curaçao"))] <- "Caribbean"
   df_raw$Region[which(u %in% c("Côte d'Ivoire"))] <- "Western Africa"
@@ -68,16 +77,22 @@ FAOdat_createRegionGroups <- function(df_raw, exclude_these, keep_FAOregions = F
   rm(u)
   #===========================
   #unique(df_raw$Area[which(is.na(df_raw$Region) == T)])
-  ind_NA <- which(is.na(df_raw$Region) == T)
-  ind_noNA <- which(is.na(df_raw$Region) == F)
-  if(keep_FAOregions == F){
-    df_raw <- df_raw[ind_noNA,]
-  }else{
-    df_raw$Region[ind_NA] <- df_raw$Area[ind_NA] 
+  if(!(df_is_trade_matrix)){
+    ind_NA <- which(is.na(df_raw$Region) == T)
+    ind_noNA <- which(is.na(df_raw$Region) == F)
+    if(keep_FAOregions == F){
+      df_raw <- df_raw[ind_noNA,]
+    }else{
+      df_raw$Region[ind_NA] <- df_raw$Area[ind_NA] 
+    }
   }
   #===========================
   #--
-  df_raw <- subset(df_raw, !(Area %in% exclude_these))
+  if(df_is_trade_matrix){
+    df_raw <- subset(df_raw, !(Partner.Countries %in% exclude_these))
+  }else{
+    df_raw <- subset(df_raw, !(Area %in% exclude_these))
+  }
   #--
   # LAC <- c("Central America", "Caribbean", "South America")
   # Europe_E <- "Eastern Europe"
