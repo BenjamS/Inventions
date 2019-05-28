@@ -1,5 +1,9 @@
 FAOdat_createRegionGroups <- function(df_raw, exclude_these, keep_FAOregions = F,
-                                      df_is_trade_matrix = F)
+                                      df_is_trade_matrix = F,
+                                      consolidate_LAC = T,
+                                      consolidate_WEur = T,
+                                      consolidate_AusNZPacIslands = T,
+                                      consolidate_SSA = T)
 {
   #=================================
   #--Africa
@@ -94,17 +98,37 @@ FAOdat_createRegionGroups <- function(df_raw, exclude_these, keep_FAOregions = F
     df_raw <- subset(df_raw, !(Area %in% exclude_these))
   }
   #--
-  # LAC <- c("Central America", "Caribbean", "South America")
+  if(consolidate_LAC){
+    LAC <- c("Central America", "Caribbean", "South America")
+    u <- df_raw$Region
+    df_raw$Region[which(u %in% LAC)] <- "LAC"
+    rm(u)
+  }
+  if(consolidate_WEur){
+    Europe_WNS <- c("Southern Europe", "Western Europe", "Northern Europe")
+    u <- df_raw$Region
+    df_raw$Region[which(u %in% Europe_WNS)] <- "W/N/S Europe"
+    rm(u)
+  }
+  if(consolidate_AusNZPacIslands){
+    AusNZPacIslands <- c("Australia & New Zealand", "Pacific Islands")
+    u <- df_raw$Region
+    df_raw$Region[which(u %in% AusNZPacIslands)] <- "Aus/NZ/Oceania"
+    rm(u)
+  }
+  if(consolidate_SSA){
+    SSA <- c("Eastern Africa", "Southern Africa", "Western Africa", "Middle Africa")
+    u <- df_raw$Region
+    df_raw$Region[which(u %in% SSA)] <- "Sub-Saharan Africa"
+    rm(u)
+  }
+  
   # Europe_E <- "Eastern Europe"
-  # Europe_WNS <- c("Southern Europe", "Western Europe", "Northern Europe")
-  # SSA <- c("Eastern Africa", "Southern Africa", "Western Africa", "Middle Africa")
   # ESE_Asia <- c("South-Eastern Asia", "Eastern Asia")
   #--
   # u <- df_raw$Region
   # df_raw$Region[which(u %in% LAC)] <- "LAC"
   # df_raw$Region[which(u %in% Europe_E)] <- "E. Europe"
-  # df_raw$Region[which(u %in% Europe_WNS)] <- "W., N., & S. Europe"
-  # df_raw$Region[which(u %in% SSA)] <- "Sub-Saharan Africa"
   # df_raw$Region[which(u %in% ESE_Asia)] <- "E. & S.E. Asia"
   # rm(u)
   #--
