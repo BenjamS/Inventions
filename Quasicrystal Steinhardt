@@ -1,15 +1,21 @@
+
+
+
+
 gr_parl <- (1 + sqrt(5)) / 2
 gr_perp <- (1 - sqrt(5)) / 2
 r_m_parl_21 <- gr_parl
 r_m_perp_21 <- gr_perp
-b_parl <- 1
-a_parl <- -r_m_perp_21 * b_parl
+a_parl <- 1
+b_parl <- -1 / r_m_perp_21 * a_parl
 k_1 <- 1 / (1 - r_m_perp_21)
 k_2 <- 1 / (1 - 1 / r_m_perp_21)
 # q_parl_0 <-
 # q_perp_0 <- 
-m_parl_1 <- 1 / ((1 - r_m_parl_21 / r_m_perp_21) * a_parl)  
-m_parl_2 <- 1 / ((1 - r_m_perp_21 / r_m_parl_21) * b_parl)  
+m_parl_1 <- 1 / ((1 - r_m_parl_21 / r_m_perp_21) * a_parl)
+m_parl_2 <- 1 / ((1 - r_m_perp_21 / r_m_parl_21) * b_parl)
+
+m_parl_2 / m_parl_1
 
 n <- 
 
