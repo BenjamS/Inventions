@@ -3,6 +3,7 @@ options(warn = -1); options(scipen = 999)
 library(plyr)
 library(tidyverse)
 library(ggplot2)
+library(zoo)
 
 
 WDI_raw <- read.csv("WDIData.csv", stringsAsFactors = F)
@@ -14,7 +15,7 @@ WDI_raw$Country <- as.character(WDI_raw$Country)
 WDI_raw$Indicator <- as.character(WDI_raw$Indicator)
 #unique(WDI_raw$Indicator)
 #unique(WDI_raw$Indicator[grep("GDP", WDI_raw$Indicator)])
-unique(WDI_raw$Indicator[grep("population", WDI_raw$Indicator, ignore.case = T)])
+unique(WDI_raw$Indicator[grep("depletion", WDI_raw$Indicator, ignore.case = T)])
 colnames(WDI_raw)[3:ncol(WDI_raw)] <- as.character(c(1960:2018))
 WDI_long <- WDI_raw %>% gather(Year, Value, `1960`:`2018`)
 #unique(WDI_raw$Country)
@@ -28,25 +29,36 @@ environmental_indicators <- c("CO2 emissions (metric tons per capita)",
                               "Total natural resources rents (% of GDP)",
                               "Agricultural land (% of land area)",
                               "Land under cereal production (hectares)",
-                              "Access to electricity, urban (% of urban population)",
-                              "Access to electricity, rural (% of rural population)",
                               "Forest area (% of land area)",
                               "Energy intensity level of primary energy (MJ/$2011 PPP GDP)",
-                              "Renewable energy consumption (% of total final energy consumption)"
+                              "Renewable energy consumption (% of total final energy consumption)",
+                              "Agricultural methane emissions (thousand metric tons of CO2 equivalent)",
+                              "Agricultural nitrous oxide emissions (thousand metric tons of CO2 equivalent)",
+                              "Forest rents (% of GDP)",
+                              "Adjusted savings: net forest depletion (% of GNI)",
+                              "Adjusted savings: mineral depletion (% of GNI)",
+                              "Adjusted savings: energy depletion (% of GNI)",
+                              "Level of water stress: freshwater withdrawal as a proportion of available freshwater resources",
+                              "Access to clean fuels and technologies for cooking (% of population)",
+                              "Renewable internal freshwater resources per capita (cubic meters)",
+                              "Water productivity, total (constant 2010 US$ GDP per cubic meter of total freshwater withdrawal)"
                               )
 
 pop_indicators <- c(#"Birth rate, crude (per 1,000 people)",
                     #"Death rate, crude (per 1,000 people)",
+                    "Urban population (% of total population)",
                     "Rural population (% of total population)",
+                    "Urban population growth (annual %)",
+                    "Population growth (annual %)",
                     #"Population ages 0-14, total",
-                    "Population ages 0-14 (% of total)",
+                    #"Population ages 0-14 (% of total)",
                     #"Population ages 15-64, total",
-                    "Population ages 15-64 (% of total)",
+                    #"Population ages 15-64 (% of total)",
                     #"Population ages 65 and above, total",
-                    "Population ages 65 and above (% of total)",
-                    "Population density (people per sq. km of land area)"
+                    #"Population ages 65 and above (% of total)",
+                    "Population density (people per sq. km of land area)",
                     #"Population growth (annual %)",
-                    #"Refugee population by country or territory of origin"
+                    "Refugee population by country or territory of origin"
                     # "Population, total",
                     # "Population ages 0-4, female (% of female population)",
                     # "Population ages 0-4, male (% of male population)",
@@ -85,41 +97,46 @@ pop_indicators <- c(#"Birth rate, crude (per 1,000 people)",
 )
 economic_indicators <- c("Consumer price index (2010 = 100)",
                          "Foreign direct investment, net inflows (% of GDP)",
-                         "Export value index (2000 = 100)",
-                         "Import value index (2000 = 100)",
+                         #"Export value index (2000 = 100)",
+                         #"Import value index (2000 = 100)",
                          "Mobile cellular subscriptions (per 100 people)",
                          "Individuals using the Internet (% of population)",
                          "Military expenditure (% of GDP)",
-                         "GDP per capita (current US$)",
+                         #"GDP per capita (current US$)",
                          "Net ODA received per capita (current US$)",
                          "Poverty headcount ratio at $1.90 a day (2011 PPP) (% of population)",
                          "Trade (% of GDP)",
-                         #"GDP growth (annual %)",
-                         "Industry (including construction), value added (% of GDP)",
+                         "GDP growth (annual %)",
+                         #"Industry (including construction), value added (% of GDP)",
                          "Industry (including construction), value added (annual % growth)",
-                         "Manufacturing, value added (% of GDP)",
-                         #"Manufacturing, value added (annual % growth)",
-                         "Services, value added (% of GDP)",
-                         #"Services, value added (annual % growth)",
-                         "Agriculture, forestry, and fishing, value added (% of GDP)",
-                         #"Agriculture, forestry, and fishing, value added (annual % growth)",
-                         "Trade in services (% of GDP)"
-                         #"Exports of goods and services (annual % growth)",
-                         #"Imports of goods and services (annual % growth)",
-                         #"Gross capital formation (annual % growth)",
-                         #"Gross fixed capital formation (annual % growth)",
-                         #"Final consumption expenditure (annual % growth)"
+                         #"Manufacturing, value added (% of GDP)",
+                         "Manufacturing, value added (annual % growth)",
+                         #"Services, value added (% of GDP)",
+                         "Services, value added (annual % growth)",
+                         #"Agriculture, forestry, and fishing, value added (% of GDP)",
+                         "Agriculture, forestry, and fishing, value added (annual % growth)",
+                         #"Trade in services (% of GDP)",
+                         "Access to electricity (% of population)",
+                         "Access to electricity, urban (% of urban population)",
+                         "Access to electricity, rural (% of rural population)",
+                         "Exports of goods and services (annual % growth)",
+                         "Imports of goods and services (annual % growth)",
+                         "Gross capital formation (annual % growth)",
+                         "Gross fixed capital formation (annual % growth)",
+                         "Final consumption expenditure (annual % growth)"
 )
 employment_indicators <- c("Employment in agriculture (% of total employment) (modeled ILO estimate)",
                            "Employment in industry (% of total employment) (modeled ILO estimate)",
                            "Employment in services (% of total employment) (modeled ILO estimate)",
                            "Labor force participation rate, total (% of total population ages 15+) (modeled ILO estimate)",
-                           "Unemployment, total (% of total labor force) (modeled ILO estimate)",
+                           #"Unemployment, total (% of total labor force) (modeled ILO estimate)",
+                           "Agriculture, forestry, and fishing, value added per worker (constant 2010 US$)",
                            "Agriculture, value added per worker (constant 2010 US$)",
                            "Industry, value added per worker (constant 2010 US$)",
+                           "Industry (including construction), value added per worker (constant 2010 US$)",
                            "Services, value added per worker (constant 2010 US$)",
-                           "Age dependency ratio, young (% of working-age population)",
-                           "Age dependency ratio, old (% of working-age population)",
+                           #"Age dependency ratio, young (% of working-age population)",
+                           #"Age dependency ratio, old (% of working-age population)",
                            "Age dependency ratio (% of working-age population)",
                            "Ratio of female to male labor force participation rate (%) (modeled ILO estimate)"
 )
@@ -137,6 +154,16 @@ educ_indicators <- c(#"Government expenditure on education, total (% of GDP)",
 
 indicator_vec <- c(educ_indicators, employment_indicators,
                    health_indicators, economic_indicators, environmental_indicators)
+
+
+
+
+
+
+
+
+
+
 WDI_look <- subset(WDI_long, Indicator %in% indicator_vec)
 #WDI_wide <- spread(WDI_long, Indicator, Value)
 
@@ -320,16 +347,17 @@ gg
 #df_WDI <- subset(WDI_look, Country %in% c("Lower middle income"))
 indicator_vec <- c(pop_indicators, educ_indicators, employment_indicators,
                    health_indicators, economic_indicators, environmental_indicators)
-df_WDI <- subset(WDI_long, Country %in% c("Low income"))
+df_WDI <- subset(WDI_long, Country %in% c("Lower middle income"))
+#df_WDI <- subset(WDI_long, Country %in% c("High income"))
 df_WDI <- subset(df_WDI, Indicator %in% indicator_vec)
 
 df_WDI <- df_WDI %>% spread(Indicator, Value)
 df_WDI$Year <- as.integer(df_WDI$Year)
-df_WDI <- subset(df_WDI, Year >= 1985)
+df_WDI <- subset(df_WDI, Year >= 1989)
 df_WDI <- subset(df_WDI, Year < 2018)
-library(zoo)
 
 #---
+year_vec <- df_WDI$Year
 df_WDI <- df_WDI[, -c(1, 2)]
 out <- apply(df_WDI, 2, function(x) length(which(is.na(x))))
 table(out)
@@ -359,56 +387,79 @@ environmental_indicators_mod <- environmental_indicators
 employment_indicators_mod <- employment_indicators
 pop_indicators_mod <- pop_indicators
 #
-# df_WDI$`Prevalence of HIV, total (% of population ages 15-49)` <- df_WDI$`Prevalence of HIV, total (% of population ages 15-49)` / 100
-# df_WDI$`1 / Prevalence of HIV, total (% of population ages 15-49)` <- 1 / df_WDI$`Prevalence of HIV, total (% of population ages 15-49)`
-# df_WDI$`Prevalence of HIV, total (% of population ages 15-49)` <- NULL
-health_indicators_mod[grep("Prevalence of HIV", health_indicators_mod)] <- "1 / Prevalence of HIV, total (% of population ages 15-49)"
-df_WDI$`Incidence of HIV (% of uninfected population ages 15-49)` <- 1 / df_WDI$`Incidence of HIV (% of uninfected population ages 15-49)`
-df_WDI <- df_WDI %>% rename(`1 / Incidence of HIV (% of uninfected population ages 15-49)` = `Incidence of HIV (% of uninfected population ages 15-49)`)
-health_indicators_mod[grep("Incidence of HIV", health_indicators_mod)] <- "1 / Incidence of HIV (% of uninfected population ages 15-49)"
-df_WDI$`1 / Mortality rate, under-5 (per 1,000 live births)` <- 1 / df_WDI$`Mortality rate, under-5 (per 1,000 live births)`
-df_WDI$`Mortality rate, under-5 (per 1,000 live births)` <- NULL
-health_indicators_mod[grep("Mortality rate", health_indicators_mod)] <- "1 / Mortality rate, under-5 (per 1,000 live births)"
+# # df_WDI$`Prevalence of HIV, total (% of population ages 15-49)` <- df_WDI$`Prevalence of HIV, total (% of population ages 15-49)` / 100
+# # df_WDI$`1 / Prevalence of HIV, total (% of population ages 15-49)` <- 1 / df_WDI$`Prevalence of HIV, total (% of population ages 15-49)`
+# # df_WDI$`Prevalence of HIV, total (% of population ages 15-49)` <- NULL
+# # health_indicators_mod[grep("Prevalence of HIV", health_indicators_mod)] <- "1 / Prevalence of HIV, total (% of population ages 15-49)"
+# df_WDI$`Incidence of HIV (% of uninfected population ages 15-49)` <- 1 / df_WDI$`Incidence of HIV (% of uninfected population ages 15-49)`
+# df_WDI <- df_WDI %>% rename(`1 / Incidence of HIV (% of uninfected population ages 15-49)` = `Incidence of HIV (% of uninfected population ages 15-49)`)
+# health_indicators_mod[grep("Incidence of HIV", health_indicators_mod)] <- "1 / Incidence of HIV (% of uninfected population ages 15-49)"
+# df_WDI$`1 / Mortality rate, under-5 (per 1,000 live births)` <- 1 / df_WDI$`Mortality rate, under-5 (per 1,000 live births)`
+# df_WDI$`Mortality rate, under-5 (per 1,000 live births)` <- NULL
+# health_indicators_mod[grep("Mortality rate", health_indicators_mod)] <- "1 / Mortality rate, under-5 (per 1,000 live births)"
 # df_WDI$`1 / Refugee population by country or territory of origin` <- 1 / df_WDI$`Refugee population by country or territory of origin`
 # df_WDI$`Refugee population by country or territory of origin` <- NULL
-df_WDI$`1 / CO2 emissions (metric tons per capita)` <- 1 / df_WDI$`CO2 emissions (metric tons per capita)`
-df_WDI$`CO2 emissions (metric tons per capita)` <- NULL
-environmental_indicators_mod[grep("CO2 emissions", environmental_indicators_mod)] <- "1 / CO2 emissions (metric tons per capita)"
-df_WDI$`1 / Population ages 0-14, (% of total)` <- 1 / df_WDI$`Population ages 0-14 (% of total)`
-df_WDI$`Population ages 0-14 (% of total)` <- NULL
-pop_indicators_mod[grep("Population ages 0-14", pop_indicators_mod)] <- "1 / Population ages 0-14, (% of total)"
-df_WDI$`1 / Unemployment, total (% of total labor force) (modeled ILO estimate)` <- 1 / df_WDI$`Unemployment, total (% of total labor force) (modeled ILO estimate)`
-df_WDI$`Unemployment, total (% of total labor force) (modeled ILO estimate)` <- NULL
-employment_indicators_mod[grep("Unemployment, total", employment_indicators_mod)] <- "1 / Unemployment, total (% of total labor force) (modeled ILO estimate)"
-df_WDI$`1 / Age dependency ratio, young (% of working-age population)` <- 1 / df_WDI$`Age dependency ratio, young (% of working-age population)`
-df_WDI$`Age dependency ratio, young (% of working-age population)` <- NULL
-employment_indicators_mod[grep("Age dependency ratio, young", employment_indicators_mod)] <- "1 / Age dependency ratio, young (% of working-age population)"
-df_WDI$`1 / Age dependency ratio, old (% of working-age population)` <- 1 / df_WDI$`Age dependency ratio, old (% of working-age population)`
-df_WDI$`Age dependency ratio, old (% of working-age population)` <- NULL
-employment_indicators_mod[grep("Age dependency ratio, old", employment_indicators_mod)] <- "1 / Age dependency ratio, old (% of working-age population)"
-df_WDI$`1 / Energy intensity level of primary energy (MJ/$2011 PPP GDP)` <- 1 / df_WDI$`Energy intensity level of primary energy (MJ/$2011 PPP GDP)`
-df_WDI$`Energy intensity level of primary energy (MJ/$2011 PPP GDP)` <- NULL
-environmental_indicators_mod[grep("Energy intensity", environmental_indicators_mod)] <- "1 / Energy intensity level of primary energy (MJ/$2011 PPP GDP)"
+# pop_indicators_mod[grep("Refugee population by country or territory of origin", pop_indicators_mod)] <- "1 / Refugee population by country or territory of origin"
+# df_WDI$`1 / CO2 emissions (metric tons per capita)` <- 1 / df_WDI$`CO2 emissions (metric tons per capita)`
+# df_WDI$`CO2 emissions (metric tons per capita)` <- NULL
+# environmental_indicators_mod[grep("CO2 emissions", environmental_indicators_mod)] <- "1 / CO2 emissions (metric tons per capita)"
+# # df_WDI$`1 / Population ages 0-14, (% of total)` <- 1 / df_WDI$`Population ages 0-14 (% of total)`
+# # df_WDI$`Population ages 0-14 (% of total)` <- NULL
+# # pop_indicators_mod[grep("Population ages 0-14", pop_indicators_mod)] <- "1 / Population ages 0-14, (% of total)"
+# df_WDI$`1 / Unemployment, total (% of total labor force) (modeled ILO estimate)` <- 1 / df_WDI$`Unemployment, total (% of total labor force) (modeled ILO estimate)`
+# df_WDI$`Unemployment, total (% of total labor force) (modeled ILO estimate)` <- NULL
+# employment_indicators_mod[grep("Unemployment, total", employment_indicators_mod)] <- "1 / Unemployment, total (% of total labor force) (modeled ILO estimate)"
+# df_WDI$`1 / Age dependency ratio, young (% of working-age population)` <- 1 / df_WDI$`Age dependency ratio, young (% of working-age population)`
+# df_WDI$`Age dependency ratio, young (% of working-age population)` <- NULL
+# employment_indicators_mod[grep("Age dependency ratio, young", employment_indicators_mod)] <- "1 / Age dependency ratio, young (% of working-age population)"
+# df_WDI$`1 / Age dependency ratio, old (% of working-age population)` <- 1 / df_WDI$`Age dependency ratio, old (% of working-age population)`
+# df_WDI$`Age dependency ratio, old (% of working-age population)` <- NULL
+# employment_indicators_mod[grep("Age dependency ratio, old", employment_indicators_mod)] <- "1 / Age dependency ratio, old (% of working-age population)"
+# df_WDI$`1 / Energy intensity level of primary energy (MJ/$2011 PPP GDP)` <- 1 / df_WDI$`Energy intensity level of primary energy (MJ/$2011 PPP GDP)`
+# df_WDI$`Energy intensity level of primary energy (MJ/$2011 PPP GDP)` <- NULL
+# environmental_indicators_mod[grep("Energy intensity", environmental_indicators_mod)] <- "1 / Energy intensity level of primary energy (MJ/$2011 PPP GDP)"
 #---
 
 
 df_WDI[df_WDI < 10^-7] <- 10^-6
 
-#mat_diff <- diff(scale(df_WDI))
-mat_diff <- diff((df_WDI))
-#mat_diff <- diff(as.matrix(log(df_WDI)))
+#mat_in <- diff(scale(df_WDI))
+mat_in <- scale(df_WDI)
+#mat_in <- diff(as.matrix(log(df_WDI)))
 
-cormat <- cor(mat_diff)
-dim(mat_diff)
-dim(cormat)
+cormat <- cor(mat_in)
+#dim(mat_in)
+#dim(cormat)
 image(cormat)
-col_order <- colnames(mat_diff)
+col_order <- colnames(mat_in)
+n_ts <- ncol(mat_in)
 
 eig_vectors <- eigen(cormat)$vectors
+collModes <- as.matrix(eig_vectors[, ind_deviating_from_noise])
+ind_neg <- which(collModes[, 1] < 0)
+df_WDI[, ind_neg] <- 1 / df_WDI[, ind_neg]
+col_order[ind_neg] <- paste("1 /", col_order[ind_neg])
+mat_in <- scale(df_WDI)
+cormat <- cor(mat_in)
+#dim(mat_in)
+#dim(cormat)
+image(cormat)
+
+list_indicatorTypes <- list(pop_indicators, educ_indicators, employment_indicators,
+                            health_indicators, economic_indicators, environmental_indicators)
+indicator_type_names <- c("Population", "Education", "Employment", "Health", "Economy", "Environment")
+for(i in 1:length(list_indicatorTypes)){
+  this_indicator_vec <- list_indicatorTypes[[i]]
+  ind_mod <- which(this_indicator_vec %in% col_order[ind_neg])
+  this_indicator_vec[ind_mod] <- paste("1 /", this_indicator_vec[ind_mod])
+  list_indicatorTypes[[indicator_type_names[i]]] <- this_indicator_vec
+}
+
+
 lam_cor <- eigen(cormat)$values
 lamcor_max <- max(lam_cor)
-N_t <- nrow(mat_diff)
-N_c <- ncol(mat_diff)
+N_t <- nrow(mat_in)
+N_c <- ncol(mat_in)
 Q <- N_t / N_c
 s_sq <- 1 - lamcor_max / N_c
 #s_sq <- 1
@@ -436,8 +487,8 @@ n_collModes <- ncol(collModes)
 #-----------------------------
 # Set sign of eigenvectors such that they
 # best conform to the input time series
-Modes <- mat_diff %*% collModes
-ts_avg <- mat_diff %*% rep(1, N_c) * 1 / N_c
+Modes <- mat_in %*% collModes
+ts_avg <- mat_in %*% rep(1, N_c) * 1 / N_c
 for(i in 1:n_collModes){
   sse <- sum((Modes[, i] - ts_avg)^2)
   sse_neg <- sum((-Modes[, i] - ts_avg)^2)
@@ -447,52 +498,142 @@ for(i in 1:n_collModes){
   }
 }
 #-----------------------------
-n_collModes_really <- n_collModes
-collModes_really <- collModes
 print(paste("Number of collective modes: ", n_collModes))
-if(ncol(collModes) > 6){
-  collModes <- collModes[, 1:6]
-  n_collModes <- 6
+collModes_show <- collModes
+n_collModes_show <- n_collModes
+if(n_collModes > 6){
+  collModes_show <- collModes[, 1:6]
+  n_collModes_show <- 6
 }
 #-----------------------------
 # Contributions of items to each mode
-Contrib_as_ModeSq <- F
-if(Contrib_as_ModeSq == T){
-  Contribution <- (collModes)^2
-}else{
-  Contribution <- collModes
-}
-df_contrib <- data.frame(ts_id = col_order, Contribution)
+df_contrib <- data.frame(Indicator = col_order, collModes_show)
 #df_contrib <- cbind(df_contrib, df_group[, c(2:ncol(df_group))])
-mode_id <- c(1:n_collModes)
-colnames(df_contrib)[2:(n_collModes + 1)] <- mode_id
+mode_id <- c(1:n_collModes_show)
+colnames(df_contrib)[2:(n_collModes_show + 1)] <- mode_id
 gathercols <- as.character(mode_id)
 df_contrib <- gather_(df_contrib, "Mode", "Contribution", gathercols)
 df_contrib$`Indicator Type` <- NA
-u <- df_contrib$ts_id
-df_contrib$`Indicator Type`[which(u %in% health_indicators_mod)] <- "Health"
-df_contrib$`Indicator Type`[which(u %in% educ_indicators)] <- "Education"
-df_contrib$`Indicator Type`[which(u %in% economic_indicators)] <- "Economy"
-df_contrib$`Indicator Type`[which(u %in% pop_indicators_mod)] <- "Population"
-df_contrib$`Indicator Type`[which(u %in% employment_indicators_mod)] <- "Employment"
-df_contrib$`Indicator Type`[which(u %in% environmental_indicators_mod)] <- "Environment"
+u <- df_contrib$Indicator
+for(i in length(list_indicatorTypes)){
+  df_contrib$`Indicator Type`[which(u %in% list_indicatorTypes[[i]])] <- indicator_type_names[i]
+}
+# df_contrib$`Indicator Type`[which(u %in% educ_indicators)] <- "Education"
+# df_contrib$`Indicator Type`[which(u %in% economic_indicators)] <- "Economy"
+# df_contrib$`Indicator Type`[which(u %in% pop_indicators_mod)] <- "Population"
+# df_contrib$`Indicator Type`[which(u %in% employment_indicators_mod)] <- "Employment"
+# df_contrib$`Indicator Type`[which(u %in% environmental_indicators_mod)] <- "Environment"
 df_contrib$`Indicator Type` <- as.factor(df_contrib$`Indicator Type`)
 df_plot <- df_contrib
 df_plot$Contribution <- df_plot$Contribution
 xx <- df_plot$`Indicator Type`
-df_plot$ts_id <- factor(df_plot$ts_id, levels = unique(df_plot$ts_id[order(xx)]))
-gg <- ggplot(df_plot, aes(x = ts_id, y = Contribution, fill = `Indicator Type`))
+df_plot$Indicator <- factor(df_plot$Indicator, levels = unique(df_plot$Indicator[order(xx)]))
+gg <- ggplot(df_plot, aes(x = Indicator, y = Contribution, fill = `Indicator Type`))
 gg <- gg + geom_bar(stat = "identity", position = "dodge")
 gg <- gg + facet_wrap(~ Mode, nrow = 1)
 if(N_c <= 50){
   gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
-                   axis.title.x = element_blank())
+                   axis.title.y = element_blank())
 }else{
   gg <- gg + theme(axis.text.x = element_blank(),
-                   axis.title.x = element_blank(),
                    axis.title.y = element_blank())
 }
 gg <- gg + coord_flip()
+gg
+
+
+
+
+
+
+
+
+
+
+
+
+
+for(i in 2:n_collModes){
+  this_PC <- print(paste("Principle Component", i))
+  print(paste("Investment in portfolio (PC)", i, "is correlated with investment in:"))
+  
+  this_df <- subset(df_contrib, Mode == i)
+  q <- quantile(this_df$Contribution, probs = 0.87)
+  ind_look <- which(this_df$Contribution >= q)
+  ind_look_ordered <- ind_look[order(this_df$Contribution[ind_look], decreasing = T)]
+  print(this_df[ind_look_ordered, ])
+  
+  print("With the following tradeoffs:")
+  
+  q <- quantile(-this_df$Contribution, probs = 0.87)
+  ind_look <- which(-this_df$Contribution >= q)
+  ind_look_ordered <- ind_look[order(-this_df$Contribution[ind_look], decreasing = T)]
+  print(this_df[ind_look_ordered, ])
+  
+  
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#====================================
+#====================================
+#====================================
+
+
+
+
+
+mat_cmts <- mat_in %*% collModes
+n_cmts <- ncol(mat_cmts)
+lam_sigs <- lam_cor[1:n_collModes]
+mat_cmts <- mat_cmts %*% diag(1 / lam_sigs)
+ts_avg <- mat_in %*% rep(1, n_ts) * 1 / n_ts
+df_cmts <- as.data.frame(mat_cmts)
+colnames(df_cmts) <- c(1:n_collModes) #mode_id
+df_cmts$`ts Avg.` <- ts_avg
+df_cmts$Year <- year_vec
+# df_cmts$Date <- date_vec
+# if(class(df_cmts$Date) == "character"){
+#   df_cmts$Date <- as.Date(df_cmts$Date)
+# }
+#df_cmts <- df_cmts[-nrow(df_cmts), ]
+df_add <- 
+
+df_cmts_wide <- df_cmts
+gathercols <- colnames(df_cmts)[c(1:(ncol(df_cmts) - 1))]
+df_cmts <- df_cmts %>% gather_("Mode", "Value", gathercols)
+#--------------------------------
+# df_plot <- subset(df_cmts, Mode %in% c("1", "ts Avg."))
+# gg <- ggplot(df_plot, aes(x = Year, y = Value,
+#                           group = Mode, color = Mode))
+# gg <- gg + geom_line()
+# gg
+#--------------------------------
+# omit <- as.character(c(1, 5:n_collModes))
+# omit <- c(omit, "ts Avg.")
+# df_plot <- subset(df_cmts, !(Mode %in% omit))
+df_plot1 <- df_cmts_wide
+df_plot2 <- subset(df_cmts, Mode != "ts Avg.")
+gg <- ggplot()
+gg <- gg + geom_line(data = df_plot1, aes(x = Year, y = `ts Avg.`), color = "orange", lwd = 1.2)
+gg <- gg + geom_line(data = df_plot2, aes(x = Year, y = Value))
+gg <- gg + facet_wrap(~Mode, nrow = 1)
+gg <- gg + theme(axis.title.y = element_blank())
 gg
 
 
@@ -511,17 +652,8 @@ gg
 
 
 
-
-
-
-
-
-
-
-
-
 library(psych)
-fourfactor <- fa(mat_diff, nfactors = 3, rotate = "oblimin", fm = "minres")
+fourfactor <- fa(mat_diff, nfactors = 4, rotate = "oblimin", fm = "minres")
 print(fourfactor$loadings,cutoff = 0.6)
 fa.diagram(fourfactor)
 library(FactoMineR)
