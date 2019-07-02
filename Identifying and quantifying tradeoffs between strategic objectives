@@ -1,0 +1,347 @@
+---
+title: Towards a method for identifying and quantifying tradeoffs between strategic
+  objectives
+author: "Ben Schiek"
+date: "July 2, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Intro
+
+
+
+```{r, fig.width=11, fig.height=7, fig.align='center', echo = FALSE}
+
+setwd("D:/OneDrive - CGIAR/Documents")
+options(warn = -1); options(scipen = 999)
+#-------------------------------------------------------------
+library(plyr)
+library(tidyverse)
+library(ggplot2)
+library(zoo)
+library(FactoMineR)
+library(factoextra)
+library(ggpubr)
+library(Hmisc)
+library(corrplot)
+library(PerformanceAnalytics)
+#-------------------------------------------------------------
+WDI_raw <- read.csv("WDIData.csv", stringsAsFactors = F)
+WDI_raw$Country.Code <- NULL
+WDI_raw$Indicator.Code <- NULL
+WDI_raw$X <- NULL
+colnames(WDI_raw)[1:2] <- c("Country", "Indicator")
+WDI_raw$Country <- as.character(WDI_raw$Country)
+WDI_raw$Indicator <- as.character(WDI_raw$Indicator)
+#unique(WDI_raw$Indicator)
+#unique(WDI_raw$Indicator[grep("GDP", WDI_raw$Indicator)])
+unique(WDI_raw$Indicator[grep("manufacturing", WDI_raw$Indicator, ignore.case = T)])
+colnames(WDI_raw)[3:ncol(WDI_raw)] <- as.character(c(1960:2018))
+WDI_long <- WDI_raw %>% gather(Year, Value, `1960`:`2018`)
+#unique(WDI_raw$Country)
+country_vec <- c("Low income", "Lower middle income", "Middle income", "High income")
+WDI_long <- subset(WDI_long, Country %in% country_vec)
+#unique(WDI_long$Indicator)
+#unique(WDI_raw$Indicator)[grep("Average", unique(WDI_raw$Indicator))]
+#-------------------------------------------------------------
+environmental_indicators <- c("CO2 emissions (metric tons per capita)", 
+                              "Total natural resources rents (% of GDP)",
+                              "Agricultural land (% of land area)",
+                              "Land under cereal production (hectares)",
+                              "Forest area (% of land area)",
+                              "Energy intensity level of primary energy (MJ/$2011 PPP GDP)",
+                              "Renewable energy consumption (% of total final energy consumption)",
+                              "Agricultural methane emissions (thousand metric tons of CO2 equivalent)",
+                              "Agricultural nitrous oxide emissions (thousand metric tons of CO2 equivalent)",
+                              #"Forest rents (% of GDP)",
+                              "Adjusted savings: net forest depletion (% of GNI)",
+                              "Adjusted savings: mineral depletion (% of GNI)",
+                              "Adjusted savings: energy depletion (% of GNI)",
+                              "Level of water stress: freshwater withdrawal as a proportion of available freshwater resources",
+                              "Access to clean fuels and technologies for cooking (% of population)",
+                              "Renewable internal freshwater resources per capita (cubic meters)",
+                              "Water productivity, total (constant 2010 US$ GDP per cubic meter of total freshwater withdrawal)"
+)
+#-------------------------------------------------------------
+pop_indicators <- c(#"Birth rate, crude (per 1,000 people)",
+  #"Death rate, crude (per 1,000 people)",
+  "Urban population (% of total population)",
+  "Rural population (% of total population)",
+  "Urban population growth (annual %)",
+  "Population growth (annual %)",
+  #"Population ages 0-14, total",
+  #"Population ages 0-14 (% of total)",
+  #"Population ages 15-64, total",
+  #"Population ages 15-64 (% of total)",
+  #"Population ages 65 and above, total",
+  #"Population ages 65 and above (% of total)",
+  "Population density (people per sq. km of land area)",
+  #"Population growth (annual %)",
+  #"Refugee population by country or territory of origin",
+  "Refugee population by country or territory of asylum"
+  # "Population, total",
+)
+#-------------------------------------------------------------
+economic_indicators <- c("Consumer price index (2010 = 100)",
+                         "Foreign direct investment, net inflows (% of GDP)",
+                         #"Export value index (2000 = 100)",
+                         #"Import value index (2000 = 100)",
+                         "Military expenditure (% of GDP)",
+                         #"GDP per capita (current US$)",
+                         "Net ODA received per capita (current US$)",
+                         "Poverty headcount ratio at $1.90 a day (2011 PPP) (% of population)",
+                         "Trade (% of GDP)",
+                         #"GDP growth (annual %)",
+                         "GDP per capita growth (annual %)",
+                         #"Industry (including construction), value added (% of GDP)",
+                         "Industry (including construction), value added (annual % growth)",
+                         #"Manufacturing, value added (% of GDP)",
+                         "Manufacturing, value added (annual % growth)",
+                         #"Services, value added (% of GDP)",
+                         "Services, value added (annual % growth)",
+                         #"Agriculture, forestry, and fishing, value added (% of GDP)",
+                         "Agriculture, forestry, and fishing, value added (annual % growth)",
+                         #"Trade in services (% of GDP)",
+                         "Exports of goods and services (annual % growth)",
+                         "Imports of goods and services (annual % growth)",
+                         "Medium and high-tech Industry (including construction) (% manufacturing value added)",
+                         "Gross capital formation (annual % growth)",
+                         "GINI index (World Bank estimate)"
+                         #"Gross fixed capital formation (annual % growth)",
+                         #"Final consumption expenditure (annual % growth)"
+)
+#-------------------------------------------------------------
+infrastructure_indicators <- c("Access to electricity (% of population)",
+                               "Access to electricity, urban (% of urban population)",
+                               "Access to electricity, rural (% of rural population)",
+                               "Mobile cellular subscriptions (per 100 people)",
+                               "Individuals using the Internet (% of population)")
+#-------------------------------------------------------------
+employment_indicators <- c("Employment in agriculture (% of total employment) (modeled ILO estimate)",
+                           "Employment in industry (% of total employment) (modeled ILO estimate)",
+                           "Employment in services (% of total employment) (modeled ILO estimate)",
+                           "Labor force participation rate, total (% of total population ages 15+) (modeled ILO estimate)",
+                           #"Unemployment, total (% of total labor force) (modeled ILO estimate)",
+                           "Agriculture, forestry, and fishing, value added per worker (constant 2010 US$)",
+                           "Agriculture, value added per worker (constant 2010 US$)",
+                           "Industry, value added per worker (constant 2010 US$)",
+                           "Industry (including construction), value added per worker (constant 2010 US$)",
+                           "Services, value added per worker (constant 2010 US$)",
+                           #"Age dependency ratio, young (% of working-age population)",
+                           #"Age dependency ratio, old (% of working-age population)",
+                           "Age dependency ratio (% of working-age population)",
+                           "Ratio of female to male labor force participation rate (%) (modeled ILO estimate)"
+)
+#-------------------------------------------------------------
+health_indicators <- c("Mortality rate, under-5 (per 1,000 live births)",
+                       "Incidence of HIV (% of uninfected population ages 15-49)",
+                       "Life expectancy at birth, total (years)"
+                       # "Life expectancy at birth, male (years)",
+                       # "Life expectancy at birth, female (years)"
+                       #"Prevalence of HIV, total (% of population ages 15-49)"
+)
+#-------------------------------------------------------------
+educ_indicators <- c("Government expenditure on education, total (% of GDP)",
+                     "School enrollment, primary (% gross)",
+                     "School enrollment, secondary (% gross)",
+                     "School enrollment, tertiary (% gross)",
+                     "Adjusted savings: education expenditure (% of GNI)",
+                     "Expenditure on primary education (% of government expenditure on education)",
+                     "Expenditure on secondary education (% of government expenditure on education)",
+                     "Expenditure on tertiary education (% of government expenditure on education)",
+                     "Government expenditure on education, total (% of government expenditure)"
+)
+
+#============================================================
+indicator_vec <- c(pop_indicators, educ_indicators, employment_indicators,
+                   health_indicators, economic_indicators,
+                   environmental_indicators, infrastructure_indicators)
+list_indicatorTypes <- list(pop_indicators, educ_indicators, employment_indicators,
+                            health_indicators, economic_indicators,
+                            environmental_indicators, infrastructure_indicators)
+indicator_type_names <- c("Population", "Education", "Employment", "Health", "Economy", "Environment", "Infrastructure")
+names(list_indicatorTypes) <- indicator_type_names
+#-------------------------------------------------------------
+df_WDI <- subset(WDI_long, Country %in% c("Lower middle income"))
+df_WDI <- subset(df_WDI, Indicator %in% indicator_vec)
+df_WDI <- df_WDI %>% spread(Indicator, Value)
+df_WDI$Year <- as.integer(df_WDI$Year)
+df_WDI <- subset(df_WDI, Year >= 1991)
+df_WDI <- subset(df_WDI, Year <= 2016)
+df_WDI$`Individuals using the Internet (% of population)`[which(df_WDI$Year < 1994)] <- 0
+#-------------------------------------------------------------
+year_vec <- df_WDI$Year
+df_WDI <- df_WDI[, -c(1, 2)]
+out <- apply(df_WDI, 2, function(x) length(which(is.na(x))))
+table(out)
+ind_rm <- which(as.numeric(out) > 10)
+length(ind_rm)
+df_WDI <- df_WDI[, -ind_rm]
+ncol(df_WDI)
+ind_rp <- which(is.na(df_WDI[1, ]))
+for(i in 1:length(ind_rp)){
+  df_WDI[1, ind_rp[i]] <- mean(df_WDI[, ind_rp[i]], na.rm = T)
+}
+ind_rp <- which(is.na(df_WDI[nrow(df_WDI), ]))
+for(i in 1:length(ind_rp)){
+  df_WDI[nrow(df_WDI), ind_rp[i]] <- mean(df_WDI[, ind_rp[i]], na.rm = T)
+}
+
+df_WDI <- as.data.frame(na.approx(df_WDI[, -c(1, 2)]))
+class(df_WDI)
+out <- apply(df_WDI, 2, function(x) length(which(is.na(x))))
+table(out)
+which(as.numeric(out) > 0)
+colnames(df_WDI)[which(as.numeric(out) > 0)]
+mat_zWDI <- scale(df_WDI)
+#------------------------------------------------------------
+df_plot <- as.data.frame(mat_zWDI)
+df_plot$Year <- year_vec
+df_plot <- df_plot %>% gather_("Indicator", "Value", colnames(df_WDI))
+df_plot$Type <- NA
+df_plot$Type[which(df_plot$Indicator %in% pop_indicators)] <- "Population"
+df_plot$Type[which(df_plot$Indicator %in% economic_indicators)] <- "Economy"
+df_plot$Type[which(df_plot$Indicator %in% educ_indicators)] <- "Education"
+df_plot$Type[which(df_plot$Indicator %in% employment_indicators)] <- "Employment"
+df_plot$Type[which(df_plot$Indicator %in% environmental_indicators)] <- "Environment"
+df_plot$Type[which(df_plot$Indicator %in% health_indicators)] <- "Health"
+df_plot$Type[which(df_plot$Indicator %in% infrastructure_indicators)] <- "Infrastructure"
+#------------------------------------------------------------
+# gg <- ggplot(df_plot, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+# gg <- gg + geom_line()
+# gg <- gg + facet_wrap(~ Type, nrow = 3, scales = "free")
+# gg <- gg + theme(legend.position = "none")
+# gg
+#------------------------------------------------------------
+this_type <- "Health"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_health <- gg
+#gg
+this_type <- "Education"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_educ <- gg
+#gg
+this_type <- "Economy"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_econ <- gg
+#gg
+this_type <- "Employment"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_employ <- gg
+#gg
+this_type <- "Environment"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_environ <- gg
+#gg
+this_type <- "Population"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_pop <- gg
+#gg
+this_type <- "Infrastructure"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_infrastr <- gg
+#gg
+ggarrange(gg_health, gg_educ, gg_econ, gg_pop, gg_environ, gg_infrastr, ncol = 1)
+#grid.arrange(gg_health, gg_educ, gg_econ, gg_pop, gg_environ, gg_infrastr)
+```
+
+### Correlation matrix approach for a small number of variables
+
+For a manageable number of variables, there is no need to get too fancy. We can just look at the correlation matrix.
+
+(Statistically insignificant ($ p > 0.01 $) values are left blank.)
+
+```{r, fig.width=10, fig.height=10, fig.align='center', echo=FALSE}
+
+df_econ <- df_WDI[, which(colnames(df_WDI) %in% economic_indicators)]
+rcorr_out <- rcorr(scale(df_econ))
+cormat_econ <- rcorr_out$r
+pmat_econ <- rcorr_out$P
+#corrplot(cormat_econ, type = "upper", order = "hclust", tl.col = "black", tl.srt = 45)
+corrplot(cormat_econ, type="upper", order="hclust", p.mat = pmat_econ, sig.level = 0.01, insig = "blank", tl.col = "black", tl.srt = 45)
+```
+
+However, the correlation matrix format does not scale well for large numbers of variables.
+
+### The PCA approach for large numbers of variables
+
+#### PCA biplot
+
+After conducting a PCA on the indicator series, a biplot of the variables is a good place to start picking out tradeoffs.
+
+Arrows pointing in the opposite direction indicate a tradeoff, while arrows pointing in the same direction are indicative of correlation or synergy.
+
+```{r, fig.width=13, fig.height=10, fig.align='center'}
+
+mat_in <- mat_zWDI
+col_order <- colnames(mat_in)
+n_ts <- ncol(mat_in)
+row.names(mat_in) <- year_vec
+res <- PCA(mat_in, graph = F)
+fviz_pca_biplot(res)
+
+
+```
+
+The graphic is cluttered and hard to read, but we can begin to discern details here and there. Things like mortality rate, deforestation, and military expenditures point roughly in the opposite direction of things like labor productivity (value added per worker) and primary school enrollment. Note also that employment in agriculture points in the opposite direction of employment in the services and industrial sectors.
+
+This graphic is called a "biplot" because it also displays the years of observation. The years closest to a variable's arrow are the years in which that variable was most strongly expressed. The result can be interpreted as a storyline that runs clockwise, beginning in the lower left quadrant (early 1990s) with relatively high military expenditures, deforestation, mortality rates, and incidence of HIV, followed in the late 1990s and early 2000s (upper left quadrant) by increasing importance of employment in agriculture, lower overall unemployment, and higher female participation in the labor force. This was then followed in the late 2000s (upper right quadrant) by capital formation and economic growth across sectors, as well as CO2 emissions. Finally, in the most recent period (lower right quadrant), technology en masse (internet and mobile services), development assistance, labor productivity, education expenditures, and refugee populations become predominant factors shaping local realities in lower middle income countries.
+
+#### The principle components (a.k.a. dimensions or eigenvectors)
+
+```{r, fig.width=13, fig.height=10, fig.align='center'}
+
+lam_cor <- as.data.frame(res$eig)$eigenvalue
+lamcor_max <- max(lam_cor)
+N_t <- nrow(mat_in)
+N_c <- ncol(mat_in)
+Q <- N_t / N_c
+s_sq <- 1 - lamcor_max / N_c
+#s_sq <- 1
+lamrand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
+lamrand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
+lam <- seq(lamrand_min, lamrand_max, 0.001)
+dens_rand <- Q / (2 * pi * s_sq) * sqrt((lamrand_max - lam) * (lam - lamrand_min)) / lam
+df_e <- data.frame(eigenvalues = lam_cor)
+#------------------------------------------------------------
+gg <- ggplot()
+gg <- gg + geom_density(data = df_e, aes(x = eigenvalues, color = "Correlation Matrix"), lwd = 1.1)
+gg <- gg + geom_line(data = data.frame(x = lam, y = dens_rand), aes(x = x, y = y, color = "Random matrix"), lwd = 1.1)
+gg <- gg + scale_colour_manual(name = "Eigenvalue density", 
+                               values = c(`Correlation Matrix` = "blue", `Random matrix` = "orange"))
+gg
+
+
+```
