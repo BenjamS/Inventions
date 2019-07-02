@@ -1,9 +1,11 @@
-setwd("D:/OneDrive - CGIAR/Documents")
+#setwd("D:/OneDrive - CGIAR/Documents")
 options(warn = -1); options(scipen = 999)
 library(plyr)
 library(tidyverse)
 library(ggplot2)
 library(zoo)
+library(FactoMineR)
+library(factoextra)
 
 
 WDI_raw <- read.csv("WDIData.csv", stringsAsFactors = F)
@@ -15,7 +17,7 @@ WDI_raw$Country <- as.character(WDI_raw$Country)
 WDI_raw$Indicator <- as.character(WDI_raw$Indicator)
 #unique(WDI_raw$Indicator)
 #unique(WDI_raw$Indicator[grep("GDP", WDI_raw$Indicator)])
-unique(WDI_raw$Indicator[grep("education", WDI_raw$Indicator, ignore.case = T)])
+unique(WDI_raw$Indicator[grep("manufacturing", WDI_raw$Indicator, ignore.case = T)])
 colnames(WDI_raw)[3:ncol(WDI_raw)] <- as.character(c(1960:2018))
 WDI_long <- WDI_raw %>% gather(Year, Value, `1960`:`2018`)
 #unique(WDI_raw$Country)
@@ -34,7 +36,7 @@ environmental_indicators <- c("CO2 emissions (metric tons per capita)",
                               "Renewable energy consumption (% of total final energy consumption)",
                               "Agricultural methane emissions (thousand metric tons of CO2 equivalent)",
                               "Agricultural nitrous oxide emissions (thousand metric tons of CO2 equivalent)",
-                              "Forest rents (% of GDP)",
+                              #"Forest rents (% of GDP)",
                               "Adjusted savings: net forest depletion (% of GNI)",
                               "Adjusted savings: mineral depletion (% of GNI)",
                               "Adjusted savings: energy depletion (% of GNI)",
@@ -42,72 +44,37 @@ environmental_indicators <- c("CO2 emissions (metric tons per capita)",
                               "Access to clean fuels and technologies for cooking (% of population)",
                               "Renewable internal freshwater resources per capita (cubic meters)",
                               "Water productivity, total (constant 2010 US$ GDP per cubic meter of total freshwater withdrawal)"
-                              )
+)
 
 pop_indicators <- c(#"Birth rate, crude (per 1,000 people)",
-                    #"Death rate, crude (per 1,000 people)",
-                    "Urban population (% of total population)",
-                    "Rural population (% of total population)",
-                    "Urban population growth (annual %)",
-                    "Population growth (annual %)",
-                    #"Population ages 0-14, total",
-                    #"Population ages 0-14 (% of total)",
-                    #"Population ages 15-64, total",
-                    #"Population ages 15-64 (% of total)",
-                    #"Population ages 65 and above, total",
-                    #"Population ages 65 and above (% of total)",
-                    "Population density (people per sq. km of land area)",
-                    #"Population growth (annual %)",
-                    "Refugee population by country or territory of origin"
-                    #"Refugee population by country or territory of asylum"
-                    # "Population, total",
-                    # "Population ages 0-4, female (% of female population)",
-                    # "Population ages 0-4, male (% of male population)",
-                    # "Population ages 5-9, female (% of female population)",
-                    # "Population ages 5-9, male (% of male population)",
-                    # "Population ages 10-14, female (% of female population)",
-                    # "Population ages 10-14, male (% of male population)",
-                    # "Population ages 15-19, female (% of female population)",
-                    # "Population ages 15-19, male (% of male population)",
-                    # "Population ages 20-24, female (% of female population)",
-                    # "Population ages 20-24, male (% of male population)",
-                    # "Population ages 25-29, female (% of female population)",
-                    # "Population ages 25-29, male (% of male population)",
-                    # "Population ages 30-34, female (% of female population)",
-                    # "Population ages 30-34, male (% of male population)",
-                    # "Population ages 35-39, female (% of female population)",
-                    # "Population ages 35-39, male (% of male population)",
-                    # "Population ages 40-44, female (% of female population)",
-                    # "Population ages 40-44, male (% of male population)",
-                    # "Population ages 45-49, female (% of female population)",
-                    # "Population ages 45-49, male (% of male population)",
-                    # "Population ages 50-54, female (% of female population)",
-                    # "Population ages 50-54, male (% of male population)",
-                    # "Population ages 55-59, female (% of female population)",
-                    # "Population ages 55-59, male (% of male population)",
-                    # "Population ages 60-64, female (% of female population)",
-                    # "Population ages 60-64, male (% of male population)",
-                    # "Population ages 65-69, female (% of female population)",
-                    # "Population ages 65-69, male (% of male population)",
-                    # "Population ages 70-74, female (% of female population)",
-                    # "Population ages 70-74, male (% of male population)",
-                    # "Population ages 75-79, female (% of female population)",
-                    # "Population ages 75-79, male (% of male population)",
-                    # "Population ages 80 and above, female (% of female population)",
-                    # "Population ages 80 and above, male (% of male population)"
+  #"Death rate, crude (per 1,000 people)",
+  "Urban population (% of total population)",
+  "Rural population (% of total population)",
+  "Urban population growth (annual %)",
+  "Population growth (annual %)",
+  #"Population ages 0-14, total",
+  #"Population ages 0-14 (% of total)",
+  #"Population ages 15-64, total",
+  #"Population ages 15-64 (% of total)",
+  #"Population ages 65 and above, total",
+  #"Population ages 65 and above (% of total)",
+  "Population density (people per sq. km of land area)",
+  #"Population growth (annual %)",
+  #"Refugee population by country or territory of origin",
+  "Refugee population by country or territory of asylum"
+  # "Population, total",
 )
 economic_indicators <- c("Consumer price index (2010 = 100)",
                          "Foreign direct investment, net inflows (% of GDP)",
                          #"Export value index (2000 = 100)",
                          #"Import value index (2000 = 100)",
-                         "Mobile cellular subscriptions (per 100 people)",
-                         "Individuals using the Internet (% of population)",
                          "Military expenditure (% of GDP)",
                          #"GDP per capita (current US$)",
                          "Net ODA received per capita (current US$)",
                          "Poverty headcount ratio at $1.90 a day (2011 PPP) (% of population)",
                          "Trade (% of GDP)",
-                         "GDP growth (annual %)",
+                         #"GDP growth (annual %)",
+                         "GDP per capita growth (annual %)",
                          #"Industry (including construction), value added (% of GDP)",
                          "Industry (including construction), value added (annual % growth)",
                          #"Manufacturing, value added (% of GDP)",
@@ -117,15 +84,22 @@ economic_indicators <- c("Consumer price index (2010 = 100)",
                          #"Agriculture, forestry, and fishing, value added (% of GDP)",
                          "Agriculture, forestry, and fishing, value added (annual % growth)",
                          #"Trade in services (% of GDP)",
-                         "Access to electricity (% of population)",
-                         "Access to electricity, urban (% of urban population)",
-                         "Access to electricity, rural (% of rural population)",
                          "Exports of goods and services (annual % growth)",
                          "Imports of goods and services (annual % growth)",
+                         "Medium and high-tech Industry (including construction) (% manufacturing value added)",
                          "Gross capital formation (annual % growth)",
-                         "Gross fixed capital formation (annual % growth)",
-                         "Final consumption expenditure (annual % growth)"
+                         "GINI index (World Bank estimate)"
+                         #"Gross fixed capital formation (annual % growth)",
+                         #"Final consumption expenditure (annual % growth)"
 )
+
+infrastructure_indicators <- c("Access to electricity (% of population)",
+                               "Access to electricity, urban (% of urban population)",
+                               "Access to electricity, rural (% of rural population)",
+                               "Mobile cellular subscriptions (per 100 people)",
+                               "Individuals using the Internet (% of population)")
+
+
 employment_indicators <- c("Employment in agriculture (% of total employment) (modeled ILO estimate)",
                            "Employment in industry (% of total employment) (modeled ILO estimate)",
                            "Employment in services (% of total employment) (modeled ILO estimate)",
@@ -143,8 +117,9 @@ employment_indicators <- c("Employment in agriculture (% of total employment) (m
 )
 health_indicators <- c("Mortality rate, under-5 (per 1,000 live births)",
                        "Incidence of HIV (% of uninfected population ages 15-49)",
-                       "Life expectancy at birth, male (years)",
-                       "Life expectancy at birth, female (years)"
+                       "Life expectancy at birth, total (years)"
+                       # "Life expectancy at birth, male (years)",
+                       # "Life expectancy at birth, female (years)"
                        #"Prevalence of HIV, total (% of population ages 15-49)"
 )
 educ_indicators <- c("Government expenditure on education, total (% of GDP)",
@@ -156,213 +131,46 @@ educ_indicators <- c("Government expenditure on education, total (% of GDP)",
                      "Expenditure on secondary education (% of government expenditure on education)",
                      "Expenditure on tertiary education (% of government expenditure on education)",
                      "Government expenditure on education, total (% of government expenditure)"
-                     )
-
-indicator_vec <- c(educ_indicators, employment_indicators,
-                   health_indicators, economic_indicators, environmental_indicators)
-
-
-
-
-
-
-
-
-
-
-WDI_look <- subset(WDI_long, Indicator %in% indicator_vec)
-#WDI_wide <- spread(WDI_long, Indicator, Value)
-
-#===============================================================
-WDI_pop <- subset(WDI_look, Indicator %in% pop_indicators)
-pop_age_absolute <- c("Population ages 0-14, total", 
-                      "Population ages 15-64, total",
-                      "Population ages 65 and above, total")
-df_plot <- subset(WDI_pop, Indicator %in% pop_age_absolute)
-df_plot$Year <- as.integer(df_plot$Year)
-u <- df_plot$Indicator
-df_plot$Indicator <- gsub(", total", "", u, fixed = T)
-colnames(df_plot)[4] <- "Millions"
-df_plot$Millions <- df_plot$Millions * 10^-6
-gg <- ggplot(df_plot, aes(x = Year, y = Millions, fill = Indicator))
-gg <- gg + geom_area(position = "stack")
-gg <- gg + facet_wrap(~ Country, ncol = 2, scales = "free")
-gg <- gg + scale_x_continuous(breaks = round(seq(min(df_plot$Year), max(df_plot$Year), by = 5),1))
-gg <- gg + labs(caption = "Source: World Development Indicators, World Bank")
-gg <- gg + theme(legend.title = element_blank(),
-                 axis.text.x = element_text(angle = 60, hjust = 1))
-gg
-
-these_indicators <- c("Rural population (% of total population)",
-                      "Age dependency ratio, young (% of working-age population)",
-                      "Population growth (annual %)"
 )
-df_plot <- subset(WDI_pop, Indicator %in% these_indicators)
-df_plot$Year <- as.integer(df_plot$Year)
-gg <- ggplot(df_plot, aes(x = Year, y = Value, group = Country, color = Country))
-gg <- gg + geom_line(lwd = 1.5)
-gg <- gg + geom_point(size = 2)
-gg <- gg + facet_wrap(~ Indicator, ncol = 1, scales = "free")
-gg <- gg + scale_x_continuous(breaks = round(seq(min(df_plot$Year), max(df_plot$Year), by = 5),1))
-gg <- gg + labs(caption = "Source: World Development Indicators, World Bank")
-gg <- gg + theme(legend.title = element_blank(),
-                 axis.text.x = element_text(angle = 60, hjust = 1),
-                 axis.title.y = element_blank())
-gg
 
 
-#===============================================================
-# Employment
-WDI_employ <- subset(WDI_look, Indicator %in% employment_indicators)
-unique(WDI_employ$Indicator)
-df_plot <- subset(WDI_employ, Indicator == "Labor force participation rate, total (% of total population ages 15+) (modeled ILO estimate)")
-df_plot$Year <- as.integer(df_plot$Year)
-#df_plot <- subset(df_plot, Year >= 1990)
-colnames(df_plot)[4] <- "Percent"
-gg <- ggplot(df_plot, aes(x = Year, y = Percent, group = Country, color = Country))
-gg <- gg + geom_line(lwd = 1.5)
-gg <- gg + geom_point(size = 2)
-gg <- gg + scale_x_continuous(breaks = round(seq(min(df_plot$Year[which(!is.na(df_plot$Percent))]), max(df_plot$Year), by = 5),1))
-gg <- gg + labs(title = "Labor force participation rate",
-                subtitle = "(% of total population ages 15+, modeled ILO estimate)",
-                caption = "Source: World Development Indicators, World Bank")
-gg <- gg + theme(legend.title = element_blank(),
-                 axis.text.x = element_text(angle = 60, hjust = 1))
-gg
-
-
-df_plot <- subset(WDI_employ, Indicator != "Labor force participation rate, total (% of total population ages 15+) (modeled ILO estimate)")
-u <- df_plot$Indicator
-df_plot$Indicator <- gsub("(% of total employment) (modeled ILO estimate)", "", u, fixed = T)
-df_plot$Year <- as.integer(df_plot$Year)
-#df_plot <- subset(df_plot, Year >= 1990)
-colnames(df_plot)[4] <- "Percent"
-gg <- ggplot(df_plot, aes(x = Year, y = Percent, fill = Indicator))
-gg <- gg + geom_area(position = "stack")
-gg <- gg + facet_wrap(~ Country, ncol = 2, scales = "free")
-gg <- gg + scale_x_continuous(breaks = round(seq(min(df_plot$Year), max(df_plot$Year), by = 5),1))
-gg <- gg + labs(title = "Distribution of employment across sectors",
-                subtitle = "(modeled ILO estimate)",
-                caption = "Source: World Development Indicators, World Bank")
-gg <- gg + theme(legend.title = element_blank(),
-                 axis.text.x = element_text(angle = 60, hjust = 1))
-gg
-
-
-#===============================================================
-# Economics
-
-WDI_econ <- subset(WDI_look, Indicator %in% economic_indicators)
-economic_indicators
-df_look <- WDI_econ %>% spread(Indicator, Value)
-df_plot <- subset(WDI_econ, Indicator %in% c("GDP per capita (current US$)",
-                                             "Net ODA received per capita (current US$)"))
-df_plot$Year <- as.integer(df_plot$Year)
-#df_plot$`Current US$` <- log(df_plot$`Current US$`)
-
-
-gg <- ggplot(df_plot, aes(x = Year, y = Value, group = Country, color = Country))
-gg <- gg + geom_line(lwd = 1.5)
-gg <- gg + geom_point(size = 2)
-gg <- gg + facet_wrap(~Indicator, ncol = 1, scales = "free")
-gg
-
-# df_Fcast <- getARIMAforecast(df_plot, n_yrs_forecast = 6)
-# u <- df_plot$Indicator
-# df_plot$Indicator <- gsub(" (current US$)", "", u, fixed = T)
-# colnames(df_plot)[4] <- "Current US$"
-# u <- df_Fcast$Indicator
-# df_Fcast$Indicator <- gsub(" (current US$)", "", u, fixed = T)
-# colnames(df_Fcast)[4] <- "Current US$"
-# 
-# gg <- ggplot()
-# gg <- gg + geom_line(data = df_plot, aes(x = Year, y = `Current US$`, group = Country, color = Country), lwd = 1.5)
-# gg <- gg + geom_point(data = df_plot, aes(x = Year, y = `Current US$`, group = Country, color = Country), size = 2)
-# gg <- gg + geom_line(data = df_Fcast, aes(x = Year, y = `Current US$`, group = Country, color = Country), linetype = "dotted", lwd = 1.2)
-# gg <- gg + scale_x_continuous(breaks = round(seq(min(df_plot$Year[which(!is.na(df_plot$Percent))]), max(df_plot$Year), by = 5),1))
-# gg <- gg + facet_wrap(~ Indicator, ncol = 1, scales = "free")
-# gg <- gg + labs(caption = "Source: World Development Indicators, World Bank\nThe dotted portion of the trajectory is an ARIMA forecast 6 years beyond the data")
-# gg <- gg + theme(legend.title = element_blank(),
-#                  axis.text.x = element_text(angle = 60, hjust = 1)
-# )
-# gg
-
-#===============================================================
-# Education
-WDI_educ <- subset(WDI_look, Indicator %in% educ_indicators)
-educ_indicators
-df_look <- WDI_educ %>% spread(Indicator, Value)
-df_plot <- subset(WDI_educ, Indicator %in% c("School enrollment, primary (% gross)",
-                                             "School enrollment, tertiary (% gross)"))
-df_plot$Year <- as.integer(df_plot$Year)
-#df_plot <- subset(df_plot, Year >= 2000)
-df_plot$Indicator <- gsub(" (% gross)", "", df_plot$Indicator, fixed = T)
-colnames(df_plot)[4] <- "% gross"
-gg <- ggplot(df_plot, aes(x = Year, y = `% gross`, group = Country, color = Country))
-gg <- gg + geom_line(lwd = 1.5)
-gg <- gg + geom_point(size = 2)
-gg <- gg + facet_wrap(~Indicator, ncol = 1, scales = "free")
-gg <- gg + scale_x_continuous(breaks = round(seq(min(df_plot$Year[which(!is.na(df_plot$Percent))]), max(df_plot$Year), by = 5),1))
-gg <- gg + labs(caption = "Source: World Development Indicators, World Bank")
-gg <- gg + theme(legend.title = element_blank()#,
-                 #axis.text.x = element_text(angle = 60, hjust = 1)
-)
-gg
-
-#===============================================================
-# Health
-health_indicators
-WDI_health <- subset(WDI_look, Indicator %in% health_indicators)
-df_look <- WDI_health %>% spread(Indicator, Value)
-df_plot <- subset(WDI_health, Indicator %in% c("Life expectancy at birth, male (years)",
-                                               "Life expectancy at birth, female (years)"))
-df_plot$Year <- as.integer(df_plot$Year)
-gg <- ggplot(df_plot, aes(x = Year, y = Value, group = Country, color = Country))
-gg <- gg + geom_line(lwd = 1.5)
-gg <- gg + geom_point(size = 2)
-gg <- gg + facet_wrap(~Indicator, ncol = 1, scales = "free")
-gg <- gg + scale_x_continuous(breaks = round(seq(min(df_plot$Year[which(!is.na(df_plot$Percent))]), max(df_plot$Year), by = 5),1))
-gg <- gg + labs(caption = "Source: World Development Indicators, World Bank")
-gg <- gg + theme(legend.title = element_blank(),
-                 axis.text.y = element_blank()
-)
-gg
-
-#===============================================================
-# Environment
-
-WDI_environ <- subset(WDI_look, Indicator %in% environmental_indicators)
-df_plot <- WDI_environ %>% spread(Indicator, Value)
-df_plot$Year <- as.integer(df_plot$Year)
-gg <- ggplot(df_plot, aes(x = Year, y = Value, group = Country, color = Country))
-gg <- gg + geom_line(lwd = 1.5)
-gg <- gg + geom_point(size = 2)
-gg <- gg + facet_wrap(~Indicator, ncol = 1, scales = "free")
-gg <- gg + scale_x_continuous(breaks = round(seq(min(df_plot$Year[which(!is.na(df_plot$Percent))]), max(df_plot$Year), by = 5),1))
-gg <- gg + labs(caption = "Source: World Development Indicators, World Bank")
-gg <- gg + theme(legend.title = element_blank(),
-                 axis.text.y = element_blank()
-)
-gg
-
-#===============================================================
-#===============================================================
-#list_WDI <- list(WDI_econ, WDI_educ, WDI_employ, WDI_health, WDI_pop)
-#df_WDI <- do.call(rbind, list_WDI)
-#df_WDI <- subset(df_WDI, Country %in% c("Low income"))
-#df_WDI <- subset(WDI_look, Country %in% c("Lower middle income"))
+#============================================================
 indicator_vec <- c(pop_indicators, educ_indicators, employment_indicators,
-                   health_indicators, economic_indicators, environmental_indicators)
+                   health_indicators, economic_indicators,
+                   environmental_indicators, infrastructure_indicators)
+list_indicatorTypes <- list(pop_indicators, educ_indicators, employment_indicators,
+                            health_indicators, economic_indicators,
+                            environmental_indicators, infrastructure_indicators)
+indicator_type_names <- c("Population", "Education", "Employment", "Health", "Economy", "Environment", "Infrastructure")
+names(list_indicatorTypes) <- indicator_type_names
+#-------------------------------------------------------------
 df_WDI <- subset(WDI_long, Country %in% c("Lower middle income"))
-#df_WDI <- subset(WDI_long, Country %in% c("High income"))
 df_WDI <- subset(df_WDI, Indicator %in% indicator_vec)
-
 df_WDI <- df_WDI %>% spread(Indicator, Value)
 df_WDI$Year <- as.integer(df_WDI$Year)
-df_WDI <- subset(df_WDI, Year >= 1989)
-df_WDI <- subset(df_WDI, Year < 2018)
-
-#---
+df_WDI <- subset(df_WDI, Year >= 1991)
+df_WDI <- subset(df_WDI, Year <= 2016)
+df_WDI$`Individuals using the Internet (% of population)`[which(df_WDI$Year < 1994)] <- 0
+#-------------------------------------------------------------
+# df_WDI$`Employment in agriculture (PP change)` <- c(NA, diff(df_WDI$`Employment in agriculture (% of total employment) (modeled ILO estimate)`))
+# df_WDI$`Employment in industry (PP change)` <- c(NA, diff(df_WDI$`Employment in industry (% of total employment) (modeled ILO estimate)`))
+# df_WDI$`Employment in services (PP change)` <- c(NA, diff(df_WDI$`Employment in services (% of total employment) (modeled ILO estimate)`))
+# employment_indicators[grep("(% of total employment) (modeled ILO estimate)", employment_indicators)] <- NULL
+# employment_indicators <- c(employment_indicators, "Employment in agriculture (PP change)",
+#                            "Employment in industry (PP change)",
+#                            "Employment in services (PP change)")
+# df_WDI$`Employment in agriculture (% of total employment) (modeled ILO estimate)` <- NULL
+# df_WDI$`Employment in industry (% of total employment) (modeled ILO estimate)` <- NULL
+# df_WDI$`Employment in services (% of total employment) (modeled ILO estimate)` <- NULL
+# 
+# df_WDI$`Agricultural land (PP change)` <- c(NA, diff(df_WDI$`Agricultural land (% of land area)`))
+# df_WDI$`Forest area (PP change)` <- c(NA, diff(df_WDI$`Forest area (% of land area)`))
+# environmental_indicators <- c(environmental_indicators, "Agricultural land (PP change)",
+#                               "Forest area (PP change)")
+# df_WDI$`Agricultural land (% of land area)` <- NULL
+# df_WDI$`Forest area (% of land area)` <- NULL
+# df_WDI <- df_WDI[-1, ]
+#-------------------------------------------------------------
 year_vec <- df_WDI$Year
 df_WDI <- df_WDI[, -c(1, 2)]
 out <- apply(df_WDI, 2, function(x) length(which(is.na(x))))
@@ -380,18 +188,13 @@ for(i in 1:length(ind_rp)){
   df_WDI[nrow(df_WDI), ind_rp[i]] <- mean(df_WDI[, ind_rp[i]], na.rm = T)
 }
 
-df_WDI <- as.data.frame(na.spline(df_WDI[, -c(1, 2)]))
+df_WDI <- as.data.frame(na.approx(df_WDI[, -c(1, 2)]))
 class(df_WDI)
 out <- apply(df_WDI, 2, function(x) length(which(is.na(x))))
 table(out)
 which(as.numeric(out) > 0)
 colnames(df_WDI)[which(as.numeric(out) > 0)]
-
-
-#df_WDI[df_WDI < 10^-7 & df_WDI > 0] <- 10^-6
-df_WDI$`Individuals using the Internet (% of population)`[1] <- 10^-6
-
-#-----------
+#------------------------------------------------------------
 df_plot <- df_WDI
 df_plot <- as.data.frame(scale(df_WDI))
 df_plot$Year <- year_vec
@@ -403,50 +206,254 @@ df_plot$Type[which(df_plot$Indicator %in% educ_indicators)] <- "Education"
 df_plot$Type[which(df_plot$Indicator %in% employment_indicators)] <- "Employment"
 df_plot$Type[which(df_plot$Indicator %in% environmental_indicators)] <- "Environment"
 df_plot$Type[which(df_plot$Indicator %in% health_indicators)] <- "Health"
+df_plot$Type[which(df_plot$Indicator %in% infrastructure_indicators)] <- "Infrastructure"
+#------------------------------------------------------------
 gg <- ggplot(df_plot, aes(x = Year, y = Value, group = Indicator, color = Indicator))
 gg <- gg + geom_line()
-gg <- gg + facet_wrap(~ Type, nrow = 1, scales = "free")
+gg <- gg + facet_wrap(~ Type, nrow = 3, scales = "free")
 gg <- gg + theme(legend.position = "none")
 gg
-
-df_plot2 <- subset(df_plot, Type == "Health")
+#------------------------------------------------------------
+this_type <- "Health"
+df_plot2 <- subset(df_plot, Type == this_type)
 gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
 gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + labs(title = "Health")
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
 gg
-df_plot2 <- subset(df_plot, Type == "Education")
+this_type <- "Education"
+df_plot2 <- subset(df_plot, Type == this_type)
 gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
 gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + labs(title = "Education")
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
 gg
-
-#-----------
-
-
-#mat_in <- diff(scale(df_WDI))
+this_type <- "Economy"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+this_type <- "Employment"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+this_type <- "Environment"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+this_type <- "Population"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+this_type <- "Infrastructure"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+#------------------------------------------------------------
 mat_in <- scale(df_WDI)
-#mat_in <- diff(as.matrix(log(df_WDI)))
-
-cormat <- cor(mat_in)
-#dim(mat_in)
-#dim(cormat)
-image(cormat)
 col_order <- colnames(mat_in)
 n_ts <- ncol(mat_in)
-
-eig_vectors <- eigen(cormat)$vectors
-lam_cor <- eigen(cormat)$values
+row.names(mat_in) <- year_vec
+res <- PCA((mat_in))
+fviz_pca_biplot(res)
+#------------------------------------------------------------
+lam_cor <- as.data.frame(res$eig)$eigenvalue
+lamcor_max <- max(lam_cor)
 N_t <- nrow(mat_in)
 N_c <- ncol(mat_in)
 Q <- N_t / N_c
 s_sq <- 1 - lamcor_max / N_c
 #s_sq <- 1
 lamrand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
+lamrand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
+lam <- seq(lamrand_min, lamrand_max, 0.001)
+dens_rand <- Q / (2 * pi * s_sq) * sqrt((lamrand_max - lam) * (lam - lamrand_min)) / lam
+df_e <- data.frame(eigenvalues = lam_cor)
+#------------------------------------------------------------
+gg <- ggplot()
+gg <- gg + geom_density(data = df_e, aes(x = eigenvalues, color = "Correlation Matrix"), lwd = 1.1)
+gg <- gg + geom_line(data = data.frame(x = lam, y = dens_rand), aes(x = x, y = y, color = "Random matrix"), lwd = 1.1)
+gg <- gg + scale_colour_manual(name = "Eigenvalue density", 
+                               values = c(`Correlation Matrix` = "blue", `Random matrix` = "orange"))
+gg
+#------------------------------------------------------------
+# How many collective modes?
+mat_eigvecs <- res$var$coord
+ind_deviating_from_noise <- which(lam_cor > lamrand_max)
+lam_signals <- lam_cor[ind_deviating_from_noise]
+n_signals <- length(lam_signals)
+print(paste("Number of collective modes: ", n_signals))
+#------------------------------------------------------------
+# Set sign of eigenvectors such that they
+# best conform to the input time series
+mat_PC_signals <- mat_eigvecs[, ind_deviating_from_noise]
+mat_signals_ts <- mat_in %*% mat_PC_signals
+mat_signals_ts <- mat_signals_ts %*% diag(1 / lam_signals)
+#ts_avg <- mat_in %*% rep(1, N_c) * 1 / N_c
+
+mean(mat_in[1,])
+ts_avg <- rowMeans(mat_in)
+ts_avg[1]
+for(i in 1:n_signals){
+  sse <- sum((mat_signals_ts[, i] - ts_avg)^2)
+  sse_neg <- sum((-mat_signals_ts[, i] - ts_avg)^2)
+  sse_vec <- c(sse, sse_neg)
+  if(which(sse_vec == min(sse_vec)) == 2){
+    mat_PC_signals[, i] <- -mat_PC_signals[, i]
+  }
+}
+#------------------------------------------------------------
+df_plot <- data.frame(Indicator = col_order, mat_PC_signals)
+signal_id <- paste("Signal", c(1:n_signals))
+colnames(df_plot)[2:(n_signals + 1)] <- signal_id
+gathercols <- as.character(signal_id)
+df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
+df_plot$`Indicator Type` <- NA
+u <- as.character(df_plot$Indicator)
+#df_plot$`Indicator Type` <- as.character(df_plot$`Indicator Type`)
+for(i in 1:length(list_indicatorTypes)){
+  ind <- which(u %in% list_indicatorTypes[[i]])
+  df_plot$`Indicator Type`[ind] <- indicator_type_names[i]
+}
+df_plot$`Indicator Type` <- as.factor(df_plot$`Indicator Type`)
+xx <- df_plot$`Indicator Type`
+df_plot$Indicator <- factor(df_plot$Indicator, levels = unique(df_plot$Indicator[order(xx)]))
+gg <- ggplot(df_plot, aes(x = Indicator, y = Loading, fill = `Indicator Type`))
+gg <- gg + geom_bar(stat = "identity", position = "dodge")
+gg <- gg + facet_wrap(~ Signal, nrow = 1)
+if(N_c <= 50){
+  gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
+                   axis.title.y = element_blank())
+}else{
+  gg <- gg + theme(axis.text.x = element_blank(),
+                   axis.title.y = element_blank())
+}
+gg <- gg + coord_flip()
+gg
+#------------------------------------------------------------
+
+
+for(i in 2:n_signals){
+  this_PC <- print(paste("Principle Component", i))
+  print(paste("Investment in portfolio (PC)", i, "is correlated with investment in:"))
+  
+  this_df <- subset(df_plot, Signal == paste("Signal", i))
+  q <- quantile(this_df$Loading, probs = 0.85)
+  ind_look <- which(this_df$Loading >= q)
+  ind_look_ordered <- ind_look[order(this_df$Loading[ind_look], decreasing = T)]
+  print(this_df[ind_look_ordered, ])
+  
+  print("With the following tradeoffs:")
+  
+  q <- quantile(-this_df$Loading, probs = 0.85)
+  ind_look <- which(-this_df$Loading >= q)
+  ind_look_ordered <- ind_look[order(-this_df$Loading[ind_look], decreasing = T)]
+  print(this_df[ind_look_ordered, ])
+  
+}
+
+#------------------------------------------------------------
+df_plot1 <- data.frame(Year = as.integer(row.names(ts_avg)), ts_avg)
+df_plot2 <- data.frame(Year = as.integer(row.names(ts_avg)), mat_signals_ts)
+signal_id <- paste("Signal", c(1:n_signals))
+colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
+gathercols <- signal_id
+df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+gg <- ggplot()
+gg <- gg + geom_line(data = df_plot1, aes(x = Year, y = ts_avg), color = "orange", lwd = 1.2)
+gg <- gg + geom_line(data = df_plot2, aes(x = Year, y = Value))
+gg <- gg + facet_wrap(~ Signal, nrow = 1)
+gg <- gg + theme(axis.title.y = element_blank())
+gg
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+cormat <- cor(mat_in)
+#dim(mat_in)
+#dim(cormat)
+image(cormat)
+
+eig_vectors <- eigen(cormat)$vectors
+df_plot <- data.frame(Indicator = col_order, eig_vectors)
+#gathercols <- colnames(df_plot)[2:ncol(df_plot)]
+#df_plot <- df_plot %>% gather_("Mode", "Value", gathercols)
+df_plot <- df_plot[, c(1, 2)]
+gg <- ggplot(df_plot, aes(x = Indicator, y = X1))
+gg <- gg + geom_bar(stat = "identity", position = "dodge")
+gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
+                 axis.title.y = element_blank())
+gg
+ind_mortRate <- which(col_order == "Mortality rate, under-5 (per 1,000 live births)")
+if(eig_vectors[ind_mortRate, 1] > 0){eig_vectors <- -eig_vectors}
+lam_cor <- eigen(cormat)$values
 lamcor_max <- max(lam_cor)
+N_t <- nrow(mat_in)
+N_c <- ncol(mat_in)
+Q <- N_t / N_c
+s_sq <- 1 - lamcor_max / N_c
+#s_sq <- 1
+lamrand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
 ind_deviating_from_noise <- which(lam_cor > lamrand_max)
 collModes <- as.matrix(eig_vectors[, ind_deviating_from_noise])
+#collModes[ind_mortRate, 1]
 ind_neg <- which(collModes[, 1] < 0)
+colnames(df_WDI)[ind_neg]
 df_WDI[, ind_neg] <- 1 / df_WDI[, ind_neg]
+#---------------------
+out <- apply(df_WDI, 2, function(x) length(which(is.infinite(x))))
+table(out)
+ind_rm <- which(as.numeric(out) > 1)
+length(ind_rm)
+if(length(ind_rm) > 0){df_WDI <- df_WDI[, -ind_rm]}
+ncol(df_WDI)
+#---------------------
 mat_in <- scale(df_WDI)
 cormat <- cor(mat_in)
 #dim(mat_in)
@@ -455,8 +462,9 @@ image(cormat)
 
 
 list_indicatorTypes <- list(pop_indicators, educ_indicators, employment_indicators,
-                            health_indicators, economic_indicators, environmental_indicators)
-indicator_type_names <- c("Population", "Education", "Employment", "Health", "Economy", "Environment")
+                            health_indicators, economic_indicators,
+                            environmental_indicators, infrastructure_indicators)
+indicator_type_names <- c("Population", "Education", "Employment", "Health", "Economy", "Environment", "Infrastructure")
 names(list_indicatorTypes) <- indicator_type_names
 for(i in 1:length(list_indicatorTypes)){
   this_indicator_vec <- list_indicatorTypes[[i]]
@@ -468,6 +476,8 @@ col_order[ind_neg] <- paste("1 /", col_order[ind_neg])
 
 
 eig_vectors <- eigen(cormat)$vectors
+ind_mortRate <- which(col_order == "1 / Mortality rate, under-5 (per 1,000 live births)")
+if(eig_vectors[ind_mortRate, 1] < 0){eig_vectors <- -eig_vectors}
 lam_cor <- eigen(cormat)$values
 lamcor_max <- max(lam_cor)
 N_t <- nrow(mat_in)
@@ -552,99 +562,6 @@ gg <- gg + coord_flip()
 gg
 
 
-
-
-
-
-
-
-
-
-
-
-
-for(i in 2:n_collModes){
-  this_PC <- print(paste("Principle Component", i))
-  print(paste("Investment in portfolio (PC)", i, "is correlated with investment in:"))
-  
-  this_df <- subset(df_contrib, Mode == i)
-  q <- quantile(this_df$Contribution, probs = 0.87)
-  ind_look <- which(this_df$Contribution >= q)
-  ind_look_ordered <- ind_look[order(this_df$Contribution[ind_look], decreasing = T)]
-  print(this_df[ind_look_ordered, ])
-  
-  print("With the following tradeoffs:")
-  
-  q <- quantile(-this_df$Contribution, probs = 0.87)
-  ind_look <- which(-this_df$Contribution >= q)
-  ind_look_ordered <- ind_look[order(-this_df$Contribution[ind_look], decreasing = T)]
-  print(this_df[ind_look_ordered, ])
-  
-  
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#====================================
-#====================================
-#====================================
-
-
-
-
-
-mat_cmts <- mat_in %*% collModes
-n_cmts <- ncol(mat_cmts)
-lam_sigs <- lam_cor[1:n_collModes]
-mat_cmts <- mat_cmts %*% diag(1 / lam_sigs)
-ts_avg <- mat_in %*% rep(1, n_ts) * 1 / n_ts
-df_cmts <- as.data.frame(mat_cmts)
-colnames(df_cmts) <- c(1:n_collModes) #mode_id
-df_cmts$`ts Avg.` <- ts_avg
-df_cmts$Year <- year_vec
-# df_cmts$Date <- date_vec
-# if(class(df_cmts$Date) == "character"){
-#   df_cmts$Date <- as.Date(df_cmts$Date)
-# }
-#df_cmts <- df_cmts[-nrow(df_cmts), ]
-#df_add <- 
-
-df_cmts_wide <- df_cmts
-gathercols <- colnames(df_cmts)[c(1:(ncol(df_cmts) - 1))]
-df_cmts <- df_cmts %>% gather_("Mode", "Value", gathercols)
-#--------------------------------
-# df_plot <- subset(df_cmts, Mode %in% c("1", "ts Avg."))
-# gg <- ggplot(df_plot, aes(x = Year, y = Value,
-#                           group = Mode, color = Mode))
-# gg <- gg + geom_line()
-# gg
-#--------------------------------
-# omit <- as.character(c(1, 5:n_collModes))
-# omit <- c(omit, "ts Avg.")
-# df_plot <- subset(df_cmts, !(Mode %in% omit))
-df_plot1 <- df_cmts_wide
-df_plot2 <- subset(df_cmts, Mode != "ts Avg.")
-gg <- ggplot()
-gg <- gg + geom_line(data = df_plot1, aes(x = Year, y = `ts Avg.`), color = "orange", lwd = 1.2)
-gg <- gg + geom_line(data = df_plot2, aes(x = Year, y = Value))
-gg <- gg + facet_wrap(~Mode, nrow = 1)
-gg <- gg + theme(axis.title.y = element_blank())
-gg
 
 
 
