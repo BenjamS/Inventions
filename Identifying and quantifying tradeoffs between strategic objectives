@@ -1,6 +1,6 @@
 ---
-title: Towards a method for identifying and quantifying tradeoffs between strategic
-  objectives
+title: Towards more rigor and precision in the identification and quantification of synergies and tradeoffs between strategic objectives
+subtitle: Concept note
 author: "Ben Schiek"
 date: "July 2, 2019"
 output: pdf_document
@@ -10,13 +10,30 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Intro
+## Problem background
+At the most abstract levels of strategic planning, it is customary for large development agencies and donor organizations to carefully define a manageable number of thematic areas for investment that broadly cover all aspects of development. These thematic areas typically fall along the lines of:
 
+* Economic growth
 
+* Economic equality, poverty reduction
+
+* Food and nutritional security
+
+* Environmental protection, conservation, reduced C02 emissions, etc.
+
+* Health
+
+Little or no care is taken, however, to address the tradeoffs that exist between investments in each of these thematic areas. It is well known, for example, that agriculture is often detrimental to the environment. This implies a tradeoff between the food security and environmental objectives. Economic growth, in its turn, is inversely related to both agricultural and environmental objectives. In many parts of the world, there is also a longstanding tradeoff between economic growth and economic equality. Investments in one thematic area can thus offset returns to investments in other thematic areas.
+
+## Proposed solution: a PCA approach
+
+Strategic objectives (SOs) map to indicators. Each indicator on its own offers but a partial glimpse of progress towards a given SO. Several partial glimpses taken together might, in theory, offer a more complete picture; but they also bring more noise and complexity to the picture.
+
+Is there a way to extract the signal from the noise.
 
 ```{r, fig.width=11, fig.height=7, fig.align='center', echo = FALSE}
 
-setwd("D:/OneDrive - CGIAR/Documents")
+#setwd("D:/OneDrive - CGIAR/Documents")
 options(warn = -1); options(scipen = 999)
 #-------------------------------------------------------------
 library(plyr)
@@ -28,7 +45,7 @@ library(factoextra)
 library(ggpubr)
 library(Hmisc)
 library(corrplot)
-library(PerformanceAnalytics)
+#library(PerformanceAnalytics)
 #-------------------------------------------------------------
 WDI_raw <- read.csv("WDIData.csv", stringsAsFactors = F)
 WDI_raw$Country.Code <- NULL
@@ -279,7 +296,7 @@ ggarrange(gg_health, gg_educ, gg_econ, gg_pop, gg_environ, gg_infrastr, ncol = 1
 
 ### Correlation matrix approach for a small number of variables
 
-For a manageable number of variables, there is no need to get too fancy. We can just look at the correlation matrix.
+For a manageable number of variables, there is no need to get too fancy. We can just look at the correlation matrix. Below is a correlation matrix of just the economic variables.
 
 (Statistically insignificant ($ p > 0.01 $) values are left blank.)
 
@@ -297,11 +314,13 @@ However, the correlation matrix format does not scale well for large numbers of 
 
 ### The PCA approach for large numbers of variables
 
+Below, a PCA is conducted on the complete dataset of economic, environmental, population, infrastructure, health, and education variables. To interpret results, we use two visualization methods: first a biplot and then a loadings barchart.
+
 #### PCA biplot
 
-After conducting a PCA on the indicator series, a biplot of the variables is a good place to start picking out tradeoffs.
+A biplot is a good place to start when trying to discern tradeoffs, or any other sort of structure, in large datasets.
 
-Arrows pointing in the opposite direction indicate a tradeoff, while arrows pointing in the same direction are indicative of correlation or synergy.
+In the biplot, arrows pointing in the opposite direction indicate a tradeoff, while arrows pointing in the same direction are indicative of correlation or synergy.
 
 ```{r, fig.width=13, fig.height=10, fig.align='center'}
 
@@ -315,13 +334,27 @@ fviz_pca_biplot(res)
 
 ```
 
-The graphic is cluttered and hard to read, but we can begin to discern details here and there. Things like mortality rate, deforestation, and military expenditures point roughly in the opposite direction of things like labor productivity (value added per worker) and primary school enrollment. Note also that employment in agriculture points in the opposite direction of employment in the services and industrial sectors.
+The biplot is cluttered and hard to read, but certain characteristics begin to emerge. Note that things like mortality rate, deforestation, and military expenditures point roughly in the opposite direction of things like labor productivity (value added per worker) and primary school enrollment. Note also that employment in agriculture points in the opposite direction of employment in the services and industrial sectors.
 
-This graphic is called a "biplot" because it also displays the years of observation. The years closest to a variable's arrow are the years in which that variable was most strongly expressed. The result can be interpreted as a storyline that runs clockwise, beginning in the lower left quadrant (early 1990s) with relatively high military expenditures, deforestation, mortality rates, and incidence of HIV, followed in the late 1990s and early 2000s (upper left quadrant) by increasing importance of employment in agriculture, lower overall unemployment, and higher female participation in the labor force. This was then followed in the late 2000s (upper right quadrant) by capital formation and economic growth across sectors, as well as CO2 emissions. Finally, in the most recent period (lower right quadrant), technology en masse (internet and mobile services), development assistance, labor productivity, education expenditures, and refugee populations become predominant factors shaping local realities in lower middle income countries.
+This graphic is called a "biplot" because it also displays the years of observation. The years closest to a variable's arrow are the years in which that variable explained most of the variance in the data.
 
-#### The principle components (a.k.a. dimensions or eigenvectors)
+Note how the years arrange themselves in a consecutive, clockwise fashion. This can be interpreted as a storyline. The story begins in the lower left quadrant (early 1990s) with relatively high military expenditures, deforestation, mortality rates, and incidence of HIV, followed in the late 1990s and early 2000s (upper left quadrant) by increasing importance of employment in agriculture, lower overall unemployment, and higher female participation in the labor force. This is then followed in the late 2000s (upper right quadrant) by capital formation and economic growth across sectors, as well as CO2 emissions. Finally, in the most recent period (lower right quadrant), technology en masse (internet and mobile services), development assistance, labor productivity, education expenditures, and refugee populations become predominant indicators explaining variance in the data.
 
-```{r, fig.width=13, fig.height=10, fig.align='center'}
+This provides a starting point to help orient and frame questions. But, again, the graphic is messy and hard to read, with several labels piled on top of each other. A more delicate approach is required to identify and quantify tradeoffs in a carefully enumerated fashion.
+
+#### PCA loadings analysis
+
+PCA reduces a problem of several dozen or even hundreds of dimensions (i.e. one dimension per variable) to a problem of just a few dimensions. The reduced group of dimensions is what is referred to by the term "principal components".
+
+The influence each variable has on the overall evolution of the system is captured by its contribution to or "loading onto" each of these dimensions.
+
+Tradeoffs and synergies can thus be identified by examining the sign on these loadings. Loadings with the same sign correspond to variables that historically "pull" in the same direction, i.e. synergy. Loadings with opposite signs correspond to variables that pull in opposite directions, i.e. tradeoffs.
+
+Before examining the loadings, there is first the question of how many dimensions the problem should be reduced to. There are a number of arbitrary rules of thumb followed in the peer reviewed literature. "Retain only the dimensions that explain 90% of the variance", for example. This is odd considering that physicists provided a rigorous solution to this dilemma many decades ago.
+
+...
+
+```{r, fig.align='center'}
 
 lam_cor <- as.data.frame(res$eig)$eigenvalue
 lamcor_max <- max(lam_cor)
@@ -345,3 +378,78 @@ gg
 
 
 ```
+
+In the graphic above, we see that the three leading eigenvalues of the WDI correlation matrix extend beyond the upper edge of the random matrix eigenvalue density. This means that three of the principle components or dimensions are signals that can be distinguished from the noise in the system.
+
+Each variable's contribution to the three signals can be assessed by looking at their loadings onto each signal.
+
+```{r, fig.width=14, fig.height=8, fig.align='center', echo=FALSE}
+#------------------------------------------------------------
+# How many signals?
+mat_eigvecs <- res$var$coord
+ind_deviating_from_noise <- which(lam_cor > (lamrand_max + 10^-1))
+lam_signals <- lam_cor[ind_deviating_from_noise]
+n_signals <- 3
+n_signals <- length(lam_signals)
+print(paste("Number of collective modes: ", n_signals))
+#------------------------------------------------------------
+# Set sign of eigenvectors such that they
+# best conform to the input time series
+mat_PC_signals <- mat_eigvecs[, ind_deviating_from_noise]
+mat_signals_ts <- mat_in %*% mat_PC_signals
+mat_signals_ts <- mat_signals_ts %*% diag(1 / lam_signals)
+#ts_avg <- mat_in %*% rep(1, N_c) * 1 / N_c
+
+mean(mat_in[1,])
+ts_avg <- rowMeans(mat_in)
+ts_avg[1]
+for(i in 1:n_signals){
+  sse <- sum((mat_signals_ts[, i] - ts_avg)^2)
+  sse_neg <- sum((-mat_signals_ts[, i] - ts_avg)^2)
+  sse_vec <- c(sse, sse_neg)
+  if(which(sse_vec == min(sse_vec)) == 2){
+    mat_PC_signals[, i] <- -mat_PC_signals[, i]
+  }
+}
+#------------------------------------------------------------
+df_plot <- data.frame(Indicator = col_order, mat_PC_signals)
+signal_id <- paste("Signal", c(1:n_signals))
+colnames(df_plot)[2:(n_signals + 1)] <- signal_id
+gathercols <- as.character(signal_id)
+df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
+df_plot$`Indicator Type` <- NA
+u <- as.character(df_plot$Indicator)
+#df_plot$`Indicator Type` <- as.character(df_plot$`Indicator Type`)
+for(i in 1:length(list_indicatorTypes)){
+  ind <- which(u %in% list_indicatorTypes[[i]])
+  df_plot$`Indicator Type`[ind] <- indicator_type_names[i]
+}
+df_plot$`Indicator Type` <- as.factor(df_plot$`Indicator Type`)
+xx <- df_plot$`Indicator Type`
+df_plot$Indicator <- factor(df_plot$Indicator, levels = unique(df_plot$Indicator[order(xx)]))
+gg <- ggplot(df_plot, aes(x = Indicator, y = Loading, fill = `Indicator Type`))
+gg <- gg + geom_bar(stat = "identity", position = "dodge")
+gg <- gg + facet_wrap(~ Signal, nrow = 1)
+if(N_c <= 50){
+  gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
+                   axis.title.y = element_blank())
+}else{
+  gg <- gg + theme(axis.text.x = element_blank(),
+                   axis.title.y = element_blank())
+}
+gg <- gg + coord_flip()
+gg
+#------------------------------------------------------------
+
+```
+
+The importance of each signal in determining the overall evolution of the system is proportional to its corresponding eigenvalue. Signal 1 is the signal with the highest eigenvalue. It essentially represents the average of the entire dataset of indicators, whereas Signals 2 and 3 represent thematically weighted forces pushing or pulling on the average.
+
+The loadings on Signal 1 answer the central question motivating this concept note. They reveal the historical tradeoffs and synergies acting on the average evolution of the system. Loadings with the same sign indicate synergies (variables pulling in the same direction). Loadings with opposite signs indicate tradeoffs (variables pulling in opposite directions). These are essentially the same tradeoffs visualized in the biplot, but presented in a more readable format.
+
+The magnitudes of the loadings on Signal 1 are all about the same. This has to do with Signal 1's association with the average trajectory of the system.
+
+The loadings on Signals 2 and 3, meanwhile, are of varying magnitude, revealing a particular "thematic character" associated with these signals. Signal 2 is associated with economic growth, low unemployment, low population growth and urbanization rates, high mineral and energy---but not forest---resource depletion, CO2 emissions, among other things. Signal 3 is associated with economic stagnation, high dependence on development assistance, refugee populations, high population growth and urbanization rates, among other things.
+
+
+
