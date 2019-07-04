@@ -7,7 +7,8 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
+
 ```
 
 ## Problem background
@@ -27,13 +28,11 @@ Little or no care is taken, however, to address the tradeoffs that exist between
 
 ## Proposed solution: a PCA approach
 
-Strategic objectives (SOs) map to indicators. Each indicator on its own offers but a partial glimpse of progress towards a given SO. Several partial glimpses taken together might, in theory, offer a more complete picture; but they also bring more noise and complexity to the picture.
+In this concept note, I propose a rigorous, precise method for identifying and quantifying tradeoffs and synergies between strategic objectives (SOs). The method is based on principle components analysis (PCA) of a large dataset of development indicators spanning the usual thematic areas. (For a good overview of PCA, see Abdi & Williams (2010).) A variant of this approach has been applied in the analysis of financial market time series (Gopikrishnan et al., 2001). Here I enhance such precedents by also leveraging a rigorous signal selecting technique developed in the study of physical systems (Dehesa et al., 1983).
 
-Is there a way to extract the signal from the noise.
+```{r, echo=FALSE}
 
-```{r, fig.width=11, fig.height=7, fig.align='center', echo = FALSE}
-
-#setwd("D:/OneDrive - CGIAR/Documents")
+setwd("D:/OneDrive - CGIAR/Documents")
 options(warn = -1); options(scipen = 999)
 #-------------------------------------------------------------
 library(plyr)
@@ -69,12 +68,12 @@ environmental_indicators <- c("CO2 emissions (metric tons per capita)",
                               "Total natural resources rents (% of GDP)",
                               "Agricultural land (% of land area)",
                               "Land under cereal production (hectares)",
-                              "Forest area (% of land area)",
+                              #"Forest area (% of land area)",
                               "Energy intensity level of primary energy (MJ/$2011 PPP GDP)",
                               "Renewable energy consumption (% of total final energy consumption)",
                               "Agricultural methane emissions (thousand metric tons of CO2 equivalent)",
                               "Agricultural nitrous oxide emissions (thousand metric tons of CO2 equivalent)",
-                              #"Forest rents (% of GDP)",
+                              "Forest rents (% of GDP)",
                               "Adjusted savings: net forest depletion (% of GNI)",
                               "Adjusted savings: mineral depletion (% of GNI)",
                               "Adjusted savings: energy depletion (% of GNI)",
@@ -173,7 +172,18 @@ educ_indicators <- c("Government expenditure on education, total (% of GDP)",
                      "Government expenditure on education, total (% of government expenditure)"
 )
 
-#============================================================
+```
+
+## The data
+
+A large set of indicators is selected from the World Bank's World Development Indicators (WDI) database. Indicators are selected so as to represent all aspects of international development: economy, environment, education, health, infrastructure, employment, and population. A rough map is assumed to exist between these indicators and the usual set of strategic objectives (the SDGs, for example).
+
+The analysis can be conducted over any country or grouping of countries, data permitting. In the exercise below, I focus on WDI's "Lower middle income" countries category.
+
+The WDI database has a lot of interesting indicators, but relatively few with a complete series going back more than two decades for a wide geographical area. This was the main limiting factor in selecting indicators for inclusion in the exercise. The final set of indicators are graphed by type below. There are 49 variables total, covering the years 1991-2016. A few of these series had as many as eight missing values, which were filled in by linear approximation.
+
+```{r, fig.width=11, fig.height=7, fig.align='center', echo = FALSE}
+
 indicator_vec <- c(pop_indicators, educ_indicators, employment_indicators,
                    health_indicators, economic_indicators,
                    environmental_indicators, infrastructure_indicators)
@@ -183,7 +193,9 @@ list_indicatorTypes <- list(pop_indicators, educ_indicators, employment_indicato
 indicator_type_names <- c("Population", "Education", "Employment", "Health", "Economy", "Environment", "Infrastructure")
 names(list_indicatorTypes) <- indicator_type_names
 #-------------------------------------------------------------
-df_WDI <- subset(WDI_long, Country %in% c("Lower middle income"))
+these_countries <- "Lower middle income"
+#-------------------------------------------------------------
+df_WDI <- subset(WDI_long, Country %in% c(these_countries))
 df_WDI <- subset(df_WDI, Indicator %in% indicator_vec)
 df_WDI <- df_WDI %>% spread(Indicator, Value)
 df_WDI$Year <- as.integer(df_WDI$Year)
@@ -294,11 +306,9 @@ ggarrange(gg_health, gg_educ, gg_econ, gg_pop, gg_environ, gg_infrastr, ncol = 1
 #grid.arrange(gg_health, gg_educ, gg_econ, gg_pop, gg_environ, gg_infrastr)
 ```
 
-### Correlation matrix approach for a small number of variables
+## Correlation matrix approach for a small number of variables
 
-For a manageable number of variables, there is no need to get too fancy. We can just look at the correlation matrix. Below is a correlation matrix of just the economic variables.
-
-(Statistically insignificant ($ p > 0.01 $) values are left blank.)
+For a manageable number of variables, there is no need to get too fancy. You can just look at the correlation matrix. Below is a correlation matrix of just the economic variables. (Statistically insignificant ($ p > 0.01 $) values are left blank.)
 
 ```{r, fig.width=10, fig.height=10, fig.align='center', echo=FALSE}
 
@@ -310,13 +320,13 @@ pmat_econ <- rcorr_out$P
 corrplot(cormat_econ, type="upper", order="hclust", p.mat = pmat_econ, sig.level = 0.01, insig = "blank", tl.col = "black", tl.srt = 45)
 ```
 
-However, the correlation matrix format does not scale well for large numbers of variables.
+However, the correlation matrix format does not scale well. For the large number of variables used in this exercise, something a little fancier is required.
 
-### The PCA approach for large numbers of variables
+## The PCA approach
 
-Below, a PCA is conducted on the complete dataset of economic, environmental, population, infrastructure, health, and education variables. To interpret results, we use two visualization methods: first a biplot and then a loadings barchart.
+Below, a PCA is conducted on the complete dataset of economic, environmental, population, infrastructure, health, and education variables for lower middle income countries. Results are interpreted using two visualization methods: first a biplot and then a loadings barchart.
 
-#### PCA biplot
+### Getting a general idea of tradeoffs/synergies: the PCA biplot
 
 A biplot is a good place to start when trying to discern tradeoffs, or any other sort of structure, in large datasets.
 
@@ -334,25 +344,31 @@ fviz_pca_biplot(res)
 
 ```
 
-The biplot is cluttered and hard to read, but certain characteristics begin to emerge. Note that things like mortality rate, deforestation, and military expenditures point roughly in the opposite direction of things like labor productivity (value added per worker) and primary school enrollment. Note also that employment in agriculture points in the opposite direction of employment in the services and industrial sectors.
+The biplot is cluttered and hard to read, but certain characteristics begin to emerge if you look closely.
+
+Note that things like mortality rate, deforestation, and military expenditures point roughly in the opposite direction of things like labor productivity (value added per worker) and primary school enrollment. Note also that employment in agriculture points in the opposite direction of employment in the services and industrial sectors.
 
 This graphic is called a "biplot" because it also displays the years of observation. The years closest to a variable's arrow are the years in which that variable explained most of the variance in the data.
 
 Note how the years arrange themselves in a consecutive, clockwise fashion. This can be interpreted as a storyline. The story begins in the lower left quadrant (early 1990s) with relatively high military expenditures, deforestation, mortality rates, and incidence of HIV, followed in the late 1990s and early 2000s (upper left quadrant) by increasing importance of employment in agriculture, lower overall unemployment, and higher female participation in the labor force. This is then followed in the late 2000s (upper right quadrant) by capital formation and economic growth across sectors, as well as CO2 emissions. Finally, in the most recent period (lower right quadrant), technology en masse (internet and mobile services), development assistance, labor productivity, education expenditures, and refugee populations become predominant indicators explaining variance in the data.
 
-This provides a starting point to help orient and frame questions. But, again, the graphic is messy and hard to read, with several labels piled on top of each other. A more delicate approach is required to identify and quantify tradeoffs in a carefully enumerated fashion.
+This provides a starting point to help orient and frame questions. But, again, the graphic is messy and hard to read, with several labels piled on top of each other. A more readable format is required to identify and quantify tradeoffs in a carefully enumerated fashion.
 
-#### PCA loadings analysis
+### Precise quantification of tradeoffs/synergies: the PCA loadings bar chart(s)
 
-PCA reduces a problem of several dozen or even hundreds of dimensions (i.e. one dimension per variable) to a problem of just a few dimensions. The reduced group of dimensions is what is referred to by the term "principal components".
+PCA reduces a problem of several dozen or even hundreds of highly correlated dimensions to a problem of just a few orthogonal dimensions. The reduced group of dimensions is what is referred to by the term "principal components".
 
-The influence each variable has on the overall evolution of the system is captured by its contribution to or "loading onto" each of these dimensions.
+The influence each variable has on the overall evolution of the system is captured by its contribution to or "loading onto" each of these dimensions. Tradeoffs and synergies can thus be identified by examining the sign on these loadings. Loadings with the same sign correspond to variables that historically "pull" in the same direction, i.e. synergy. Loadings with opposite signs correspond to variables that pull in opposite directions, i.e. tradeoffs.
 
-Tradeoffs and synergies can thus be identified by examining the sign on these loadings. Loadings with the same sign correspond to variables that historically "pull" in the same direction, i.e. synergy. Loadings with opposite signs correspond to variables that pull in opposite directions, i.e. tradeoffs.
+But before getting to the loadings, there is first the question of exactly how many of the principal components to retain.
 
-Before examining the loadings, there is first the question of how many dimensions the problem should be reduced to. There are a number of arbitrary rules of thumb followed in the peer reviewed literature. "Retain only the dimensions that explain 90% of the variance", for example. This is odd considering that physicists provided a rigorous solution to this dilemma many decades ago.
 
-...
+#### Rigorous separation of signals from noise
+
+In the literature, a number of arbitrary rules of thumb are followed, such as "retain only the dimensions that explain 90% of the variance". However, a more rigorous solution to this dilemma was developed long ago in the study of physical systems (Dehesa et al., 1983); and this has more recently been applied in financial analysis (Laloux et al. 1999). The method is based on an important result in the theory of random matrices which says that the maximum eigenvalue of any correlation matrix generated from a random matrix is a function of the number of variables and observations in the random matrix (Mehta, 2004). For a given data correlation matrix, then, only the dimensions with eigenvalues in excess of the corresponding maximum random matrix eigenvalue can be meaningfully distinguished from noise.
+
+Below, the WDI data correlation matrix eigenvalue density (blue) is compared to the random matrix eigenvalue density (yellow).
+
 
 ```{r, fig.align='center'}
 
@@ -375,23 +391,25 @@ gg <- gg + geom_line(data = data.frame(x = lam, y = dens_rand), aes(x = x, y = y
 gg <- gg + scale_colour_manual(name = "Eigenvalue density", 
                                values = c(`Correlation Matrix` = "blue", `Random matrix` = "orange"))
 gg
+#------------------------------------------------------------
+# How many signals?
+mat_eigvecs <- res$var$coord
+ind_deviating_from_noise <- which(lam_cor > (lamrand_max + 5 * 10^-1))
+lam_signals <- lam_cor[ind_deviating_from_noise]
+n_signals <- length(lam_signals)
+print(paste("Number of signals: ", n_signals))
 
 
 ```
 
-In the graphic above, we see that the three leading eigenvalues of the WDI correlation matrix extend beyond the upper edge of the random matrix eigenvalue density. This means that three of the principle components or dimensions are signals that can be distinguished from the noise in the system.
+The graphic shows that only the three leading eigenvalues of the WDI correlation matrix extend beyond the upper edge of the random matrix eigenvalue density. Hence, only the first three principal components should be retained as signals, and the rest are discarded as noise.
 
-Each variable's contribution to the three signals can be assessed by looking at their loadings onto each signal.
+#### The loadings barcharts
 
-```{r, fig.width=14, fig.height=8, fig.align='center', echo=FALSE}
-#------------------------------------------------------------
-# How many signals?
-mat_eigvecs <- res$var$coord
-ind_deviating_from_noise <- which(lam_cor > (lamrand_max + 10^-1))
-lam_signals <- lam_cor[ind_deviating_from_noise]
-n_signals <- 3
-n_signals <- length(lam_signals)
-print(paste("Number of collective modes: ", n_signals))
+The importance of each signal in determining the overall evolution of the system is proportional to its corresponding eigenvalue. Signal 1 is the signal with the highest eigenvalue. The magnitude and direction of each variable's influence over a given signal's trajectory can be assessed by looking at the loadings.
+
+
+```{r, fig.width=27, fig.height=10, fig.align='center', echo=FALSE}
 #------------------------------------------------------------
 # Set sign of eigenvectors such that they
 # best conform to the input time series
@@ -402,7 +420,7 @@ mat_signals_ts <- mat_signals_ts %*% diag(1 / lam_signals)
 
 mean(mat_in[1,])
 ts_avg <- rowMeans(mat_in)
-ts_avg[1]
+#ts_avg[1]
 for(i in 1:n_signals){
   sse <- sum((mat_signals_ts[, i] - ts_avg)^2)
   sse_neg <- sum((-mat_signals_ts[, i] - ts_avg)^2)
@@ -410,6 +428,12 @@ for(i in 1:n_signals){
   if(which(sse_vec == min(sse_vec)) == 2){
     mat_PC_signals[, i] <- -mat_PC_signals[, i]
   }
+    lm_out <- lm(y ~ x, data = data.frame(y = mat_signals_ts[, i], x = ts_avg))
+  sum_lm <- summary(lm_out)
+  param <- sum_lm$coefficients[2]
+  mat_signals_ts[, i] <- 1 / param * mat_signals_ts[, i]
+  mat_PC_signals[, i] <- 1 / param * mat_PC_signals[, i]
+
 }
 #------------------------------------------------------------
 df_plot <- data.frame(Indicator = col_order, mat_PC_signals)
@@ -430,26 +454,227 @@ df_plot$Indicator <- factor(df_plot$Indicator, levels = unique(df_plot$Indicator
 gg <- ggplot(df_plot, aes(x = Indicator, y = Loading, fill = `Indicator Type`))
 gg <- gg + geom_bar(stat = "identity", position = "dodge")
 gg <- gg + facet_wrap(~ Signal, nrow = 1)
-if(N_c <= 50){
-  gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
-                   axis.title.y = element_blank())
-}else{
-  gg <- gg + theme(axis.text.x = element_blank(),
-                   axis.title.y = element_blank())
-}
+gg <- gg + labs(title = these_countries)
+gg <- gg + theme(axis.title.y = element_blank())
+# if(N_c <= 50){
+#   gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
+#                    axis.title.y = element_blank())
+# }else{
+#   gg <- gg + theme(axis.text.x = element_blank(),
+#                    axis.title.y = element_blank())
+# }
 gg <- gg + coord_flip()
 gg
 #------------------------------------------------------------
 
 ```
 
-The importance of each signal in determining the overall evolution of the system is proportional to its corresponding eigenvalue. Signal 1 is the signal with the highest eigenvalue. It essentially represents the average of the entire dataset of indicators, whereas Signals 2 and 3 represent thematically weighted forces pushing or pulling on the average.
+Note that the loadings on signal 1 are relatively uniform in their magnitude. This is because Signal 1 essentially represents the average trajectory of the entire dataset of indicators.
 
-The loadings on Signal 1 answer the central question motivating this concept note. They reveal the historical tradeoffs and synergies acting on the average evolution of the system. Loadings with the same sign indicate synergies (variables pulling in the same direction). Loadings with opposite signs indicate tradeoffs (variables pulling in opposite directions). These are essentially the same tradeoffs visualized in the biplot, but presented in a more readable format.
+The loadings on Signal 1 answer the central question motivating this concept note: They reveal the historical tradeoffs and synergies acting on the average evolution of the system. Loadings with the same sign indicate synergies (variables pulling in the same direction). Loadings with opposite signs indicate tradeoffs (variables pulling in opposite directions).
 
-The magnitudes of the loadings on Signal 1 are all about the same. This has to do with Signal 1's association with the average trajectory of the system.
-
-The loadings on Signals 2 and 3, meanwhile, are of varying magnitude, revealing a particular "thematic character" associated with these signals. Signal 2 is associated with economic growth, low unemployment, low population growth and urbanization rates, high mineral and energy---but not forest---resource depletion, CO2 emissions, among other things. Signal 3 is associated with economic stagnation, high dependence on development assistance, refugee populations, high population growth and urbanization rates, among other things.
+The loadings on Signals 2 and 3, meanwhile, are of varying magnitude, revealing a particular "thematic character" associated with these signals. Signal 2 is associated with economic growth, low unemployment, low population growth and urbanization rates, high mineral and energy---but not forest---resource depletion, high agricultural greenhouse gas emissions, but low overall CO2 emissions per capita, high energy productivity, trade, among other things. Signal 3 is associated with economic stagnation, high dependence on development assistance, refugee populations, high population growth and urbanization rates, high CO2 emissions per capita, low energy productivity, a lack of trade, among other things.
 
 
+#### Signal time series
 
+The signal time series can be plotted as follows. Here you can see how Signal 1 is representative of the average, while the other signals capture forces pushing and pulling on the average.
+
+```{r, fig.width=12, fig.height=4, fig.align='center', echo=FALSE}
+
+df_plot1 <- data.frame(Year = as.integer(names(ts_avg)), ts_avg)
+df_plot2 <- data.frame(Year = as.integer(names(ts_avg)), mat_signals_ts)
+signal_id <- paste("Signal", c(1:n_signals))
+colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
+gathercols <- signal_id
+df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+gg <- ggplot()
+gg <- gg + geom_line(data = df_plot1, aes(x = Year, y = ts_avg), color = "orange", lwd = 1.2)
+gg <- gg + geom_line(data = df_plot2, aes(x = Year, y = Value))
+gg <- gg + facet_wrap(~ Signal, nrow = 1)
+gg <- gg + theme(axis.title.y = element_blank())
+gg
+
+
+```
+### Careful
+
+* As always, correlation is not necessarily indicative of causation. For example, the opposite signs on the loadings for development assistance and GDP growth in Signal 3 do not necessarily mean that a tradeoff exists between growth and aid. Rather, it indicates an historical negative correlation between the two, probably because economically stagnant countries are more obvious aid targets than economically active countries.
+
+* This analysis captures historical tradeoffs. Sometimes, historical trends are indicative of empirical laws---Bennet's Law, Engel's Law, etc. But not always! Looking forward, we must be open to the possibility that historical tradeoffs between certain strategic objectives (economic and environmental, for example) can be transformed into synergies.
+
+### One more example: Low income countries 
+
+#### Loadings bar charts
+
+```{r, fig.width=27, fig.height=10, fig.align='center', echo=FALSE}
+#-------------------------------------------------------------
+these_countries <- "Low income"
+#-------------------------------------------------------------
+df_WDI <- subset(WDI_long, Country %in% c(these_countries))
+df_WDI <- subset(df_WDI, Indicator %in% indicator_vec)
+df_WDI <- df_WDI %>% spread(Indicator, Value)
+df_WDI$Year <- as.integer(df_WDI$Year)
+df_WDI <- subset(df_WDI, Year >= 1991)
+df_WDI <- subset(df_WDI, Year <= 2016)
+df_WDI$`Individuals using the Internet (% of population)`[which(df_WDI$Year < 1994)] <- 0
+#-------------------------------------------------------------
+year_vec <- df_WDI$Year
+df_WDI <- df_WDI[, -c(1, 2)]
+out <- apply(df_WDI, 2, function(x) length(which(is.na(x))))
+table(out)
+ind_rm <- which(as.numeric(out) > 10)
+length(ind_rm)
+df_WDI <- df_WDI[, -ind_rm]
+ncol(df_WDI)
+ind_rp <- which(is.na(df_WDI[1, ]))
+for(i in 1:length(ind_rp)){
+  df_WDI[1, ind_rp[i]] <- mean(df_WDI[, ind_rp[i]], na.rm = T)
+}
+ind_rp <- which(is.na(df_WDI[nrow(df_WDI), ]))
+for(i in 1:length(ind_rp)){
+  df_WDI[nrow(df_WDI), ind_rp[i]] <- mean(df_WDI[, ind_rp[i]], na.rm = T)
+}
+
+df_WDI <- as.data.frame(na.approx(df_WDI[, -c(1, 2)]))
+class(df_WDI)
+out <- apply(df_WDI, 2, function(x) length(which(is.na(x))))
+table(out)
+which(as.numeric(out) > 0)
+colnames(df_WDI)[which(as.numeric(out) > 0)]
+mat_zWDI <- scale(df_WDI)
+#------------------------------------------------------------
+mat_in <- mat_zWDI
+col_order <- colnames(mat_in)
+n_ts <- ncol(mat_in)
+row.names(mat_in) <- year_vec
+res <- PCA(mat_in, graph = F)
+#fviz_pca_biplot(res)
+#------------------------------------------------------------
+lam_cor <- as.data.frame(res$eig)$eigenvalue
+lamcor_max <- max(lam_cor)
+N_t <- nrow(mat_in)
+N_c <- ncol(mat_in)
+Q <- N_t / N_c
+s_sq <- 1 - lamcor_max / N_c
+#s_sq <- 1
+lamrand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
+lamrand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
+lam <- seq(lamrand_min, lamrand_max, 0.001)
+dens_rand <- Q / (2 * pi * s_sq) * sqrt((lamrand_max - lam) * (lam - lamrand_min)) / lam
+df_e <- data.frame(eigenvalues = lam_cor)
+#------------------------------------------------------------
+# How many signals?
+mat_eigvecs <- res$var$coord
+ind_deviating_from_noise <- which(lam_cor > (lamrand_max + 5 * 10^-1))
+lam_signals <- lam_cor[ind_deviating_from_noise]
+n_signals <- length(lam_signals)
+print(paste("Number of signals: ", n_signals))
+#------------------------------------------------------------
+# Set sign of eigenvectors such that they
+# best conform to the input time series
+mat_PC_signals <- mat_eigvecs[, ind_deviating_from_noise]
+mat_signals_ts <- mat_in %*% mat_PC_signals
+mat_signals_ts <- mat_signals_ts %*% diag(1 / lam_signals)
+#ts_avg <- mat_in %*% rep(1, N_c) * 1 / N_c
+
+#mean(mat_in[1,])
+ts_avg <- rowMeans(mat_in)
+ts_avg[1]
+for(i in 1:n_signals){
+  sse <- sum((mat_signals_ts[, i] - ts_avg)^2)
+  sse_neg <- sum((-mat_signals_ts[, i] - ts_avg)^2)
+  sse_vec <- c(sse, sse_neg)
+  if(which(sse_vec == min(sse_vec)) == 2){
+    mat_PC_signals[, i] <- -mat_PC_signals[, i]
+  }
+  lm_out <- lm(y ~ x, data = data.frame(y = mat_signals_ts[, i], x = ts_avg))
+  sum_lm <- summary(lm_out)
+  param <- sum_lm$coefficients[2]
+  mat_signals_ts[, i] <- 1 / param * mat_signals_ts[, i]
+  mat_PC_signals[, i] <- 1 / param * mat_PC_signals[, i]
+}
+
+#------------------------------------------------------------
+df_plot <- data.frame(Indicator = col_order, mat_PC_signals)
+signal_id <- paste("Signal", c(1:n_signals))
+colnames(df_plot)[2:(n_signals + 1)] <- signal_id
+gathercols <- as.character(signal_id)
+df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
+df_plot$`Indicator Type` <- NA
+u <- as.character(df_plot$Indicator)
+#df_plot$`Indicator Type` <- as.character(df_plot$`Indicator Type`)
+for(i in 1:length(list_indicatorTypes)){
+  ind <- which(u %in% list_indicatorTypes[[i]])
+  df_plot$`Indicator Type`[ind] <- indicator_type_names[i]
+}
+df_plot$`Indicator Type` <- as.factor(df_plot$`Indicator Type`)
+xx <- df_plot$`Indicator Type`
+df_plot$Indicator <- factor(df_plot$Indicator, levels = unique(df_plot$Indicator[order(xx)]))
+gg <- ggplot(df_plot, aes(x = Indicator, y = Loading, fill = `Indicator Type`))
+gg <- gg + geom_bar(stat = "identity", position = "dodge")
+gg <- gg + facet_wrap(~ Signal, nrow = 1)
+gg <- gg + labs(title = these_countries)
+gg <- gg + theme(axis.title.y = element_blank())
+# if(N_c <= 50){
+#   gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
+#                    axis.title.y = element_blank())
+# }else{
+#   gg <- gg + theme(axis.text.x = element_blank(),
+#                    axis.title.y = element_blank())
+# }
+gg <- gg + coord_flip()
+gg
+#------------------------------------------------------------
+
+
+```
+
+#### Signal trajectories
+
+```{r, fig.width=12, fig.height=4, fig.align='center', echo=FALSE}
+
+df_plot1 <- data.frame(Year = as.integer(names(ts_avg)), ts_avg)
+df_plot2 <- data.frame(Year = as.integer(names(ts_avg)), mat_signals_ts)
+signal_id <- paste("Signal", c(1:n_signals))
+colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
+gathercols <- signal_id
+df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+gg <- ggplot()
+gg <- gg + geom_line(data = df_plot1, aes(x = Year, y = ts_avg), color = "orange", lwd = 1.2)
+gg <- gg + geom_line(data = df_plot2, aes(x = Year, y = Value))
+gg <- gg + facet_wrap(~ Signal, nrow = 1)
+gg <- gg + theme(axis.title.y = element_blank())
+gg
+
+
+```
+
+
+<!-- ```{r, echo=FALSE} -->
+
+<!-- sig2 <- apply(mat_signals_ts, 2, sd) -->
+<!-- mat_cov <- diag(sig2) -->
+<!-- #nab_mu <- rep(0, n_signals) -->
+<!-- nab_c <- rep(1, n_signals) -->
+<!-- #mat_nab <- as.matrix(cbind(nab_mu, nab_c)) -->
+
+<!-- M <- t(nab_c) %*% mat_cov %*% nab_c -->
+<!-- M_inv <- solve(M) -->
+
+
+<!-- ``` -->
+
+
+
+## References
+
+Abdi, H., & Williams, L. J. (2010). Principal component analysis. Wiley interdisciplinary reviews: computational statistics, 2(4), 433-459.
+
+Dehesa, J. S., Gomez, J. M. G., & Polls, A. (1983). Mathematical and computational methods in nuclear physics.
+
+Gopikrishnan, P., Rosenow, B., Plerou, V., & Stanley, H. E. (2001). Quantifying and interpreting collective behavior in financial markets. Physical Review E, 64(3), 035106.
+
+Laloux, L., Cizeau, P., Bouchaud, J. P., & Potters, M. (1999). Noise dressing of financial correlation matrices. Physical review letters, 83(7), 1467.
+
+Mehta, M. L. (2004). Random matrices (Vol. 142). Elsevier.
