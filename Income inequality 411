@@ -1,0 +1,45 @@
+setwd("D:/OneDrive - CGIAR/Documents")
+IE_raw <- read.csv("WIID_19Dec2018.csv", stringsAsFactors = F)
+colnames(IE_raw)
+u <- IE_raw$gini_reported
+ind_rm <- which(is.na(u) == T)
+df_IE <- IE_raw[-ind_rm, ]
+df_IE <- df_IE[, c("country", "year", "gini_reported", "q1", "q2", "q3", "q4", "d1","d2","d4","d5","d6","d9","d10", "mean_usd",
+                   "gdp_ppp_pc_usd2011", "resource", "resource_detailed", "scale", "scale_detailed", "incomegroup")]
+df_IE <- subset(df_IE, resource == "Income (gross)")
+df_IE <- as.data.frame(df_IE %>% group_by(country) %>% mutate(keep = ifelse(scale == "No adjustment", 1, 0)))
+df_IE <- as.data.frame(df_IE %>% group_by(country) %>% )
+
+df_x <- subset(df_IE, country == "United States")
+ind_dup <- which(duplicated(df_x$year))
+diff(ind_dup)
+df_x$year[ind_dup]
+
+df_IE <- subset(df_IE, resource_detailed == "Income, gross")
+df_IE <- df_IE %>% group_by(country) %>% mutate(dup_year  = duplicated(year))
+df_IE <- df_IE[-which(df_IE$dup_year), ]
+
+df_x <- subset(df_IE, year >= 2012)
+unique(df_x$incomegroup)
+
+df_IE <- subset(df_IE, resource_detailed == "Income (gross)")
+hist(df_IE$gini_reported)
+unique(df_IE$year)[order(unique(df_IE$year))]
+unique(df_IE$country)
+
+df_plot <- subset(df_IE, country == "United States")
+plot(df_plot$year, df_plot$gini_reported, type = "l")
+
+which(duplicated(df_plot$year))
+
+IE <- IE %>% group_by(Country, Year) %>% summarise_each(funs(mean))
+IE <- subset(IE, Country %in% country_vec)
+IE <- subset(IE, Year %in% c(1992:2016))
+n_countries <- length(country_vec)
+dflist <- list()
+for(i in 1:n_countries)
+{
+  dflist[[i]] <- data.frame(Country = country_vec[i], Year = c(1992:2016))
+}
+df_allyrs <- do.call(rbind, dflist)
+IE <- merge(IE, df_allyrs, by = c("Country", "Year"), all.x=T, all.y=T)
