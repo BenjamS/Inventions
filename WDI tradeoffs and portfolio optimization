@@ -1,13 +1,209 @@
-#setwd("D:/OneDrive - CGIAR/Documents")
-options(warn = -1); options(scipen = 999)
+---
+title: "Tradeoff-adjusted optimization of investments across strategic objectives"
+author: "Ben Schiek"
+date: "July 5, 2019"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    latex_engine: xelatex
+mainfont: Calibri Light
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+
+```{r, echo=FALSE}
+setwd("D:/OneDrive - CGIAR/Documents")
+#options(warn = -1); options(scipen = 999)
+#-------------------------------------------------------------
 library(plyr)
 library(tidyverse)
 library(ggplot2)
 library(zoo)
 library(FactoMineR)
 library(factoextra)
+library(ggpubr)
+library(Hmisc)
+library(corrplot)
+#library(PerformanceAnalytics)
 
 
+Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
+                               tsType_names = NULL,
+                               pca_var_plot = F,
+                               pca_ind_plot = F,
+                               eigenvalue_density_plot = F,
+                               yearly = F){
+  col_order <- colnames(mat_in)
+  date_vec <- row.names(mat_in)
+  if(yearly){date_vec <- as.integer(date_vec)}
+  n_ts <- ncol(mat_in)
+  #----
+  if(!is.null(list_tsTypes)){
+    group_vec <- rep(NA, n_ts)
+    for(i in 1:length(list_tsTypes)){
+      this_tsType_vec <- list_tsTypes[[i]]
+      this_tsType_name <- tsType_names[i]
+      group_vec[which(col_order %in% this_tsType_vec)] <- this_tsType_name
+      
+    }
+  }
+  #----
+  if(pca_ind_plot){
+    res <- FactoMineR::PCA(t(mat_in), graph = F)
+    gg <- factoextra::fviz_pca_ind(res, habillage = factor(group_vec), addEllipses = T)
+    print(gg)
+  }
+  #----
+  res <- FactoMineR::PCA(mat_in, graph = F)
+  #----
+  if(pca_var_plot){
+    gg <- factoextra::fviz_pca_var(res, habillage = factor(group_vec))
+    print(gg)
+  }
+  # library(mclust)
+  # mc <- Mclust(t(mat_in))
+  # summary(mc)
+  # View(mc$classification)
+  # factoextra::fviz_cluster(mc, frame.type = "norm", geom = "text")
+  #--Extraction of signals (main PCs)
+  lam_cor <- as.data.frame(res$eig)$eigenvalue
+  lamcor_max <- max(lam_cor)
+  N_t <- nrow(mat_in)
+  N_c <- ncol(mat_in)
+  Q <- N_t / N_c
+  s_sq <- 1 - lamcor_max / N_c
+  #s_sq <- 1
+  lamrand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
+  lamrand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
+  lam <- seq(lamrand_min, lamrand_max, 0.001)
+  dens_rand <- Q / (2 * pi * s_sq) * sqrt((lamrand_max - lam) * (lam - lamrand_min)) / lam
+  df_e <- data.frame(eigenvalues = lam_cor)
+  #--Eigenvalue density vs. random matrix eigenvalue density
+  if(eigenvalue_density_plot){
+    gg <- ggplot()
+    gg <- gg + geom_density(data = df_e, aes(x = eigenvalues, color = "Correlation Matrix"), lwd = 1.1)
+    gg <- gg + geom_line(data = data.frame(x = lam, y = dens_rand), aes(x = x, y = y, color = "Random matrix"), lwd = 1.1)
+    gg <- gg + scale_colour_manual(name = "Eigenvalue density", 
+                                   values = c(`Correlation Matrix` = "blue", `Random matrix` = "orange"))
+    print(gg)
+  }
+  #-----------------------------------------
+  ind_deviating_from_noise <- which(lam_cor > (lamrand_max + 5 * 10^-1))
+  mat_eigvecs_scaled <- res$var$coord
+  if(ncol(mat_eigvecs_scaled) < length(ind_deviating_from_noise)){
+    ind_deviating_from_noise <- 1:ncol(mat_eigvecs)
+  }
+  lam_signals <- lam_cor[ind_deviating_from_noise]
+  n_signals <- length(lam_signals)
+  print(paste("Number of signals: ", n_signals))
+  # Set sign of eigenvectors such that they
+  # best conform to the input time series
+  if(n_signals == 1){
+    mat_PC_signals <- mat_eigvecs_scaled[, ind_deviating_from_noise] / sqrt(lam_signals)
+    mat_signals_ts <- mat_in %*% mat_PC_signals
+    mat_signals_ts <- mat_signals_ts / lam_signals
+  }else{
+    mat_PC_signals <- mat_eigvecs_scaled[, ind_deviating_from_noise] %*% diag(1 / sqrt(lam_signals))
+    mat_signals_ts <- mat_in %*% mat_PC_signals
+    mat_signals_ts <- mat_signals_ts %*% diag(1 / lam_signals)
+  }
+    ts_avg <- mat_in %*% rep(1, n_ts) * 1 / n_ts
+  if(n_signals == 1){
+    sse <- sum((mat_signals_ts - ts_avg)^2)
+    sse_neg <- sum((-mat_signals_ts - ts_avg)^2)
+    if(sse_neg < sse){
+      mat_PC_signals <- -mat_PC_signals
+      mat_signals_ts <- -mat_signals_ts
+      }
+  }else{
+    for(i in 1:n_signals){
+      sse <- sum((mat_signals_ts[, i] - ts_avg)^2)
+      sse_neg <- sum((-mat_signals_ts[, i] - ts_avg)^2)
+      sse_vec <- c(sse, sse_neg)
+      if(sse_neg < sse){
+        mat_PC_signals[, i] <- -mat_PC_signals[, i]
+        mat_signals_ts[, i] <- -mat_signals_ts[, i]
+      }
+    }
+    
+  }
+  #------------------------------------------------------------
+  # Plot loadings barcharts
+  df_plot <- data.frame(ts = col_order, mat_PC_signals)
+  signal_id <- paste("Signal", c(1:n_signals))
+  colnames(df_plot)[2:(n_signals + 1)] <- signal_id
+  gathercols <- as.character(signal_id)
+  df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
+  #--
+  if(!is.null(list_tsTypes)){
+    # df_plot$Type <- NA
+    # u <- as.character(df_plot$ts)
+    # for(i in 1:length(list_tsTypes)){
+    #   ind <- which(u %in% list_tsTypes[[i]])
+    #   df_plot$Type[ind] <- tsType_names[i]
+    # }
+    # df_plot$Type <- as.factor(df_plot$Type)
+    df_plot$Type <- factor(group_vec)
+    xx <- df_plot$Type
+    df_plot$ts <- factor(df_plot$ts, levels = unique(df_plot$ts[order(xx)]))
+    gg <- ggplot(df_plot, aes(x = ts, y = Loading, fill = Type))
+  }else{
+    gg <- ggplot(df_plot, aes(x = ts, y = Loading))
+  }
+  #--
+  gg <- gg + geom_bar(stat = "identity", position = "dodge")
+  gg <- gg + facet_wrap(~ Signal, nrow = 1)
+  #gg <- gg + labs(title = )
+  gg <- gg + theme(axis.text.y = element_text(face = "bold", size = 10),
+                   axis.text.x = element_text(face = "bold", size = 10),
+                   axis.title.y = element_text(face = "bold", size = 10),
+                   axis.title.x = element_text(face = "bold", size = 10))
+  gg <- gg + coord_equal()
+  # if(N_c <= 50){
+  #   gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
+  #                    axis.title.y = element_blank())
+  # }else{
+  #   gg <- gg + theme(axis.text.x = element_blank(),
+  #                    axis.title.y = element_blank())
+  # }
+  gg <- gg + coord_flip()
+  print(gg)
+  #---------------------------------
+  # Plot signal ts against average
+  df_plot1 <- data.frame(date = date_vec, ts_avg)
+  df_plot2 <- data.frame(date = date_vec, mat_signals_ts)
+  signal_id <- paste("Signal", c(1:n_signals))
+  colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
+  gathercols <- signal_id
+  df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+  gg <- ggplot()
+  gg <- gg + geom_line(data = df_plot1, aes(x = date, y = ts_avg), color = "orange", lwd = 1.2)
+  gg <- gg + geom_line(data = df_plot2, aes(x = date, y = Value))
+  gg <- gg + facet_wrap(~ Signal, ncol = 1)
+  gg <- gg + theme(axis.title.y = element_blank())
+  gg
+  print(gg)
+  #--Correlation matrix
+  # t(mat_signals_ts) %*% mat_signals_ts
+  # t(mat_PC_signals) %*% mat_PC_signals
+  rcorr_out <- rcorr(mat_signals_ts)
+  cormat <- rcorr_out$r
+  print(cormat)
+  pmat <- rcorr_out$P
+  corrplot(cormat, type="upper", order="hclust", p.mat = pmat, sig.level = 0.01, insig = "blank", tl.col = "black", tl.srt = 45)
+  #---------------------------------
+  df_sigs <- data.frame(date = date_vec, mat_signals_ts)
+  return(df_sigs)
+}
+
+
+#-------------------------------------------------------------
 WDI_raw <- read.csv("WDIData.csv", stringsAsFactors = F)
 WDI_raw$Country.Code <- NULL
 WDI_raw$Indicator.Code <- NULL
@@ -15,28 +211,37 @@ WDI_raw$X <- NULL
 colnames(WDI_raw)[1:2] <- c("Country", "Indicator")
 WDI_raw$Country <- as.character(WDI_raw$Country)
 WDI_raw$Indicator <- as.character(WDI_raw$Indicator)
+#unique(WDI_raw$Country)
 #unique(WDI_raw$Indicator)
 #unique(WDI_raw$Indicator[grep("GDP", WDI_raw$Indicator)])
-unique(WDI_raw$Indicator[grep("manufacturing", WDI_raw$Indicator, ignore.case = T)])
+#unique(WDI_raw$Indicator[grep("manufacturing", WDI_raw$Indicator, ignore.case = T)])
 colnames(WDI_raw)[3:ncol(WDI_raw)] <- as.character(c(1960:2018))
 WDI_long <- WDI_raw %>% gather(Year, Value, `1960`:`2018`)
 #unique(WDI_raw$Country)
-country_vec <- c("Low income", "Lower middle income", "Middle income", "High income")
+country_vec <- c("Low income", "Lower middle income", "Middle income", "High income",
+                 "Least developed countries: UN classification",
+                 "Sub-Saharan Africa (excluding high income)")
 WDI_long <- subset(WDI_long, Country %in% country_vec)
 #unique(WDI_long$Indicator)
 #unique(WDI_raw$Indicator)[grep("Average", unique(WDI_raw$Indicator))]
+#-------------------------------------------------------------
 
+```
+
+
+
+```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 
 environmental_indicators <- c("CO2 emissions (metric tons per capita)", 
                               "Total natural resources rents (% of GDP)",
                               "Agricultural land (% of land area)",
                               "Land under cereal production (hectares)",
-                              "Forest area (% of land area)",
+                              #"Forest area (% of land area)",
                               "Energy intensity level of primary energy (MJ/$2011 PPP GDP)",
                               "Renewable energy consumption (% of total final energy consumption)",
                               "Agricultural methane emissions (thousand metric tons of CO2 equivalent)",
                               "Agricultural nitrous oxide emissions (thousand metric tons of CO2 equivalent)",
-                              #"Forest rents (% of GDP)",
+                              "Forest rents (% of GDP)",
                               "Adjusted savings: net forest depletion (% of GNI)",
                               "Adjusted savings: mineral depletion (% of GNI)",
                               "Adjusted savings: energy depletion (% of GNI)",
@@ -45,61 +250,62 @@ environmental_indicators <- c("CO2 emissions (metric tons per capita)",
                               "Renewable internal freshwater resources per capita (cubic meters)",
                               "Water productivity, total (constant 2010 US$ GDP per cubic meter of total freshwater withdrawal)"
 )
-
+#-------------------------------------------------------------
 pop_indicators <- c(#"Birth rate, crude (per 1,000 people)",
   #"Death rate, crude (per 1,000 people)",
   "Urban population (% of total population)",
-  "Rural population (% of total population)",
-  "Urban population growth (annual %)",
-  "Population growth (annual %)",
+  #"Rural population (% of total population)",
+  #"Urban population growth (annual %)",
+  #"Population growth (annual %)",
   #"Population ages 0-14, total",
   #"Population ages 0-14 (% of total)",
   #"Population ages 15-64, total",
   #"Population ages 15-64 (% of total)",
   #"Population ages 65 and above, total",
   #"Population ages 65 and above (% of total)",
-  "Population density (people per sq. km of land area)",
+  "Population density (people per sq. km of land area)"#,
   #"Population growth (annual %)",
   #"Refugee population by country or territory of origin",
-  "Refugee population by country or territory of asylum"
+  #"Refugee population by country or territory of asylum"
   # "Population, total",
 )
+#-------------------------------------------------------------
 economic_indicators <- c("Consumer price index (2010 = 100)",
                          "Foreign direct investment, net inflows (% of GDP)",
                          #"Export value index (2000 = 100)",
                          #"Import value index (2000 = 100)",
                          "Military expenditure (% of GDP)",
-                         #"GDP per capita (current US$)",
+                         "GDP per capita (current US$)",
                          "Net ODA received per capita (current US$)",
                          "Poverty headcount ratio at $1.90 a day (2011 PPP) (% of population)",
                          "Trade (% of GDP)",
                          #"GDP growth (annual %)",
-                         "GDP per capita growth (annual %)",
-                         #"Industry (including construction), value added (% of GDP)",
-                         "Industry (including construction), value added (annual % growth)",
-                         #"Manufacturing, value added (% of GDP)",
-                         "Manufacturing, value added (annual % growth)",
-                         #"Services, value added (% of GDP)",
-                         "Services, value added (annual % growth)",
-                         #"Agriculture, forestry, and fishing, value added (% of GDP)",
-                         "Agriculture, forestry, and fishing, value added (annual % growth)",
+                         #"GDP per capita growth (annual %)",
+                         "Industry (including construction), value added (% of GDP)",
+                         #"Industry (including construction), value added (annual % growth)",
+                         "Manufacturing, value added (% of GDP)",
+                         #"Manufacturing, value added (annual % growth)",
+                         "Services, value added (% of GDP)",
+                         #"Services, value added (annual % growth)",
+                         "Agriculture, forestry, and fishing, value added (% of GDP)",
+                         #"Agriculture, forestry, and fishing, value added (annual % growth)",
                          #"Trade in services (% of GDP)",
-                         "Exports of goods and services (annual % growth)",
-                         "Imports of goods and services (annual % growth)",
+                         #"Exports of goods and services (annual % growth)",
+                         #"Imports of goods and services (annual % growth)",
                          "Medium and high-tech Industry (including construction) (% manufacturing value added)",
-                         "Gross capital formation (annual % growth)",
+                         #"Gross capital formation (annual % growth)",
                          "GINI index (World Bank estimate)"
                          #"Gross fixed capital formation (annual % growth)",
                          #"Final consumption expenditure (annual % growth)"
 )
-
-infrastructure_indicators <- c("Access to electricity (% of population)",
+#-------------------------------------------------------------
+infrastructure_indicators <- c(#"Access to electricity (% of population)",
                                "Access to electricity, urban (% of urban population)",
-                               "Access to electricity, rural (% of rural population)",
-                               "Mobile cellular subscriptions (per 100 people)",
-                               "Individuals using the Internet (% of population)")
-
-
+                               "Access to electricity, rural (% of rural population)"#,
+                               #"Mobile cellular subscriptions (per 100 people)",
+                               #"Individuals using the Internet (% of population)"
+                               )
+#-------------------------------------------------------------
 employment_indicators <- c("Employment in agriculture (% of total employment) (modeled ILO estimate)",
                            "Employment in industry (% of total employment) (modeled ILO estimate)",
                            "Employment in services (% of total employment) (modeled ILO estimate)",
@@ -115,6 +321,7 @@ employment_indicators <- c("Employment in agriculture (% of total employment) (m
                            "Age dependency ratio (% of working-age population)",
                            "Ratio of female to male labor force participation rate (%) (modeled ILO estimate)"
 )
+#-------------------------------------------------------------
 health_indicators <- c("Mortality rate, under-5 (per 1,000 live births)",
                        "Incidence of HIV (% of uninfected population ages 15-49)",
                        "Life expectancy at birth, total (years)"
@@ -122,6 +329,7 @@ health_indicators <- c("Mortality rate, under-5 (per 1,000 live births)",
                        # "Life expectancy at birth, female (years)"
                        #"Prevalence of HIV, total (% of population ages 15-49)"
 )
+#-------------------------------------------------------------
 educ_indicators <- c("Government expenditure on education, total (% of GDP)",
                      "School enrollment, primary (% gross)",
                      "School enrollment, secondary (% gross)",
@@ -132,243 +340,88 @@ educ_indicators <- c("Government expenditure on education, total (% of GDP)",
                      "Expenditure on tertiary education (% of government expenditure on education)",
                      "Government expenditure on education, total (% of government expenditure)"
 )
-
-
-#============================================================
+#-------------------------------------------------------------
 indicator_vec <- c(pop_indicators, educ_indicators, employment_indicators,
                    health_indicators, economic_indicators,
                    environmental_indicators, infrastructure_indicators)
-list_indicatorTypes <- list(pop_indicators, educ_indicators, employment_indicators,
+list_tsTypes <- list(pop_indicators, educ_indicators, employment_indicators,
                             health_indicators, economic_indicators,
                             environmental_indicators, infrastructure_indicators)
-indicator_type_names <- c("Population", "Education", "Employment", "Health", "Economy", "Environment", "Infrastructure")
-names(list_indicatorTypes) <- indicator_type_names
+tsType_names <- c("Population", "Education", "Employment", "Health", "Economy", "Environment", "Infrastructure")
+names(list_tsTypes) <- tsType_names
 #-------------------------------------------------------------
-df_WDI <- subset(WDI_long, Country %in% c("Lower middle income"))
+#"Least developed countries: UN classification"
+#"Sub-Saharan Africa (excluding high income)"
+these_countries <- "Least developed countries: UN classification"
+#-------------------------------------------------------------
+df_WDI <- subset(WDI_long, Country %in% c(these_countries))
 df_WDI <- subset(df_WDI, Indicator %in% indicator_vec)
 df_WDI <- df_WDI %>% spread(Indicator, Value)
 df_WDI$Year <- as.integer(df_WDI$Year)
-df_WDI <- subset(df_WDI, Year >= 1991)
+df_WDI <- subset(df_WDI, Year >= 1970)
 df_WDI <- subset(df_WDI, Year <= 2016)
-df_WDI$`Individuals using the Internet (% of population)`[which(df_WDI$Year < 1994)] <- 0
-#-------------------------------------------------------------
-# df_WDI$`Employment in agriculture (PP change)` <- c(NA, diff(df_WDI$`Employment in agriculture (% of total employment) (modeled ILO estimate)`))
-# df_WDI$`Employment in industry (PP change)` <- c(NA, diff(df_WDI$`Employment in industry (% of total employment) (modeled ILO estimate)`))
-# df_WDI$`Employment in services (PP change)` <- c(NA, diff(df_WDI$`Employment in services (% of total employment) (modeled ILO estimate)`))
-# employment_indicators[grep("(% of total employment) (modeled ILO estimate)", employment_indicators)] <- NULL
-# employment_indicators <- c(employment_indicators, "Employment in agriculture (PP change)",
-#                            "Employment in industry (PP change)",
-#                            "Employment in services (PP change)")
-# df_WDI$`Employment in agriculture (% of total employment) (modeled ILO estimate)` <- NULL
-# df_WDI$`Employment in industry (% of total employment) (modeled ILO estimate)` <- NULL
-# df_WDI$`Employment in services (% of total employment) (modeled ILO estimate)` <- NULL
-# 
-# df_WDI$`Agricultural land (PP change)` <- c(NA, diff(df_WDI$`Agricultural land (% of land area)`))
-# df_WDI$`Forest area (PP change)` <- c(NA, diff(df_WDI$`Forest area (% of land area)`))
-# environmental_indicators <- c(environmental_indicators, "Agricultural land (PP change)",
-#                               "Forest area (PP change)")
-# df_WDI$`Agricultural land (% of land area)` <- NULL
-# df_WDI$`Forest area (% of land area)` <- NULL
-# df_WDI <- df_WDI[-1, ]
+#df_WDI$`Individuals using the Internet (% of population)`[which(df_WDI$Year < 1994)] <- 0
 #-------------------------------------------------------------
 year_vec <- df_WDI$Year
 df_WDI <- df_WDI[, -c(1, 2)]
 out <- apply(df_WDI, 2, function(x) length(which(is.na(x))))
-table(out)
+#table(out)
 ind_rm <- which(as.numeric(out) > 10)
-length(ind_rm)
+#length(ind_rm)
 df_WDI <- df_WDI[, -ind_rm]
-ncol(df_WDI)
+#ncol(df_WDI)
 ind_rp <- which(is.na(df_WDI[1, ]))
-for(i in 1:length(ind_rp)){
+if(length(ind_rp) != 0){
+  for(i in 1:length(ind_rp)){
   df_WDI[1, ind_rp[i]] <- mean(df_WDI[, ind_rp[i]], na.rm = T)
+}
 }
 ind_rp <- which(is.na(df_WDI[nrow(df_WDI), ]))
 for(i in 1:length(ind_rp)){
   df_WDI[nrow(df_WDI), ind_rp[i]] <- mean(df_WDI[, ind_rp[i]], na.rm = T)
 }
 
-df_WDI <- as.data.frame(na.approx(df_WDI[, -c(1, 2)]))
-class(df_WDI)
+#df_WDI <- as.data.frame(na.approx(df_WDI[, -c(1, 2)]))
+df_WDI <- as.data.frame(na.approx(df_WDI))
+#class(df_WDI)
 out <- apply(df_WDI, 2, function(x) length(which(is.na(x))))
 table(out)
-which(as.numeric(out) > 0)
-colnames(df_WDI)[which(as.numeric(out) > 0)]
+#which(as.numeric(out) > 0)
+#colnames(df_WDI)[which(as.numeric(out) > 0)]
+#mat_zWDI <- scale(df_WDI)
 #------------------------------------------------------------
-df_plot <- df_WDI
-df_plot <- as.data.frame(scale(df_WDI))
-df_plot$Year <- year_vec
-df_plot <- df_plot %>% gather_("Indicator", "Value", colnames(df_WDI))
-df_plot$Type <- NA
-df_plot$Type[which(df_plot$Indicator %in% pop_indicators)] <- "Population"
-df_plot$Type[which(df_plot$Indicator %in% economic_indicators)] <- "Economy"
-df_plot$Type[which(df_plot$Indicator %in% educ_indicators)] <- "Education"
-df_plot$Type[which(df_plot$Indicator %in% employment_indicators)] <- "Employment"
-df_plot$Type[which(df_plot$Indicator %in% environmental_indicators)] <- "Environment"
-df_plot$Type[which(df_plot$Indicator %in% health_indicators)] <- "Health"
-df_plot$Type[which(df_plot$Indicator %in% infrastructure_indicators)] <- "Infrastructure"
-#------------------------------------------------------------
-gg <- ggplot(df_plot, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line()
-gg <- gg + facet_wrap(~ Type, nrow = 3, scales = "free")
-gg <- gg + theme(legend.position = "none")
-gg
-#------------------------------------------------------------
-this_type <- "Health"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg
-this_type <- "Education"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg
-this_type <- "Economy"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg
-this_type <- "Employment"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg
-this_type <- "Environment"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg
-this_type <- "Population"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg
-this_type <- "Infrastructure"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg
-#------------------------------------------------------------
-mat_in <- scale(df_WDI)
-col_order <- colnames(mat_in)
-n_ts <- ncol(mat_in)
-row.names(mat_in) <- year_vec
-res <- PCA((mat_in))
-fviz_pca_biplot(res)
-#------------------------------------------------------------
-lam_cor <- as.data.frame(res$eig)$eigenvalue
-lamcor_max <- max(lam_cor)
-N_t <- nrow(mat_in)
-N_c <- ncol(mat_in)
-Q <- N_t / N_c
-s_sq <- 1 - lamcor_max / N_c
-#s_sq <- 1
-lamrand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
-lamrand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
-lam <- seq(lamrand_min, lamrand_max, 0.001)
-dens_rand <- Q / (2 * pi * s_sq) * sqrt((lamrand_max - lam) * (lam - lamrand_min)) / lam
-df_e <- data.frame(eigenvalues = lam_cor)
-#------------------------------------------------------------
-gg <- ggplot()
-gg <- gg + geom_density(data = df_e, aes(x = eigenvalues, color = "Correlation Matrix"), lwd = 1.1)
-gg <- gg + geom_line(data = data.frame(x = lam, y = dens_rand), aes(x = x, y = y, color = "Random matrix"), lwd = 1.1)
-gg <- gg + scale_colour_manual(name = "Eigenvalue density", 
-                               values = c(`Correlation Matrix` = "blue", `Random matrix` = "orange"))
-gg
-#------------------------------------------------------------
-# How many collective modes?
-mat_eigvecs <- res$var$coord
-ind_deviating_from_noise <- which(lam_cor > lamrand_max)
-lam_signals <- lam_cor[ind_deviating_from_noise]
-n_signals <- length(lam_signals)
-print(paste("Number of collective modes: ", n_signals))
-#------------------------------------------------------------
-# Set sign of eigenvectors such that they
-# best conform to the input time series
-mat_PC_signals <- mat_eigvecs[, ind_deviating_from_noise]
-mat_signals_ts <- mat_in %*% mat_PC_signals
-mat_signals_ts <- mat_signals_ts %*% diag(1 / lam_signals)
-#ts_avg <- mat_in %*% rep(1, N_c) * 1 / N_c
+#mat_in <- diff(as.matrix(log(df_WDI)))
+mat_in <- diff(as.matrix(df_WDI)) / as.matrix(df_WDI[-nrow(df_WDI), ])
+row.names(mat_in) <- year_vec[-1]
+# library(tidyquant)
+# ema_per <- 2
+# mat_in <- apply(df_WDI, 2, function(x) x - EMA(x, ema_per))
+# row.names(mat_in) <- year_vec
+# mat_in <- mat_in[-c(1:(ema_per - 1)), ]
+# mat_in[is.nan(mat_in)] <- 0
+# mat_in[is.infinite(mat_in)] <- 0
 
-mean(mat_in[1,])
-ts_avg <- rowMeans(mat_in)
-ts_avg[1]
-for(i in 1:n_signals){
-  sse <- sum((mat_signals_ts[, i] - ts_avg)^2)
-  sse_neg <- sum((-mat_signals_ts[, i] - ts_avg)^2)
-  sse_vec <- c(sse, sse_neg)
-  if(which(sse_vec == min(sse_vec)) == 2){
-    mat_PC_signals[, i] <- -mat_PC_signals[, i]
-  }
-}
-#------------------------------------------------------------
-df_plot <- data.frame(Indicator = col_order, mat_PC_signals)
-signal_id <- paste("Signal", c(1:n_signals))
-colnames(df_plot)[2:(n_signals + 1)] <- signal_id
-gathercols <- as.character(signal_id)
-df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
-df_plot$`Indicator Type` <- NA
-u <- as.character(df_plot$Indicator)
-#df_plot$`Indicator Type` <- as.character(df_plot$`Indicator Type`)
-for(i in 1:length(list_indicatorTypes)){
-  ind <- which(u %in% list_indicatorTypes[[i]])
-  df_plot$`Indicator Type`[ind] <- indicator_type_names[i]
-}
-df_plot$`Indicator Type` <- as.factor(df_plot$`Indicator Type`)
-xx <- df_plot$`Indicator Type`
-df_plot$Indicator <- factor(df_plot$Indicator, levels = unique(df_plot$Indicator[order(xx)]))
-gg <- ggplot(df_plot, aes(x = Indicator, y = Loading, fill = `Indicator Type`))
-gg <- gg + geom_bar(stat = "identity", position = "dodge")
-gg <- gg + facet_wrap(~ Signal, nrow = 1)
-if(N_c <= 50){
-  gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
-                   axis.title.y = element_blank())
-}else{
-  gg <- gg + theme(axis.text.x = element_blank(),
-                   axis.title.y = element_blank())
-}
-gg <- gg + coord_flip()
-gg
-#------------------------------------------------------------
+df_sigs <- Signals_from_noise(mat_in, list_tsTypes = list_tsTypes,
+                              tsType_names = tsType_names,
+                              pca_var_plot = T,
+                              pca_ind_plot = T,
+                              eigenvalue_density_plot = T,
+                              yearly = T)
 
 
-for(i in 2:n_signals){
-  this_PC <- print(paste("Principle Component", i))
-  print(paste("Investment in portfolio (PC)", i, "is correlated with investment in:"))
-  
-  this_df <- subset(df_plot, Signal == paste("Signal", i))
-  q <- quantile(this_df$Loading, probs = 0.85)
-  ind_look <- which(this_df$Loading >= q)
-  ind_look_ordered <- ind_look[order(this_df$Loading[ind_look], decreasing = T)]
-  print(this_df[ind_look_ordered, ])
-  
-  print("With the following tradeoffs:")
-  
-  q <- quantile(-this_df$Loading, probs = 0.85)
-  ind_look <- which(-this_df$Loading >= q)
-  ind_look_ordered <- ind_look[order(-this_df$Loading[ind_look], decreasing = T)]
-  print(this_df[ind_look_ordered, ])
-  
-}
+colMeans(df_sigs[, -1])
+sig_vec <- apply(df_sigs[, -1], 2, sd)
+covmat <- diag(sig_vec) %*% cor(df_sigs[, -1]) %*% diag(sig_vec)
+print(covmat)
+
+```
+
+
+```{r, fig.width=12, fig.height=4, fig.align='center', echo=FALSE}
 
 #------------------------------------------------------------
-df_plot1 <- data.frame(Year = as.integer(row.names(ts_avg)), ts_avg)
-df_plot2 <- data.frame(Year = as.integer(row.names(ts_avg)), mat_signals_ts)
+df_plot1 <- data.frame(Year = as.integer(names(ts_avg)), ts_avg)
+df_plot2 <- data.frame(Year = as.integer(names(ts_avg)), mat_signals_ts)
 signal_id <- paste("Signal", c(1:n_signals))
 colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
 gathercols <- signal_id
@@ -380,211 +433,12 @@ gg <- gg + facet_wrap(~ Signal, nrow = 1)
 gg <- gg + theme(axis.title.y = element_blank())
 gg
 
+```
 
+```{r, echo=FALSE}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-cormat <- cor(mat_in)
-#dim(mat_in)
-#dim(cormat)
-image(cormat)
-
-eig_vectors <- eigen(cormat)$vectors
-df_plot <- data.frame(Indicator = col_order, eig_vectors)
-#gathercols <- colnames(df_plot)[2:ncol(df_plot)]
-#df_plot <- df_plot %>% gather_("Mode", "Value", gathercols)
-df_plot <- df_plot[, c(1, 2)]
-gg <- ggplot(df_plot, aes(x = Indicator, y = X1))
-gg <- gg + geom_bar(stat = "identity", position = "dodge")
-gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
-                 axis.title.y = element_blank())
-gg
-ind_mortRate <- which(col_order == "Mortality rate, under-5 (per 1,000 live births)")
-if(eig_vectors[ind_mortRate, 1] > 0){eig_vectors <- -eig_vectors}
-lam_cor <- eigen(cormat)$values
-lamcor_max <- max(lam_cor)
-N_t <- nrow(mat_in)
-N_c <- ncol(mat_in)
-Q <- N_t / N_c
-s_sq <- 1 - lamcor_max / N_c
-#s_sq <- 1
-lamrand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
-ind_deviating_from_noise <- which(lam_cor > lamrand_max)
-collModes <- as.matrix(eig_vectors[, ind_deviating_from_noise])
-#collModes[ind_mortRate, 1]
-ind_neg <- which(collModes[, 1] < 0)
-colnames(df_WDI)[ind_neg]
-df_WDI[, ind_neg] <- 1 / df_WDI[, ind_neg]
-#---------------------
-out <- apply(df_WDI, 2, function(x) length(which(is.infinite(x))))
-table(out)
-ind_rm <- which(as.numeric(out) > 1)
-length(ind_rm)
-if(length(ind_rm) > 0){df_WDI <- df_WDI[, -ind_rm]}
-ncol(df_WDI)
-#---------------------
-mat_in <- scale(df_WDI)
-cormat <- cor(mat_in)
-#dim(mat_in)
-#dim(cormat)
-image(cormat)
-
-
-list_indicatorTypes <- list(pop_indicators, educ_indicators, employment_indicators,
-                            health_indicators, economic_indicators,
-                            environmental_indicators, infrastructure_indicators)
-indicator_type_names <- c("Population", "Education", "Employment", "Health", "Economy", "Environment", "Infrastructure")
-names(list_indicatorTypes) <- indicator_type_names
-for(i in 1:length(list_indicatorTypes)){
-  this_indicator_vec <- list_indicatorTypes[[i]]
-  ind_mod <- which(this_indicator_vec %in% col_order[ind_neg])
-  this_indicator_vec[ind_mod] <- paste("1 /", this_indicator_vec[ind_mod])
-  list_indicatorTypes[[i]] <- this_indicator_vec
-}
-col_order[ind_neg] <- paste("1 /", col_order[ind_neg])
-
-
-eig_vectors <- eigen(cormat)$vectors
-ind_mortRate <- which(col_order == "1 / Mortality rate, under-5 (per 1,000 live births)")
-if(eig_vectors[ind_mortRate, 1] < 0){eig_vectors <- -eig_vectors}
-lam_cor <- eigen(cormat)$values
-lamcor_max <- max(lam_cor)
-N_t <- nrow(mat_in)
-N_c <- ncol(mat_in)
-Q <- N_t / N_c
-s_sq <- 1 - lamcor_max / N_c
-#s_sq <- 1
-lamrand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
-lamrand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
-lam <- seq(lamrand_min, lamrand_max, 0.001)
-dens_rand <- Q / (2 * pi * s_sq) * sqrt((lamrand_max - lam) * (lam - lamrand_min)) / lam
-df_e <- data.frame(values = lam_cor)
-#--
-gg <- ggplot() +
-  geom_density(data = df_e, aes(x = values, color = "Correlation Matrix")) +
-  #geom_histogram(data = df_e, aes(x = values), alpha = 0.2) +
-  geom_line(data = data.frame(x = lam, y = dens_rand), aes(x = x, y = y, color = "Random matrix")) +
-  coord_cartesian(xlim = c(0, ceiling(lamcor_max))) +
-  scale_colour_manual(name = "Eigenvalue density", 
-                      values = c(`Correlation Matrix` = "blue", `Random matrix` = "orange"))
-gg
-
-#-----------------------------
-# How many collective modes?
-ind_deviating_from_noise <- which(lam_cor > lamrand_max)
-collModes <- as.matrix(eig_vectors[, ind_deviating_from_noise])
-noiseModes <- as.matrix(eig_vectors[, -ind_deviating_from_noise])
-n_collModes <- ncol(collModes)
-#-----------------------------
-# Set sign of eigenvectors such that they
-# best conform to the input time series
-Modes <- mat_in %*% collModes
-Modes <- Modes %*% diag(1 / lam_cor[1:n_collModes])
-ts_avg <- mat_in %*% rep(1, N_c) * 1 / N_c
-for(i in 1:n_collModes){
-  sse <- sum((Modes[, i] - ts_avg)^2)
-  sse_neg <- sum((-Modes[, i] - ts_avg)^2)
-  sse_vec <- c(sse, sse_neg)
-  if(which(sse_vec == min(sse_vec)) == 2){
-    collModes[, i] <- -collModes[, i]
-  }
-}
-#-----------------------------
-print(paste("Number of collective modes: ", n_collModes))
-collModes_show <- collModes
-n_collModes_show <- n_collModes
-if(n_collModes > 6){
-  collModes_show <- collModes[, 1:6]
-  n_collModes_show <- 6
-}
-#-----------------------------
-# Contributions of items to each mode
-df_contrib <- data.frame(Indicator = col_order, collModes_show)
-#df_contrib <- cbind(df_contrib, df_group[, c(2:ncol(df_group))])
-mode_id <- c(1:n_collModes_show)
-colnames(df_contrib)[2:(n_collModes_show + 1)] <- mode_id
-gathercols <- as.character(mode_id)
-df_contrib <- gather_(df_contrib, "Mode", "Contribution", gathercols)
-df_contrib$`Indicator Type` <- NA
-u <- as.character(df_contrib$Indicator)
-df_contrib$`Indicator Type` <- as.character(df_contrib$`Indicator Type`)
-for(i in 1:length(list_indicatorTypes)){
-  ind <- which(u %in% list_indicatorTypes[[i]])
-  df_contrib$`Indicator Type`[ind] <- indicator_type_names[i]
-}
-df_contrib$`Indicator Type` <- as.factor(df_contrib$`Indicator Type`)
-df_plot <- df_contrib
-df_plot$Contribution <- df_plot$Contribution
-xx <- df_plot$`Indicator Type`
-df_plot$Indicator <- factor(df_plot$Indicator, levels = unique(df_plot$Indicator[order(xx)]))
-gg <- ggplot(df_plot, aes(x = Indicator, y = Contribution, fill = `Indicator Type`))
-gg <- gg + geom_bar(stat = "identity", position = "dodge")
-gg <- gg + facet_wrap(~ Mode, nrow = 1)
-if(N_c <= 50){
-  gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
-                   axis.title.y = element_blank())
-}else{
-  gg <- gg + theme(axis.text.x = element_blank(),
-                   axis.title.y = element_blank())
-}
-gg <- gg + coord_flip()
-gg
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-library(psych)
-fourfactor <- fa(mat_diff, nfactors = 4, rotate = "oblimin", fm = "minres")
-print(fourfactor$loadings,cutoff = 0.6)
-fa.diagram(fourfactor)
-library(FactoMineR)
-res <- PCA(t(mat_diff))
-library(factoextra)
-fviz_pca_biplot(res)
-fviz_screeplot(res)
+apply(mat_signals_ts, 2, mean)
+mat_x <- mat_signals_ts - ts_avg
+mu_r <- apply(mat_x, 2, mean)
+mu_r
+```
