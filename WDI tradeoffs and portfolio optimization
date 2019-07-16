@@ -1,7 +1,7 @@
 ---
-title: "Tradeoff-adjusted optimization of investments across strategic objectives"
+title: "Tradeoffs, risk, and optimization of investments across strategic objectives"
 author: "Ben Schiek"
-date: "July 5, 2019"
+date: "July 18, 2019"
 output:
   pdf_document:
     toc: true
@@ -15,7 +15,29 @@ mainfont: Calibri Light
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
+## I. Introduction
+### I.i Problem background
+At the most abstract levels of strategic planning, it is customary for large development agencies and donor organizations to carefully define a manageable number of thematic areas for investment that broadly cover all aspects of development. The 17 Sustainable Development Goals (SDG), for example, are grouped  Persons (poverty reduction and human rights), Environmental Sustainability, Economic Prosperity, Peace, and Alliances ().
 
+* Economic growth
+
+* Economic equality, poverty reduction
+
+* Food and nutritional security
+
+* Environmental protection, conservation, reduced C02 emissions, etc.
+
+* Health
+
+
+
+Little or no care is taken, however, to address the tradeoffs that exist between investments in each of these thematic areas. It is well known, for example, that agriculture is often detrimental to the environment. This implies a tradeoff between the food security and environmental objectives. Economic growth, in its turn, is inversely related to both agricultural and environmental objectives. In many parts of the world, there is also a longstanding tradeoff between economic growth and economic equality. Investments in one thematic area can thus offset returns to investments in other thematic areas.
+
+Moreover, conventional
+
+### I.ii Proposed solution: a PCA approach
+
+In this concept note, I propose a rigorous, precise method for identifying and quantifying tradeoffs and synergies between strategic objectives (SOs). The method is based on principle components analysis (PCA) of a large dataset of development indicators spanning the usual thematic areas. (For a good overview of PCA, see Abdi & Williams (2010).) A variant of this approach has been applied in the analysis of financial market time series (Gopikrishnan et al., 2001). Here I enhance such precedents by also leveraging a rigorous signal selecting technique developed in the study of physical systems (Dehesa et al., 1983).
 
 ```{r, echo=FALSE}
 setwd("D:/OneDrive - CGIAR/Documents")
@@ -113,14 +135,14 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
     mat_signals_ts <- mat_in %*% mat_PC_signals
     mat_signals_ts <- mat_signals_ts %*% diag(1 / lam_signals)
   }
-    ts_avg <- mat_in %*% rep(1, n_ts) * 1 / n_ts
+  ts_avg <- mat_in %*% rep(1, n_ts) * 1 / n_ts
   if(n_signals == 1){
     sse <- sum((mat_signals_ts - ts_avg)^2)
     sse_neg <- sum((-mat_signals_ts - ts_avg)^2)
     if(sse_neg < sse){
       mat_PC_signals <- -mat_PC_signals
       mat_signals_ts <- -mat_signals_ts
-      }
+    }
   }else{
     for(i in 1:n_signals){
       sse <- sum((mat_signals_ts[, i] - ts_avg)^2)
@@ -204,6 +226,13 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
 
 
 #-------------------------------------------------------------
+remove_countries <- c("SÃ£o TomÃ© and Principe", "Micronesia, Fed. Sts.")
+WDI_country_classification <- read.csv("WDICountry.csv", stringsAsFactors = F)
+Low_income_countries <- unique(WDI_country_classification$Table.Name[which(WDI_country_classification$Income.Group == "Low income")])
+
+Lower_middle_income_countries <- unique(WDI_country_classification$Table.Name[which(WDI_country_classification$Income.Group == "Lower middle income")])
+Upper_middle_income_countries <- unique(WDI_country_classification$Table.Name[which(WDI_country_classification$Income.Group == "Upper middle income")])
+
 WDI_raw <- read.csv("WDIData.csv", stringsAsFactors = F)
 WDI_raw$Country.Code <- NULL
 WDI_raw$Indicator.Code <- NULL
@@ -213,15 +242,21 @@ WDI_raw$Country <- as.character(WDI_raw$Country)
 WDI_raw$Indicator <- as.character(WDI_raw$Indicator)
 #unique(WDI_raw$Country)
 #unique(WDI_raw$Indicator)
-#unique(WDI_raw$Indicator[grep("GDP", WDI_raw$Indicator)])
-#unique(WDI_raw$Indicator[grep("manufacturing", WDI_raw$Indicator, ignore.case = T)])
+unique(WDI_raw$Indicator[grep("basic", WDI_raw$Indicator, ignore.case = T)])
 colnames(WDI_raw)[3:ncol(WDI_raw)] <- as.character(c(1960:2018))
 WDI_long <- WDI_raw %>% gather(Year, Value, `1960`:`2018`)
 #unique(WDI_raw$Country)
-country_vec <- c("Low income", "Lower middle income", "Middle income", "High income",
-                 "Least developed countries: UN classification",
-                 "Sub-Saharan Africa (excluding high income)")
-WDI_long <- subset(WDI_long, Country %in% country_vec)
+WDI_long <- as.data.frame(WDI_long %>% group_by(Year, Indicator) %>% mutate(world_mu = mean(Value, na.rm = T)))
+ind_worldGini <- which(WDI_long$Country == "World" & WDI_long$Indicator == "GINI index (World Bank estimate)")
+WDI_long$Value[ind_worldGini] <- WDI_long$world_mu[ind_worldGini]
+ind_worldIncomeBottom <- which(WDI_long$Country == "World" & WDI_long$Indicator == "Income share held by lowest 20%")
+WDI_long$Value[ind_worldIncomeBottom] <- WDI_long$world_mu[ind_worldIncomeBottom]
+WDI_long$world_mu <- NULL
+WDI_long <- as.data.frame(WDI_long %>% group_by(Year, Indicator) %>% mutate(world_sum = sum(Value, na.rm = T)))
+ind_worldBatDeaths <- which(WDI_long$Country == "World" & WDI_long$Indicator == "Battle-related deaths (number of people)")
+WDI_long$Value[ind_worldBatDeaths] <- WDI_long$world_sum[ind_worldBatDeaths]
+WDI_long$world_sum <- NULL
+WDI_long$Value[which(is.nan(WDI_long$Value))] <- NA
 #unique(WDI_long$Indicator)
 #unique(WDI_raw$Indicator)[grep("Average", unique(WDI_raw$Indicator))]
 #-------------------------------------------------------------
@@ -230,135 +265,198 @@ WDI_long <- subset(WDI_long, Country %in% country_vec)
 
 
 
-```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
+```{r, fig.width=10, fig.height=4, fig.align='center', echo = FALSE}
 
 environmental_indicators <- c("CO2 emissions (metric tons per capita)", 
-                              "Total natural resources rents (% of GDP)",
-                              "Agricultural land (% of land area)",
-                              "Land under cereal production (hectares)",
-                              #"Forest area (% of land area)",
+                              #"Combustible renewables and waste (% of total energy)",
+                              "CO2 intensity (kg per kg of oil equivalent energy use)",
+                              "Forest area (% of land area)",
+                              "GDP per unit of energy use (PPP $ per kg of oil equivalent)",
                               "Energy intensity level of primary energy (MJ/$2011 PPP GDP)",
                               "Renewable energy consumption (% of total final energy consumption)",
                               "Agricultural methane emissions (thousand metric tons of CO2 equivalent)",
                               "Agricultural nitrous oxide emissions (thousand metric tons of CO2 equivalent)",
-                              "Forest rents (% of GDP)",
+                              "Methane emissions in energy sector (thousand metric tons of CO2 equivalent)",
+                              "Nitrous oxide emissions in energy sector (thousand metric tons of CO2 equivalent)",
+                              "Fertilizer consumption (kilograms per hectare of arable land)",
+                              "Fertilizer consumption (% of fertilizer production)",
                               "Adjusted savings: net forest depletion (% of GNI)",
                               "Adjusted savings: mineral depletion (% of GNI)",
                               "Adjusted savings: energy depletion (% of GNI)",
                               "Level of water stress: freshwater withdrawal as a proportion of available freshwater resources",
                               "Access to clean fuels and technologies for cooking (% of population)",
-                              "Renewable internal freshwater resources per capita (cubic meters)",
-                              "Water productivity, total (constant 2010 US$ GDP per cubic meter of total freshwater withdrawal)"
+                              "Renewable internal freshwater resources per capita (cubic meters)"
+                              #"Water productivity, total (constant 2010 US$ GDP per cubic meter of total freshwater withdrawal)"
 )
 #-------------------------------------------------------------
-pop_indicators <- c(#"Birth rate, crude (per 1,000 people)",
-  #"Death rate, crude (per 1,000 people)",
-  "Urban population (% of total population)",
-  #"Rural population (% of total population)",
-  #"Urban population growth (annual %)",
-  #"Population growth (annual %)",
-  #"Population ages 0-14, total",
-  #"Population ages 0-14 (% of total)",
-  #"Population ages 15-64, total",
-  #"Population ages 15-64 (% of total)",
-  #"Population ages 65 and above, total",
-  #"Population ages 65 and above (% of total)",
-  "Population density (people per sq. km of land area)"#,
-  #"Population growth (annual %)",
-  #"Refugee population by country or territory of origin",
-  #"Refugee population by country or territory of asylum"
-  # "Population, total",
-)
-#-------------------------------------------------------------
-economic_indicators <- c("Consumer price index (2010 = 100)",
-                         "Foreign direct investment, net inflows (% of GDP)",
-                         #"Export value index (2000 = 100)",
-                         #"Import value index (2000 = 100)",
-                         "Military expenditure (% of GDP)",
-                         "GDP per capita (current US$)",
-                         "Net ODA received per capita (current US$)",
-                         "Poverty headcount ratio at $1.90 a day (2011 PPP) (% of population)",
-                         "Trade (% of GDP)",
-                         #"GDP growth (annual %)",
-                         #"GDP per capita growth (annual %)",
-                         "Industry (including construction), value added (% of GDP)",
-                         #"Industry (including construction), value added (annual % growth)",
-                         "Manufacturing, value added (% of GDP)",
-                         #"Manufacturing, value added (annual % growth)",
-                         "Services, value added (% of GDP)",
-                         #"Services, value added (annual % growth)",
+food_sec_indicators <- c("Agricultural land (% of land area)",
+                         "Land under cereal production (hectares)",
+                         "Prevalence of undernourishment (% of population)",
+                         "Food imports (% of merchandise imports)",
+                         "Agriculture, forestry, and fishing, value added per worker (constant 2010 US$)",
+                         "Agriculture, value added per worker (constant 2010 US$)",
                          "Agriculture, forestry, and fishing, value added (% of GDP)",
                          #"Agriculture, forestry, and fishing, value added (annual % growth)",
-                         #"Trade in services (% of GDP)",
-                         #"Exports of goods and services (annual % growth)",
-                         #"Imports of goods and services (annual % growth)",
-                         "Medium and high-tech Industry (including construction) (% manufacturing value added)",
-                         #"Gross capital formation (annual % growth)",
-                         "GINI index (World Bank estimate)"
-                         #"Gross fixed capital formation (annual % growth)",
-                         #"Final consumption expenditure (annual % growth)"
+                         "Food, beverages and tobacco (% of value added in manufacturing)"
+)
+
+economic_growth_indicators <- c(
+  "Oil rents (% of GDP)",
+  "Coal rents (% of GDP)",
+  "Forest rents (% of GDP)",
+  "Natural gas rents (% of GDP)",
+  #"Total natural resources rents (% of GDP)",
+  "Mineral rents (% of GDP)",
+  #"Foreign direct investment, net (BoP, current US$)",
+  "Foreign direct investment, net inflows (BoP, current US$)",
+  #"Foreign direct investment, net inflows (% of GDP)",
+  #"Export value index (2000 = 100)",
+  #"Import value index (2000 = 100)",
+  "GDP per capita (current US$)",
+  "Net ODA received per capita (current US$)",
+  "Trade (% of GDP)",
+  #"GDP growth (annual %)",
+  #"GDP per capita growth (annual %)",
+  "Industry (including construction), value added (% of GDP)",
+  #"Industry (including construction), value added (annual % growth)",
+  "Manufacturing, value added (% of GDP)",
+  #"Manufacturing, value added (annual % growth)",
+  "Machinery and transport equipment (% of value added in manufacturing)",
+  "Services, value added (% of GDP)",
+  #"Services, value added (annual % growth)",
+  "Trade in services (% of GDP)",
+  #"Exports of goods and services (annual % growth)",
+  #"Imports of goods and services (annual % growth)",
+  #"Medium and high-tech Industry (including construction) (% manufacturing value added)",
+  #"Gross capital formation (annual % growth)",
+  #"Gross fixed capital formation (annual % growth)",
+  #"Final consumption expenditure (annual % growth)",
+  "Final consumption expenditure (constant 2010 US$)",
+  "Employment in agriculture (% of total employment) (modeled ILO estimate)",
+  "Employment in industry (% of total employment) (modeled ILO estimate)",
+  "Employment in services (% of total employment) (modeled ILO estimate)",
+  "Labor force participation rate, total (% of total population ages 15+) (modeled ILO estimate)",
+  #"Unemployment, total (% of total labor force) (modeled ILO estimate)",
+  "Industry, value added per worker (constant 2010 US$)",
+  "Industry (including construction), value added per worker (constant 2010 US$)",
+  "Services, value added per worker (constant 2010 US$)"
+)
+#-------------------------------------------------------------
+peaceHRights_indicators <- c("Military expenditure (% of GDP)",
+                             "Ratio of female to male labor force participation rate (%) (modeled ILO estimate)",
+                             "Refugee population by country or territory of origin",
+                             "Internally displaced persons, new displacement associated with conflict and violence (number of cases)",
+                             "Internally displaced persons, total displaced by conflict and violence (number of people)",
+                             "Battle-related deaths (number of people)",
+                             "Literacy rate, youth (ages 15-24), gender parity index (GPI)",
+                             "School enrollment, primary (gross), gender parity index (GPI)",
+                             "School enrollment, primary and secondary (gross), gender parity index (GPI)",
+                             "School enrollment, secondary (gross), gender parity index (GPI)",
+                             "School enrollment, tertiary (gross), gender parity index (GPI)"  
+)
+#-------------------------------------------------------------
+economic_equality_indicators <- c("Consumer price index (2010 = 100)",
+                                  "Income share held by lowest 10%",
+                                  "Income share held by lowest 20%",
+                                  #"GINI index (World Bank estimate)",
+                                  "Risk premium on lending (lending rate minus treasury bill rate, %)",
+                                  #"Poverty gap at $1.90 a day (2011 PPP) (%)",
+                                  "Poverty headcount ratio at $1.90 a day (2011 PPP) (% of population)",
+                                  "Number of people pushed below the $1.90 ($ 2011 PPP) poverty line by out-of-pocket health care expenditure",
+                                  "Number of people pushed below the $3.10 ($ 2011 PPP) poverty line by out-of-pocket health care expenditure",
+                                  "Number of people spending more than 10% of household consumption or income on out-of-pocket health care expenditure",
+                                  "Number of people spending more than 25% of household consumption or income on out-of-pocket health care expenditure",
+                                  "Mortality rate attributed to unsafe water, unsafe sanitation and lack of hygiene (per 100,000 population)",
+                                  "People using at least basic sanitation services (% of population)",
+                                  "People using at least basic sanitation services, rural (% of rural population)",
+                                  "People using at least basic sanitation services, urban (% of urban population)",
+                                  "People using safely managed sanitation services (% of population)",
+                                  "People using safely managed sanitation services, rural (% of rural population)",
+                                  "People using safely managed sanitation services, urban (% of urban population)",
+                                  "People using at least basic drinking water services (% of population)",
+                                  "People using at least basic drinking water services, rural (% of rural population)",
+                                  "People using at least basic drinking water services, urban (% of urban population)",
+                                  "Labor force with basic education, female (% of female working-age population with basic education)",
+                                  "Labor force with basic education, male (% of male working-age population with basic education)"
 )
 #-------------------------------------------------------------
 infrastructure_indicators <- c(#"Access to electricity (% of population)",
-                               "Access to electricity, urban (% of urban population)",
-                               "Access to electricity, rural (% of rural population)"#,
-                               #"Mobile cellular subscriptions (per 100 people)",
-                               #"Individuals using the Internet (% of population)"
-                               )
-#-------------------------------------------------------------
-employment_indicators <- c("Employment in agriculture (% of total employment) (modeled ILO estimate)",
-                           "Employment in industry (% of total employment) (modeled ILO estimate)",
-                           "Employment in services (% of total employment) (modeled ILO estimate)",
-                           "Labor force participation rate, total (% of total population ages 15+) (modeled ILO estimate)",
-                           #"Unemployment, total (% of total labor force) (modeled ILO estimate)",
-                           "Agriculture, forestry, and fishing, value added per worker (constant 2010 US$)",
-                           "Agriculture, value added per worker (constant 2010 US$)",
-                           "Industry, value added per worker (constant 2010 US$)",
-                           "Industry (including construction), value added per worker (constant 2010 US$)",
-                           "Services, value added per worker (constant 2010 US$)",
-                           #"Age dependency ratio, young (% of working-age population)",
-                           #"Age dependency ratio, old (% of working-age population)",
-                           "Age dependency ratio (% of working-age population)",
-                           "Ratio of female to male labor force participation rate (%) (modeled ILO estimate)"
+  "Access to electricity, urban (% of urban population)",
+  "Access to electricity, rural (% of rural population)",
+  "Air transport, freight (million ton-km)",
+  "Air transport, passengers carried",
+  "Railways, goods transported (million ton-km)",
+  "Railways, passengers carried (million passenger-km)"
+  #"Mobile cellular subscriptions (per 100 people)"
+  #"Individuals using the Internet (% of population)"
 )
 #-------------------------------------------------------------
-health_indicators <- c("Mortality rate, under-5 (per 1,000 live births)",
-                       "Incidence of HIV (% of uninfected population ages 15-49)",
-                       "Life expectancy at birth, total (years)"
-                       # "Life expectancy at birth, male (years)",
-                       # "Life expectancy at birth, female (years)"
-                       #"Prevalence of HIV, total (% of population ages 15-49)"
+healthPop_indicators <- c("Mortality rate, under-5 (per 1,000 live births)",
+                          #"Incidence of HIV (% of uninfected population ages 15-49)",
+                          "Life expectancy at birth, total (years)",
+                          # "Life expectancy at birth, male (years)",
+                          # "Life expectancy at birth, female (years)"
+                          "Prevalence of HIV, total (% of population ages 15-49)",
+                          #"Birth rate, crude (per 1,000 people)",
+                          #"Death rate, crude (per 1,000 people)",
+                          "Urban population (% of total population)",
+                          "Rural population (% of total population)",
+                          #"Urban population growth (annual %)",
+                          #"Population growth (annual %)",
+                          #"Population ages 0-14, total",
+                          #"Population ages 0-14 (% of total)",
+                          #"Population ages 15-64, total",
+                          #"Population ages 15-64 (% of total)",
+                          #"Population ages 65 and above, total",
+                          #"Population ages 65 and above (% of total)",
+                          "Population density (people per sq. km of land area)",
+                          "Population growth (annual %)",
+                          "Physicians (per 1,000 people)",
+                          # "Population, total",
+                          #"Age dependency ratio, young (% of working-age population)",
+                          #"Age dependency ratio, old (% of working-age population)",
+                          "Age dependency ratio (% of working-age population)",
+                          "Adolescent fertility rate (births per 1,000 women ages 15-19)"
+                          
 )
 #-------------------------------------------------------------
 educ_indicators <- c("Government expenditure on education, total (% of GDP)",
                      "School enrollment, primary (% gross)",
                      "School enrollment, secondary (% gross)",
                      "School enrollment, tertiary (% gross)",
+                     #"Adjusted savings: education expenditure (current US$)",
                      "Adjusted savings: education expenditure (% of GNI)",
                      "Expenditure on primary education (% of government expenditure on education)",
                      "Expenditure on secondary education (% of government expenditure on education)",
                      "Expenditure on tertiary education (% of government expenditure on education)",
-                     "Government expenditure on education, total (% of government expenditure)"
+                     "Government expenditure on education, total (% of government expenditure)",
+                     "Literacy rate, adult total (% of people ages 15 and above)",
+                     "Literacy rate, youth total (% of people ages 15-24)"
 )
 #-------------------------------------------------------------
-indicator_vec <- c(pop_indicators, educ_indicators, employment_indicators,
-                   health_indicators, economic_indicators,
-                   environmental_indicators, infrastructure_indicators)
-list_tsTypes <- list(pop_indicators, educ_indicators, employment_indicators,
-                            health_indicators, economic_indicators,
-                            environmental_indicators, infrastructure_indicators)
-tsType_names <- c("Population", "Education", "Employment", "Health", "Economy", "Environment", "Infrastructure")
+indicator_vec <- c(healthPop_indicators, food_sec_indicators, educ_indicators,
+                   economic_growth_indicators, economic_equality_indicators,
+                   environmental_indicators, peaceHRights_indicators,
+                   infrastructure_indicators)
+list_tsTypes <- list(healthPop_indicators, food_sec_indicators, educ_indicators,
+                     economic_growth_indicators, economic_equality_indicators,
+                     environmental_indicators, peaceHRights_indicators,
+                     infrastructure_indicators)
+tsType_names <- c("Health/Population", "Food Security", "Education",
+                  "Economic Growth", "Economic Equality",
+                  "Environmental Sustainability", "Peace and Human Rights", "Infrastructure")
 names(list_tsTypes) <- tsType_names
 #-------------------------------------------------------------
 #"Least developed countries: UN classification"
 #"Sub-Saharan Africa (excluding high income)"
-these_countries <- "Least developed countries: UN classification"
+#"Lower middle income"
+these_countries <- "World"
 #-------------------------------------------------------------
 df_WDI <- subset(WDI_long, Country %in% c(these_countries))
 df_WDI <- subset(df_WDI, Indicator %in% indicator_vec)
 df_WDI <- df_WDI %>% spread(Indicator, Value)
 df_WDI$Year <- as.integer(df_WDI$Year)
-df_WDI <- subset(df_WDI, Year >= 1970)
+df_WDI <- subset(df_WDI, Year >= 1990)
 df_WDI <- subset(df_WDI, Year <= 2016)
 #df_WDI$`Individuals using the Internet (% of population)`[which(df_WDI$Year < 1994)] <- 0
 #-------------------------------------------------------------
@@ -373,8 +471,8 @@ df_WDI <- df_WDI[, -ind_rm]
 ind_rp <- which(is.na(df_WDI[1, ]))
 if(length(ind_rp) != 0){
   for(i in 1:length(ind_rp)){
-  df_WDI[1, ind_rp[i]] <- mean(df_WDI[, ind_rp[i]], na.rm = T)
-}
+    df_WDI[1, ind_rp[i]] <- mean(df_WDI[, ind_rp[i]], na.rm = T)
+  }
 }
 ind_rp <- which(is.na(df_WDI[nrow(df_WDI), ]))
 for(i in 1:length(ind_rp)){
@@ -389,7 +487,6 @@ table(out)
 #which(as.numeric(out) > 0)
 #colnames(df_WDI)[which(as.numeric(out) > 0)]
 #mat_zWDI <- scale(df_WDI)
-#------------------------------------------------------------
 #mat_in <- diff(as.matrix(log(df_WDI)))
 mat_in <- diff(as.matrix(df_WDI)) / as.matrix(df_WDI[-nrow(df_WDI), ])
 row.names(mat_in) <- year_vec[-1]
@@ -400,6 +497,94 @@ row.names(mat_in) <- year_vec[-1]
 # mat_in <- mat_in[-c(1:(ema_per - 1)), ]
 # mat_in[is.nan(mat_in)] <- 0
 # mat_in[is.infinite(mat_in)] <- 0
+#-----------------------------------------------------------
+df_plot <- as.data.frame(mat_in)
+df_plot$Year <- year_vec[-1]
+df_plot <- df_plot %>% gather_("Indicator", "Value", colnames(df_WDI))
+df_plot$Type <- NA
+df_plot$Type[which(df_plot$Indicator %in% healthPop_indicators)] <- "Health/Population"
+df_plot$Type[which(df_plot$Indicator %in% economic_equality_indicators)] <- "Economic Equality"
+df_plot$Type[which(df_plot$Indicator %in% educ_indicators)] <- "Education"
+df_plot$Type[which(df_plot$Indicator %in% economic_growth_indicators)] <- "Economic Growth"
+df_plot$Type[which(df_plot$Indicator %in% environmental_indicators)] <- "Environmental Sustainability"
+df_plot$Type[which(df_plot$Indicator %in% food_sec_indicators)] <- "Food Security"
+df_plot$Type[which(df_plot$Indicator %in% infrastructure_indicators)] <- "Infrastructure"
+df_plot$Type[which(df_plot$Indicator %in% peaceHRights_indicators)] <- "Peace and Human Rights"
+#------------------------------------------------------------
+# gg <- ggplot(df_plot, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+# gg <- gg + geom_line()
+# gg <- gg + facet_wrap(~ Type, nrow = 3, scales = "free")
+# gg <- gg + theme(legend.position = "none")
+# gg
+#------------------------------------------------------------
+this_type <- "Health/Population"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_health <- gg
+gg
+this_type <- "Education"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_educ <- gg
+gg
+this_type <- "Economic Growth"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_econ <- gg
+gg
+this_type <- "Economic Equality"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_employ <- gg
+gg
+this_type <- "Environmental Sustainability"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_environ <- gg
+gg
+this_type <- "Food Security"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_pop <- gg
+gg
+this_type <- "Infrastructure"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_infrastr <- gg
+gg
+this_type <- "Peace and Human Rights"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg_infrastr <- gg
+gg
+```
+
+```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
+#------------------------------------------------------------
 
 df_sigs <- Signals_from_noise(mat_in, list_tsTypes = list_tsTypes,
                               tsType_names = tsType_names,
