@@ -15,31 +15,8 @@ mainfont: Calibri Light
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
-## I. Introduction
-### I.i Problem background
-At the most abstract levels of strategic planning, it is customary for large development agencies and donor organizations to carefully define a manageable number of thematic areas for investment that broadly cover all aspects of development. The 17 Sustainable Development Goals (SDG), for example, are grouped  Persons (poverty reduction and human rights), Environmental Sustainability, Economic Prosperity, Peace, and Alliances ().
 
-* Economic growth
-
-* Economic equality, poverty reduction
-
-* Food and nutritional security
-
-* Environmental protection, conservation, reduced C02 emissions, etc.
-
-* Health
-
-
-
-Little or no care is taken, however, to address the tradeoffs that exist between investments in each of these thematic areas. It is well known, for example, that agriculture is often detrimental to the environment. This implies a tradeoff between the food security and environmental objectives. Economic growth, in its turn, is inversely related to both agricultural and environmental objectives. In many parts of the world, there is also a longstanding tradeoff between economic growth and economic equality. Investments in one thematic area can thus offset returns to investments in other thematic areas.
-
-Moreover, conventional
-
-### I.ii Proposed solution: a PCA approach
-
-In this concept note, I propose a rigorous, precise method for identifying and quantifying tradeoffs and synergies between strategic objectives (SOs). The method is based on principle components analysis (PCA) of a large dataset of development indicators spanning the usual thematic areas. (For a good overview of PCA, see Abdi & Williams (2010).) A variant of this approach has been applied in the analysis of financial market time series (Gopikrishnan et al., 2001). Here I enhance such precedents by also leveraging a rigorous signal selecting technique developed in the study of physical systems (Dehesa et al., 1983).
-
-```{r, echo=FALSE}
+```{r, fig.width=10, fig.height=4, fig.align='center', echo = FALSE}
 setwd("D:/OneDrive - CGIAR/Documents")
 #options(warn = -1); options(scipen = 999)
 #-------------------------------------------------------------
@@ -49,17 +26,17 @@ library(ggplot2)
 library(zoo)
 library(FactoMineR)
 library(factoextra)
-library(ggpubr)
 library(Hmisc)
 library(corrplot)
-#library(PerformanceAnalytics)
-
+library(tidyquant)
+#-------------------------------------------------------------
 
 Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
                                tsType_names = NULL,
                                pca_var_plot = F,
                                pca_ind_plot = F,
                                eigenvalue_density_plot = F,
+                               sig_corr_plot = F,
                                yearly = F){
   col_order <- colnames(mat_in)
   date_vec <- row.names(mat_in)
@@ -82,7 +59,7 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
     print(gg)
   }
   #----
-  res <- FactoMineR::PCA(mat_in, graph = F)
+  res <- FactoMineR::PCA(mat_in, ncp = ncol(mat_in), graph = F)
   #----
   if(pca_var_plot){
     gg <- factoextra::fviz_pca_var(res, habillage = factor(group_vec))
@@ -117,47 +94,43 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
   }
   #-----------------------------------------
   ind_deviating_from_noise <- which(lam_cor > (lamrand_max + 5 * 10^-1))
-  mat_eigvecs_scaled <- res$var$coord
-  if(ncol(mat_eigvecs_scaled) < length(ind_deviating_from_noise)){
-    ind_deviating_from_noise <- 1:ncol(mat_eigvecs)
-  }
+  mat_PCs <- res$var$coord
+  mat_eigvecs <-  mat_PCs %*% diag(1 / sqrt(lam_cor))
   lam_signals <- lam_cor[ind_deviating_from_noise]
   n_signals <- length(lam_signals)
   print(paste("Number of signals: ", n_signals))
+  mat_signal_eigvecs <- mat_eigvecs[, ind_deviating_from_noise]
+  mat_signal_tss <- mat_in %*% mat_signal_eigvecs
+  if(n_signals == 1){
+    mat_signal_tss <- mat_signal_tss / lam_signals
+  }else{
+    mat_signal_tss <- mat_signal_tss %*% diag(1 / lam_signals)
+  }
   # Set sign of eigenvectors such that they
   # best conform to the input time series
-  if(n_signals == 1){
-    mat_PC_signals <- mat_eigvecs_scaled[, ind_deviating_from_noise] / sqrt(lam_signals)
-    mat_signals_ts <- mat_in %*% mat_PC_signals
-    mat_signals_ts <- mat_signals_ts / lam_signals
-  }else{
-    mat_PC_signals <- mat_eigvecs_scaled[, ind_deviating_from_noise] %*% diag(1 / sqrt(lam_signals))
-    mat_signals_ts <- mat_in %*% mat_PC_signals
-    mat_signals_ts <- mat_signals_ts %*% diag(1 / lam_signals)
-  }
   ts_avg <- mat_in %*% rep(1, n_ts) * 1 / n_ts
   if(n_signals == 1){
-    sse <- sum((mat_signals_ts - ts_avg)^2)
-    sse_neg <- sum((-mat_signals_ts - ts_avg)^2)
+    sse <- sum((mat_signal_tss - ts_avg)^2)
+    sse_neg <- sum((-mat_signal_tss - ts_avg)^2)
     if(sse_neg < sse){
-      mat_PC_signals <- -mat_PC_signals
-      mat_signals_ts <- -mat_signals_ts
+      mat_signal_eigvecs <- -mat_signal_eigvecs
+      mat_signal_tss <- -mat_signal_tss
     }
   }else{
     for(i in 1:n_signals){
-      sse <- sum((mat_signals_ts[, i] - ts_avg)^2)
-      sse_neg <- sum((-mat_signals_ts[, i] - ts_avg)^2)
+      sse <- sum((mat_signal_tss[, i] - ts_avg)^2)
+      sse_neg <- sum((-mat_signal_tss[, i] - ts_avg)^2)
       sse_vec <- c(sse, sse_neg)
       if(sse_neg < sse){
-        mat_PC_signals[, i] <- -mat_PC_signals[, i]
-        mat_signals_ts[, i] <- -mat_signals_ts[, i]
+        mat_signal_eigvecs[, i] <- -mat_signal_eigvecs[, i]
+        mat_signal_tss[, i] <- -mat_signal_tss[, i]
       }
     }
     
   }
   #------------------------------------------------------------
   # Plot loadings barcharts
-  df_plot <- data.frame(ts = col_order, mat_PC_signals)
+  df_plot <- data.frame(ts = col_order, mat_signal_eigvecs)
   signal_id <- paste("Signal", c(1:n_signals))
   colnames(df_plot)[2:(n_signals + 1)] <- signal_id
   gathercols <- as.character(signal_id)
@@ -198,35 +171,309 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
   print(gg)
   #---------------------------------
   # Plot signal ts against average
-  df_plot1 <- data.frame(date = date_vec, ts_avg)
-  df_plot2 <- data.frame(date = date_vec, mat_signals_ts)
+  df_plot1 <- data.frame(Date = date_vec, ts_avg)
+  df_plot2 <- data.frame(Date = date_vec, mat_signal_tss)
+    df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
+  df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
+  xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
   signal_id <- paste("Signal", c(1:n_signals))
   colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
   gathercols <- signal_id
   df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
   gg <- ggplot()
-  gg <- gg + geom_line(data = df_plot1, aes(x = date, y = ts_avg), color = "orange", lwd = 1.2)
-  gg <- gg + geom_line(data = df_plot2, aes(x = date, y = Value))
+  gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = ts_avg, group = 1), color = "orange", lwd = 1.2)
+  gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
+  gg <- gg + scale_x_discrete(breaks = xAxis_labels)
   gg <- gg + facet_wrap(~ Signal, ncol = 1)
   gg <- gg + theme(axis.title.y = element_blank())
   gg
   print(gg)
   #--Correlation matrix
-  # t(mat_signals_ts) %*% mat_signals_ts
-  # t(mat_PC_signals) %*% mat_PC_signals
-  rcorr_out <- rcorr(mat_signals_ts)
-  cormat <- rcorr_out$r
-  print(cormat)
-  pmat <- rcorr_out$P
-  corrplot(cormat, type="upper", order="hclust", p.mat = pmat, sig.level = 0.01, insig = "blank", tl.col = "black", tl.srt = 45)
+  if(sig_corr_plot){
+    # t(mat_signal_tss) %*% mat_signal_tss
+    # t(mat_signal_eigvecs) %*% mat_signal_eigvecs
+    rcorr_out <- rcorr(mat_signal_tss)
+    cormat <- rcorr_out$r
+    print(cormat)
+    pmat <- rcorr_out$P
+    corrplot(cormat, type="upper", order="hclust", p.mat = pmat, sig.level = 0.01, insig = "blank", tl.col = "black", tl.srt = 45)
+    
+  }
   #---------------------------------
-  df_sigs <- data.frame(date = date_vec, mat_signals_ts)
-  return(df_sigs)
+  df_sig_tss <- data.frame(date = date_vec, ts_sigs = mat_signal_tss)
+  df_sig_eigvecs <- data.frame(PC_sigs = mat_signal_eigvecs)
+  list_out <- list(df_sig_tss, df_sig_eigvecs, lam_signals, lam_cor, mat_eigvecs)
+  return(list_out)
 }
 
 
+
+spy_sector_symbs <- c("XLF", "XLC", "XLY", "XLP", "XLV", "XLK", "RWR",
+                      "XLU", "XLI", "XBI", "IYT") #"TTEK"
+spy_sector_detail <- c("Financials", "Communications", "Luxury goods", "Staple goods",
+                       "Healthcare", "Technology", "Real estate", "Utilities", "Industrial",
+                       "Biotechnology", "Transportation") #"Gov. foreign aid"
+minerals_symbs <- c("GLD", "SLV", "PPLT", "JJC", "JJM") #"XME"
+minerals_detail <- c("Gold", "Silver", "Platinum", "Copper", "Industrial metals") #"US metals and mining"
+agriculture_symbs <- c("JJG", "BAL", "SOYB", "SGG", "JO", "NIB", "DBA")
+agriculture_detail <- c("Grains", "Cotton", "Soybean", "Sugar", "Coffee", "Cacao", "General agriculture")
+energy_symbs <- c("WTI", "FUE", "WOOD", "ICLN", "KOL", "UNG")
+energy_detail <- c("Oil (W&T Offshore Inc.)", "Biofuels", "Timber", "Clean energy", "Coal", "US natural gas")
+#currency_symbs <- c("EMLC", "UUP", "FXE", "FXY", "FXF", "FXC", "FXB", "FXA")
+#currency_detail <- c("Emerging mkt currencies", "USD", "EUR", "JPY", "CHF", "CND", "GBP", "AUD")
+currency_symbs <- c("EURUSD=X", "JPY=X", "CHF=X", "CAD=X",
+                    "GBPUSD=X", "AUDUSD=X", "INR=X")
+currency_detail <- c("EUR/USD", "USD/JPY",
+                     "USD/CHF", "USD/CAD", "GBP/USD", "AUD/USD", "USD/INR")
+emerg_mkt_symbs <- c("EMLC", "ELD", "BKF", "VWOB")
+emerg_mkt_detail <- c("Emerg mkts debt", "Emerg mkts gov. bonds", "BRIC countries", "Emerging mkt currencies")
+crypto_symbs <- c("BLOK", "LEGR", "BCNA")
+crypto_detail <- c("Blockchain tech.", "Blockchain companies", "Blockchain in China")
+Tbond_symbs <- c("IEI", "IEF", "TLT")#, "BIL"
+Tbond_detail <- c("T-bond 3-7 yrs", "T-bond 7-10 yrs", "T-bond 20+ yrs") #"T-bond 1-3 months"
+
+ts_symb_vec <- c(spy_sector_symbs, minerals_symbs, agriculture_symbs, energy_symbs,
+                 currency_symbs, emerg_mkt_symbs, crypto_symbs, Tbond_symbs)
+ts_detail_vec <- c(spy_sector_detail, minerals_detail, agriculture_detail, energy_detail,
+                   currency_detail, emerg_mkt_detail, crypto_detail, Tbond_detail)
+df_symb_detail <- data.frame(symbol = ts_symb_vec, detail = ts_detail_vec)
+#--
+length(ts_symb_vec)
+#--
+# list_tsTypes <- list(spy_sector_symbs, minerals_symbs, agriculture_symbs, energy_symbs,
+#                      currency_symbs, emerg_mkt_symbs, crypto_symbs, Tbond_symbs)
+list_tsTypes <- list(spy_sector_detail, minerals_detail, agriculture_detail, energy_detail,
+                     currency_detail, emerg_mkt_detail, crypto_detail, Tbond_detail)
+tsType_names <- c("US Sectors", "Minerals", "Agriculture", "Energy", "Major Currency Pairs",
+                  "Emerging Markets", "Cryptocurrencies/Blockchain", "T-Bonds")
+#--
+#per_ema <- 13
+#fromdate = Sys.Date() - 360
+fromdate = "2018-06-20"
+tbl_ohlcv <- tq_get(ts_symb_vec, get = "stock.prices", from = fromdate)
+df_ohlcv <- as.data.frame(tbl_ohlcv)
+#--
+# Crypto ts can have duplicate date entries sometimes (BTC-USD)
+# Get rid of these duplicates, if any
+df_ohlcv <- as.data.frame(df_ohlcv %>% group_by(symbol) %>% mutate(dup = duplicated(date)))
+df_ohlcv <- subset(df_ohlcv, dup == F)
+df_ohlcv$dup <- NULL
+#--
+
+#df_ohlcv$p <- rowSums(df_ohlcv[, c(4:6)]) / 3
+#--
+#df <- df_ohlcv[, c("date", "symbol", "p")]
+# df <- df_ohlcv %>% group_by(symbol) %>% tq_transmute(select = adjusted, 
+#                      mutate_fun = periodReturn, 
+#                      period     = "monthly")
+#--
+df <- df_ohlcv[, c("date", "symbol", "adjusted")]
+df <- df %>% spread(symbol, adjusted)
+ind_shift <- which(colnames(df) %in% currency_symbs)
+df[, ind_shift] <- rbind(rep(NA, length(ind_shift)), df[-nrow(df), ind_shift])
+df <- df[-c(1, nrow(df)), ]
+date_vec <- df$date
+mat_in <- na.approx(df[, -1])
+
+o <- apply(mat_in, 2, function(x) length(which(is.na(x))))
+#table(o)
+#which(o==1)
+xts_in <- xts(mat_in, date_vec)
+xts_in <- to.weekly(xts_in, OHLC = F)
+date_vec <- index(xts_in)
+mat_in <- as.matrix(xts_in)
+#ind_rm_ema <- 1:(per_ema - 1)
+# mat_in <- apply(mat_in, 2, function(x) x - EMA(x, per_ema))
+# mat_in <- mat_in[-ind_rm_ema, ]
+# date_vec <- df$date[-c(ind_rm_ema, ind_rm_na)]
+mat_in <- diff(mat_in) / mat_in[-nrow(mat_in), ] * 100
+date_vec <- date_vec[-1]
+#length(date_vec)
+row.names(mat_in) <- as.character(date_vec)
+colnames(mat_in) <- as.character(df_symb_detail$detail[order(df_symb_detail$symbol)])
+
+df_plot <- as.data.frame(mat_in)
+gathercols <- colnames(df_plot)
+df_plot$Date <- date_vec
+df_plot <- df_plot %>% gather_("Security", "Weekly change (%)", gathercols)
+df_plot$Type <- NA
+df_plot$Type[which(df_plot$Security %in% spy_sector_detail)] <- "US Sectors"
+df_plot$Type[which(df_plot$Security %in% minerals_detail)] <- "Minerals"
+df_plot$Type[which(df_plot$Security %in% agriculture_detail)] <- "Agriculture"
+df_plot$Type[which(df_plot$Security %in% energy_detail)] <- "Energy"
+df_plot$Type[which(df_plot$Security %in% currency_detail)] <- "Major Currency Pairs"
+df_plot$Type[which(df_plot$Security %in% emerg_mkt_detail)] <- "Emerging Markets"
+df_plot$Type[which(df_plot$Security %in% crypto_detail)] <- "Cryptocurrencies/Blockchain"
+df_plot$Type[which(df_plot$Security %in% Tbond_detail)] <- "T-bonds"
+#------------------------------------------------------------
+# gg <- ggplot(df_plot, aes(x = Year, y = Value, group = Security, color = Security))
+# gg <- gg + geom_line()
+# gg <- gg + facet_wrap(~ Type, nrow = 3, scales = "free")
+# gg <- gg + theme(legend.position = "none")
+# gg
+#------------------------------------------------------------
+this_type <- "US Sectors"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Date, y = `Weekly change (%)`, group = Security, color = Security))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+this_type <- "Minerals"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Date, y = `Weekly change (%)`, group = Security, color = Security))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+this_type <- "Agriculture"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Date, y = `Weekly change (%)`, group = Security, color = Security))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+this_type <- "Energy"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Date, y = `Weekly change (%)`, group = Security, color = Security))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+this_type <- "Major Currency Pairs"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Date, y = `Weekly change (%)`, group = Security, color = Security))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+this_type <- "Emerging Markets"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Date, y = `Weekly change (%)`, group = Security, color = Security))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+this_type <- "Cryptocurrencies/Blockchain"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Date, y = `Weekly change (%)`, group = Security, color = Security))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+this_type <- "T-bonds"
+df_plot2 <- subset(df_plot, Type == this_type)
+gg <- ggplot(df_plot2, aes(x = Date, y = `Weekly change (%)`, group = Security, color = Security))
+gg <- gg + geom_line(lwd = 1.1)
+gg <- gg + geom_point(size = 2)
+gg <- gg + labs(title = this_type)
+gg
+
+
+```
+
+
+
+```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
+list_sigs <- Signals_from_noise(mat_in, list_tsTypes = list_tsTypes,
+                                tsType_names = tsType_names,
+                                pca_var_plot = T,
+                                pca_ind_plot = T,
+                                eigenvalue_density_plot = T,
+                                sig_corr_plot = F,
+                                yearly = F)
+
+
+```
+
+
+```{r, echo=F}
+
+mat_sig_tss <- as.matrix(list_sigs[[1]])
+mat_sig_eigvecs <- as.matrix(list_sigs[[2]])
+eigvals_sig <- list_sigs[[3]]
+eigvals_all <- list_sigs[[4]]
+mat_all_eigvecs <- as.matrix(list_sigs[[5]])
+#--
+targ_vec <- c(0.05, 1, 1, 0.5)
+l_s2 <- 1
+# diag(1 / eigvals_sig) %*% t(mat_sig_eigvecs) %*% mat_all_eigvecs %*% diag(eigvals_all) %*% t(mat_all_eigvecs) - t(mat_sig_eigvecs)
+
+Cvec <- diag(1 / eigvals_sig) %*% t(mat_sig_eigvecs) %*% rep(1, nrow(mat_sig_eigvecs))
+
+l_vec <- 2 * l_s2 * targ_vec + Cvec
+
+w_star <- 1 / (2 * l_s2) * mat_all_eigvecs %*% diag(1 / eigvals_all) %*% t(mat_all_eigvecs) %*% mat_sig_eigvecs %*% l_vec - mat_all_eigvecs %*% diag(1 / eigvals_all) %*% t(mat_all_eigvecs) %*% rep(1, nrow(mat_sig_eigvecs))
+
+sum(w_star)
+
+t(mat_all_eigvecs) %*% mat_sig_eigvecs
+
+# hist(colMeans(mat_in))
+# hist(df_sigs_PC$PC_sigs.1)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## I. Introduction
+### I.i Problem background
+At the most abstract levels of strategic planning, it is customary for large development agencies and donor organizations to carefully define a manageable number of thematic areas for investment that broadly cover all aspects of development. The 17 Sustainable Development Goals (SDG), for example, are grouped  Persons (poverty reduction and human rights), Environmental Sustainability, Economic Prosperity, Peace, and Alliances ().
+
+* Economic growth
+
+* Economic equality, poverty reduction
+
+* Food and nutritional security
+
+* Environmental protection, conservation, reduced C02 emissions, etc.
+
+* Health
+
+
+
+Little or no care is taken, however, to address the tradeoffs that exist between investments in each of these thematic areas. It is well known, for example, that agriculture is often detrimental to the environment. This implies a tradeoff between the food security and environmental objectives. Economic growth, in its turn, is inversely related to both agricultural and environmental objectives. In many parts of the world, there is also a longstanding tradeoff between economic growth and economic equality. Investments in one thematic area can thus offset returns to investments in other thematic areas.
+
+Moreover, conventional
+
+### I.ii Proposed solution: a PCA approach
+
+In this concept note, I propose a rigorous, precise method for identifying and quantifying tradeoffs and synergies between strategic objectives (SOs). The method is based on principle components analysis (PCA) of a large dataset of development indicators spanning the usual thematic areas. (For a good overview of PCA, see Abdi & Williams (2010).) A variant of this approach has been applied in the analysis of financial market time series (Gopikrishnan et al., 2001). Here I enhance such precedents by also leveraging a rigorous signal selecting technique developed in the study of physical systems (Dehesa et al., 1983).
+
+
+```{r, echo=FALSE}
+setwd("D:/OneDrive - CGIAR/Documents")
+#options(warn = -1); options(scipen = 999)
 #-------------------------------------------------------------
-remove_countries <- c("SÃ£o TomÃ© and Principe", "Micronesia, Fed. Sts.")
+library(plyr)
+library(tidyverse)
+library(ggplot2)
+library(zoo)
+library(FactoMineR)
+library(factoextra)
+library(Hmisc)
+library(corrplot)
+#library(PerformanceAnalytics)
+
+
+
+
+#-------------------------------------------------------------
+remove_countries <- c("São Tomé and Principe", "Micronesia, Fed. Sts.")
 WDI_country_classification <- read.csv("WDICountry.csv", stringsAsFactors = F)
 Low_income_countries <- unique(WDI_country_classification$Table.Name[which(WDI_country_classification$Income.Group == "Low income")])
 
@@ -606,7 +853,7 @@ print(covmat)
 
 #------------------------------------------------------------
 df_plot1 <- data.frame(Year = as.integer(names(ts_avg)), ts_avg)
-df_plot2 <- data.frame(Year = as.integer(names(ts_avg)), mat_signals_ts)
+df_plot2 <- data.frame(Year = as.integer(names(ts_avg)), mat_signal_tss)
 signal_id <- paste("Signal", c(1:n_signals))
 colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
 gathercols <- signal_id
@@ -622,8 +869,8 @@ gg
 
 ```{r, echo=FALSE}
 
-apply(mat_signals_ts, 2, mean)
-mat_x <- mat_signals_ts - ts_avg
+apply(mat_signal_tss, 2, mean)
+mat_x <- mat_signal_tss - ts_avg
 mu_r <- apply(mat_x, 2, mean)
 mu_r
 ```
