@@ -15,6 +15,47 @@ mainfont: Calibri Light
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
+$$R = \mathbf{w \cdot r}, \:\:\: C=\mathbf{w\cdot1}, \:\:\: V = \mathbf{w\cdot\Sigma\cdot w} \tag{1}$$
+
+$$\max_{\mathbf{w}}{R} \:\:\:\:s.t. \:\:\: C=\overline{C} \:, \:\:\: V = \overline{V} \tag{2}$$
+
+$$\mathcal{L} = R - \lambda_C(C - \overline{C}) - \lambda_{V}(V - \overline{V}) \tag{3}$$
+$$\nabla \mathcal{L} = \mathbf{r} - \lambda_C \mathbf{1} - 2 \lambda_{V} \Sigma \cdot \mathbf{w} = \mathbf{0} \tag{4}$$
+$$\Sigma^{-1} \cdot (\mathbf{r} - \lambda_C \mathbf{1}) = 2 \lambda_{V} \mathbf{w}^* \tag{5}$$
+$$\Sigma^{-1} \cdot [\mathbf{r}, \: \mathbf{1}] \left[\begin{matrix} 1 \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \mathbf{w}^* \tag{6}$$
+    
+
+$$ M\left[\begin{matrix}
+    1 \\
+    -\lambda_C \\
+    \end{matrix} \right] = 2 \lambda_{V} \left[\begin{matrix}
+    R \\
+    \bar{C} \\
+    \end{matrix} \right] \tag{7}$$
+
+where 
+
+$$M = [\mathbf{r}, \: \mathbf{1}]' \Sigma^{-1} [\mathbf{r}, \: \mathbf{1}] \tag{8}$$
+
+$$\left[\begin{matrix}
+    1 \\
+    -\lambda_C \\
+    \end{matrix} \right] = 2 \lambda_{V} M^{-1} \left[\begin{matrix}
+    R \\
+    \bar{C} \\
+    \end{matrix} \right] \tag{9}$$
+
+
+$$\mathbf{r} = \lambda_{p1} \mathbf{p_1} + \lambda_{p2} \mathbf{p_2} + \cdots +\lambda_{pk} \mathbf{p_k} \tag{10}$$
+$$\Sigma = P \Lambda P' \tag{11}$$
+$$M = [\tilde{P}, \: \mathbf{1}]' \Sigma^{-1} [\tilde{P}, \: \mathbf{1}] = \tilde{\Lambda}^{-1} \tag{12}$$
+$$\left[\begin{matrix} \lambda_{p1} \\ \lambda_{p2} \\ \vdots \\ \lambda_{pk} \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \tilde{\Lambda} \left[\begin{matrix} r_1 \\ r_2 \\ \vdots \\ r_k \\ \bar{C} \\ \end{matrix} \right] \tag{13}$$
+
+
+$$ \Lambda^{-1}[\mathbf{1}] \left[\begin{matrix} \lambda_{p1} \\ \lambda_{p2} \\ \vdots \\ \lambda_{pk} \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \mathbf{w}^* \tag{14}$$
+
+$$$$
+
 
 ```{r, fig.width=10, fig.height=4, fig.align='center', echo = FALSE}
 setwd("D:/OneDrive - CGIAR/Documents")
@@ -109,25 +150,25 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
   # Set sign of eigenvectors such that they
   # best conform to the input time series
   ts_avg <- mat_in %*% rep(1, n_ts) * 1 / n_ts
-  if(n_signals == 1){
-    sse <- sum((mat_signal_tss - ts_avg)^2)
-    sse_neg <- sum((-mat_signal_tss - ts_avg)^2)
-    if(sse_neg < sse){
-      mat_signal_eigvecs <- -mat_signal_eigvecs
-      mat_signal_tss <- -mat_signal_tss
-    }
-  }else{
-    for(i in 1:n_signals){
-      sse <- sum((mat_signal_tss[, i] - ts_avg)^2)
-      sse_neg <- sum((-mat_signal_tss[, i] - ts_avg)^2)
-      sse_vec <- c(sse, sse_neg)
-      if(sse_neg < sse){
-        mat_signal_eigvecs[, i] <- -mat_signal_eigvecs[, i]
-        mat_signal_tss[, i] <- -mat_signal_tss[, i]
-      }
-    }
-    
-  }
+  # if(n_signals == 1){
+  #   sse <- sum((mat_signal_tss - ts_avg)^2)
+  #   sse_neg <- sum((-mat_signal_tss - ts_avg)^2)
+  #   if(sse_neg < sse){
+  #     mat_signal_eigvecs <- -mat_signal_eigvecs
+  #     mat_signal_tss <- -mat_signal_tss
+  #   }
+  # }else{
+  #   for(i in 1:n_signals){
+  #     sse <- sum((mat_signal_tss[, i] - ts_avg)^2)
+  #     sse_neg <- sum((-mat_signal_tss[, i] - ts_avg)^2)
+  #     sse_vec <- c(sse, sse_neg)
+  #     if(sse_neg < sse){
+  #       mat_signal_eigvecs[, i] <- -mat_signal_eigvecs[, i]
+  #       mat_signal_tss[, i] <- -mat_signal_tss[, i]
+  #     }
+  #   }
+  #   
+  # }
   #------------------------------------------------------------
   # Plot loadings barcharts
   df_plot <- data.frame(ts = col_order, mat_signal_eigvecs)
@@ -173,7 +214,7 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
   # Plot signal ts against average
   df_plot1 <- data.frame(Date = date_vec, ts_avg)
   df_plot2 <- data.frame(Date = date_vec, mat_signal_tss)
-    df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
+  df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
   df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
   xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
   signal_id <- paste("Signal", c(1:n_signals))
@@ -181,7 +222,7 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
   gathercols <- signal_id
   df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
   gg <- ggplot()
-  gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = ts_avg, group = 1), color = "orange", lwd = 1.2)
+  gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = ts_avg, group = 1), color = "orange", lwd = 2)
   gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
   gg <- gg + scale_x_discrete(breaks = xAxis_labels)
   gg <- gg + facet_wrap(~ Signal, ncol = 1)
@@ -273,20 +314,20 @@ ind_shift <- which(colnames(df) %in% currency_symbs)
 df[, ind_shift] <- rbind(rep(NA, length(ind_shift)), df[-nrow(df), ind_shift])
 df <- df[-c(1, nrow(df)), ]
 date_vec <- df$date
-mat_in <- na.approx(df[, -1])
+mat_ts <- na.approx(df[, -1])
 
-o <- apply(mat_in, 2, function(x) length(which(is.na(x))))
+o <- apply(mat_ts, 2, function(x) length(which(is.na(x))))
 #table(o)
 #which(o==1)
-xts_in <- xts(mat_in, date_vec)
-xts_in <- to.weekly(xts_in, OHLC = F)
-date_vec <- index(xts_in)
-mat_in <- as.matrix(xts_in)
+xts_ts <- xts(mat_ts, date_vec)
+xts_ts <- to.weekly(xts_ts, OHLC = F)
+date_vec <- index(xts_ts)
+mat_ts <- as.matrix(xts_ts)
 #ind_rm_ema <- 1:(per_ema - 1)
 # mat_in <- apply(mat_in, 2, function(x) x - EMA(x, per_ema))
 # mat_in <- mat_in[-ind_rm_ema, ]
 # date_vec <- df$date[-c(ind_rm_ema, ind_rm_na)]
-mat_in <- diff(mat_in) / mat_in[-nrow(mat_in), ] * 100
+mat_in <- diff(mat_ts) / mat_ts[-nrow(mat_ts), ] * 100
 date_vec <- date_vec[-1]
 #length(date_vec)
 row.names(mat_in) <- as.character(date_vec)
@@ -383,11 +424,60 @@ list_sigs <- Signals_from_noise(mat_in, list_tsTypes = list_tsTypes,
                                 sig_corr_plot = F,
                                 yearly = F)
 
+mat_sig_eigvecs <- as.matrix(list_sigs[[2]])
+mat_sig_ts <- mat_ts %*% mat_sig_eigvecs
+mat_sig_ts <- scale(mat_sig_ts)
+ts_avg <- rowMeans(mat_ts)
+ts_avg <- scale(ts_avg)
+n_sigs <- ncol(mat_sig_eigvecs)
+df_plot1 <- data.frame(Date = row.names(mat_sig_ts), ts_avg)
+colnames(df_plot1)[2] <- "Average"
+df_plot2 <- data.frame(Date = row.names(mat_sig_ts), mat_sig_ts)
+df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
+df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
+#df_plot2$PC_sigs.2 <- -df_plot2$PC_sigs.2
+xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
+colnames(df_plot2)[2:ncol(df_plot2)] <- paste("Signal", c(1:n_sigs))
+gathercols <- colnames(df_plot2)[2:ncol(df_plot2)]
+df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+gg <- ggplot()
+gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = Average, group = 1), color = "orange", lwd = 2)
+gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
+gg <- gg + scale_x_discrete(breaks = xAxis_labels)
+gg <- gg + facet_wrap(~Signal, ncol = 1)
+gg
+
+
+
+# eigvals_sig <- list_sigs[[3]]
+# r <- mat_sig_eigvecs %*% eigvals_sig
+# vec_sig_ts <- log10(mat_ts %*% r)
+# ts_avg <- rowMeans(mat_ts)
+# df_plot3 <- data.frame(Date = row.names(mat_sig_ts), ts_avg, vec_sig_ts)
+# 
+# gg <- ggplot()
+# gg <- gg + geom_line(data = df_plot3, aes(x = Date, y = ts_avg, group = 1), color = "orange", lwd = 2)
+# gg <- gg + geom_line(data = df_plot3, aes(x = Date, y = vec_sig_ts, group = 1))
+# gg  
 
 ```
 
 
 ```{r, echo=F}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 mat_sig_tss <- as.matrix(list_sigs[[1]])
 mat_sig_eigvecs <- as.matrix(list_sigs[[2]])
