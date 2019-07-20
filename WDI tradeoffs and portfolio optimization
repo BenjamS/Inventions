@@ -35,7 +35,7 @@ $$ M\left[\begin{matrix}
 
 where 
 
-$$M = [\mathbf{r}, \: \mathbf{1}]' \Sigma^{-1} [\mathbf{r}, \: \mathbf{1}] \tag{8}$$
+$$M = [\mathbf{r}, \: \mathbf{1}]' \cdot \Sigma^{-1} \cdot [\mathbf{r}, \: \mathbf{1}] \tag{8}$$
 
 $$\left[\begin{matrix}
     1 \\
@@ -45,10 +45,17 @@ $$\left[\begin{matrix}
     \bar{C} \\
     \end{matrix} \right] \tag{9}$$
 
+However, mean returns are notoriously difficult to measure.
+
+$$\Sigma = P \Lambda P' \tag{11}$$
 
 $$\mathbf{r} = \lambda_{p1} \mathbf{p_1} + \lambda_{p2} \mathbf{p_2} + \cdots +\lambda_{pk} \mathbf{p_k} \tag{10}$$
-$$\Sigma = P \Lambda P' \tag{11}$$
-$$M = [\tilde{P}, \: \mathbf{1}]' \Sigma^{-1} [\tilde{P}, \: \mathbf{1}] = \tilde{\Lambda}^{-1} \tag{12}$$
+
+$$M = [\tilde{P}, \: \mathbf{1}]' \cdot \Sigma^{-1} \cdot [\tilde{P}, \: \mathbf{1}] = \underline{\tilde{\Lambda}}^{-1} \tag{12}$$
+where
+
+$$\underline{\tilde{\Lambda}} = \left[\begin{matrix} \lambda_{p1} & 0 & \cdots & 0 & \mathbf{p_1} \cdot \Lambda \cdot \mathbf{1} \\ 0 & \lambda_{p2} & \cdots & 0 & \mathbf{p_2} \cdot \Lambda \cdot \mathbf{1} \\ \vdots & \vdots & \ddots & 0 & \vdots \\ 0 & 0 & 0 & \lambda_{pk} & \mathbf{p_k} \cdot \Lambda \cdot \mathbf{1}  \\ \mathbf{1} \cdot \Lambda \cdot \mathbf{p_1} & \mathbf{1} \cdot \Lambda \cdot \mathbf{p_2} & \cdots & \mathbf{1} \cdot \Lambda \cdot \mathbf{p_k} & \mathbf{1} \cdot \Lambda \cdot \mathbf{1} \end{matrix} \right]$$
+
 $$\left[\begin{matrix} \lambda_{p1} \\ \lambda_{p2} \\ \vdots \\ \lambda_{pk} \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \tilde{\Lambda} \left[\begin{matrix} r_1 \\ r_2 \\ \vdots \\ r_k \\ \bar{C} \\ \end{matrix} \right] \tag{13}$$
 
 
@@ -58,7 +65,7 @@ $$$$
 
 
 ```{r, fig.width=10, fig.height=4, fig.align='center', echo = FALSE}
-setwd("D:/OneDrive - CGIAR/Documents")
+#setwd("D:/OneDrive - CGIAR/Documents")
 #options(warn = -1); options(scipen = 999)
 #-------------------------------------------------------------
 library(plyr)
@@ -141,30 +148,30 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
   n_signals <- length(lam_signals)
   print(paste("Number of signals: ", n_signals))
   mat_signal_eigvecs <- mat_eigvecs[, ind_deviating_from_noise]
-  mat_signal_tss <- mat_in %*% mat_signal_eigvecs
+  mat_signal_ts <- mat_in %*% mat_signal_eigvecs
   if(n_signals == 1){
-    mat_signal_tss <- mat_signal_tss / lam_signals
+    mat_signal_ts <- mat_signal_ts / lam_signals
   }else{
-    mat_signal_tss <- mat_signal_tss %*% diag(1 / lam_signals)
+    mat_signal_ts <- mat_signal_ts %*% diag(1 / lam_signals)
   }
   # Set sign of eigenvectors such that they
   # best conform to the input time series
   ts_avg <- mat_in %*% rep(1, n_ts) * 1 / n_ts
   # if(n_signals == 1){
-  #   sse <- sum((mat_signal_tss - ts_avg)^2)
-  #   sse_neg <- sum((-mat_signal_tss - ts_avg)^2)
+  #   sse <- sum((mat_signal_ts - ts_avg)^2)
+  #   sse_neg <- sum((-mat_signal_ts - ts_avg)^2)
   #   if(sse_neg < sse){
   #     mat_signal_eigvecs <- -mat_signal_eigvecs
-  #     mat_signal_tss <- -mat_signal_tss
+  #     mat_signal_ts <- -mat_signal_ts
   #   }
   # }else{
   #   for(i in 1:n_signals){
-  #     sse <- sum((mat_signal_tss[, i] - ts_avg)^2)
-  #     sse_neg <- sum((-mat_signal_tss[, i] - ts_avg)^2)
+  #     sse <- sum((mat_signal_ts[, i] - ts_avg)^2)
+  #     sse_neg <- sum((-mat_signal_ts[, i] - ts_avg)^2)
   #     sse_vec <- c(sse, sse_neg)
   #     if(sse_neg < sse){
   #       mat_signal_eigvecs[, i] <- -mat_signal_eigvecs[, i]
-  #       mat_signal_tss[, i] <- -mat_signal_tss[, i]
+  #       mat_signal_ts[, i] <- -mat_signal_ts[, i]
   #     }
   #   }
   #   
@@ -213,7 +220,7 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
   #---------------------------------
   # Plot signal ts against average
   df_plot1 <- data.frame(Date = date_vec, ts_avg)
-  df_plot2 <- data.frame(Date = date_vec, mat_signal_tss)
+  df_plot2 <- data.frame(Date = date_vec, mat_signal_ts)
   df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
   df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
   xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
@@ -231,9 +238,9 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
   print(gg)
   #--Correlation matrix
   if(sig_corr_plot){
-    # t(mat_signal_tss) %*% mat_signal_tss
+    # t(mat_signal_ts) %*% mat_signal_ts
     # t(mat_signal_eigvecs) %*% mat_signal_eigvecs
-    rcorr_out <- rcorr(mat_signal_tss)
+    rcorr_out <- rcorr(mat_signal_ts)
     cormat <- rcorr_out$r
     print(cormat)
     pmat <- rcorr_out$P
@@ -241,9 +248,9 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
     
   }
   #---------------------------------
-  df_sig_tss <- data.frame(date = date_vec, ts_sigs = mat_signal_tss)
+  df_sig_ts <- data.frame(date = date_vec, ts_sigs = mat_signal_ts)
   df_sig_eigvecs <- data.frame(PC_sigs = mat_signal_eigvecs)
-  list_out <- list(df_sig_tss, df_sig_eigvecs, lam_signals, lam_cor, mat_eigvecs)
+  list_out <- list(df_sig_ts, df_sig_eigvecs, lam_signals, lam_cor, mat_eigvecs)
   return(list_out)
 }
 
@@ -447,6 +454,20 @@ gg <- gg + scale_x_discrete(breaks = xAxis_labels)
 gg <- gg + facet_wrap(~Signal, ncol = 1)
 gg
 
+mat_eigvecs <- eigen(cor(mat_in))$vectors
+eigvals_all <- eigen(cor(mat_in))$values
+ones_vec <- rep(1, nrow(mat_eigvecs))
+mat_sig_eigvecs_aug <- cbind(mat_sig_eigvecs, ones_vec)
+
+Q <- t(mat_sig_eigvecs_aug) %*% mat_eigvecs
+M <- round(Q %*% diag(eigvals_all) %*% t(Q), 3)
+M
+
+t(ones_vec) %*% mat_eigvecs %*% diag(eigvals_all) %*% t(mat_eigvecs) %*% mat_eigvecs[, 1]
+
+t(ones_vec) %*% cov(mat_in) %*% mat_eigvecs[, 1]
+
+eigen(cov(mat_in))$vectors[,1] / eigen(cor(mat_in))$vectors[,1]
 
 
 # eigvals_sig <- list_sigs[[3]]
@@ -479,7 +500,12 @@ gg
 
 
 
-mat_sig_tss <- as.matrix(list_sigs[[1]])
+
+
+
+
+
+mat_sig_ts <- as.matrix(list_sigs[[1]])
 mat_sig_eigvecs <- as.matrix(list_sigs[[2]])
 eigvals_sig <- list_sigs[[3]]
 eigvals_all <- list_sigs[[4]]
@@ -943,7 +969,7 @@ print(covmat)
 
 #------------------------------------------------------------
 df_plot1 <- data.frame(Year = as.integer(names(ts_avg)), ts_avg)
-df_plot2 <- data.frame(Year = as.integer(names(ts_avg)), mat_signal_tss)
+df_plot2 <- data.frame(Year = as.integer(names(ts_avg)), mat_signal_ts)
 signal_id <- paste("Signal", c(1:n_signals))
 colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
 gathercols <- signal_id
@@ -959,8 +985,8 @@ gg
 
 ```{r, echo=FALSE}
 
-apply(mat_signal_tss, 2, mean)
-mat_x <- mat_signal_tss - ts_avg
+apply(mat_signal_ts, 2, mean)
+mat_x <- mat_signal_ts - ts_avg
 mu_r <- apply(mat_x, 2, mean)
 mu_r
 ```
