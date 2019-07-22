@@ -15,51 +15,123 @@ mainfont: Calibri Light
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
-$$R = \mathbf{w \cdot r}, \:\:\: C=\mathbf{w\cdot1}, \:\:\: V = \mathbf{w\cdot\Sigma\cdot w} \tag{1}$$
+
+## I. Introduction
+### I.i Problem background
+At the most abstract levels of strategic planning, it is customary for large development agencies and donor organizations to carefully define a manageable number of thematic areas for investment that broadly cover all aspects of development. The 17 Sustainable Development Goals (SDG), for example, are grouped  Persons (poverty reduction and human rights), Environmental Sustainability, Economic Prosperity, Peace, and Alliances ().
+
+* Economic growth
+
+* Economic equality, poverty reduction
+
+* Food and nutritional security
+
+* Environmental protection, conservation, reduced C02 emissions, etc.
+
+* Health
+
+
+...
+
+### Proposed solution
+
+In this paper, I propose a method to identify and quantify such tradeoffs in the SDG Tracker historical data. I then combine this with methods from financial analysis to determine a donor's optimal allocation of investments across the indicators given the donor's level of risk tolerance.
+
+#### Eigendecomposition of SDG Tracker data
+
+The method for identifying and quantifying tradeoffs is based on the eigendecomposition of the correlation matrix of SDG Tracker data. First, signals are separated from noise using a method developed in the analysis of physical systems (). The components of the retained eigenvectors are then interpreted as the magnitude and direction of the influence (a.k.a. "loading" or "score") of each SDG Tracker over the average movement of the dataset. Loadings with opposite signs indicate a tradeoff, while loadings with the same sign are indicative of synergy.
+
+Beyond tradeoffs, this method is also useful for identifying just a few key crosscutting tendencies that are broadly characteristic of the entire dataset. In other words, the loadings on each eigenvector tend to be thematically organized, such that each eigenvector captures a particular aspect of the overall evolution of the system. This effectively reduces the problem of making sense of several dozen complexly interacting indicators to the more mangeable problem of making sense of just a few crosscutting trends.
+
+#### Risk adjusted portfolio optimization
+
+The identification of tradeoffs and key crosscutting trends is useful in and of itself for stimulating and orienting high level policy discussion. However, longstanding methods used in the analogous decisionmaking context of finance are motivation to aim for more. In particular, a variant of Minimum Variance (MV) analysis can be applied to determine the optimal allocation of a budget across the---potentially several dozen---SDG indicators, given a certain risk tolerance.
+
+It is worth taking a moment to emphasize that this goes far beyond the mere "priority setting", with which many donors, development agencies, and research for development (R4D) institutions may be familiar. The method proposed here, adapted from finance, determines, _precisely_, the portion of the donor's/development agency's/R4D research institution's budget that must be allocated in order to maximize net benefit, given a certain risk tolerance specified by the donor. (The budget can be a budget in the literal sense, or an "attention" or "enthusiasm", etc., budget.)
+
+MV analysis currently suffers under longstanding methodological issues that severely limit its usefulness in any context, financial or otherwise (). In a nutshell, noise in the data makes accurate estimation of returns and correlations difficult. This means that one is optimizing over a great deal of noise. In the present adaptation of MV analyis, I propose to define the returns vector as a linear combination of the retained correlation matrix eigenvectors. This, in turn, automatically purges the correlation matrix of noisy elements. The problem is then set up for optimization over signal, not noise.
+
+This set-up also results in a structuring of the problem that allows for non-market valuation of each of the cross-cutting tendencies associated with each eigenvector---i.e. it endogenously determines the development agency's implicit willingness to pay for more of this or that cross-cutting tendency. This could be used to determine a given agency's investment preferences based on their observed spending. It could also become important later on in the formation of SDG markets (analogous to carbon markets) and/or initial coin offerings.
+
+Many in the international development community may be unfamiliar with MV analysis. To build motivation and intuition for its application in the development context, I first walk through an example of its application in the financial context where it originated.
+
+### Summary of results
+
+In the SDG Tracker data, three signals are pulled from the noise. Loadings on the first eigenvector are evenly distributed. Loadings on the second eigenvector eigenvector captures agricultural and/or natural resource intensive development, associated with relatively higher emissions and low industrial development, trade, and overall GDP growth.
+...
+
+## Method
+
+## Data
+
+Yahoo data
+
+WDI data . This is the data that the UN (SDG Tracker) uses to track progress towards SDGs.
+
+## Modified MV analysis in the financial context
+
+The data below are intended to be representative of what a broad-minded investor might have on their radar screen these days, covering a wide range of asset classes.
+
+
+## Mod-MV analysis to determine optimal investments across strategic objectives in the development context
+
+## Conclusion
+
+$$R = \mathbf{w \cdot r}, \:\:\: C=\mathbf{w\cdot1}, \:\:\: V = \mathbf{w\cdot K \cdot w} \tag{1}$$
+
 
 $$\max_{\mathbf{w}}{R} \:\:\:\:s.t. \:\:\: C=\overline{C} \:, \:\:\: V = \overline{V} \tag{2}$$
 
 $$\mathcal{L} = R - \lambda_C(C - \overline{C}) - \lambda_{V}(V - \overline{V}) \tag{3}$$
-$$\nabla \mathcal{L} = \mathbf{r} - \lambda_C \mathbf{1} - 2 \lambda_{V} \Sigma \cdot \mathbf{w} = \mathbf{0} \tag{4}$$
-$$\Sigma^{-1} \cdot (\mathbf{r} - \lambda_C \mathbf{1}) = 2 \lambda_{V} \mathbf{w}^* \tag{5}$$
-$$\Sigma^{-1} \cdot [\mathbf{r}, \: \mathbf{1}] \left[\begin{matrix} 1 \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \mathbf{w}^* \tag{6}$$
-    
+
+$$\nabla \mathcal{L} = \mathbf{r} - \lambda_C \mathbf{1} - 2 \lambda_{V} K \cdot \mathbf{w} = \mathbf{0} \tag{4}$$
+
+$$R^* = \lambda_C \overline{C} + 2 \lambda_V \overline{V} \tag{5}$$
+Note this implies that the risk shadow price is proportional to the expected reward to risk ratio.
+
+$$\lambda_V = \frac{1}{2} \frac{R^* - \lambda_C \overline{C}}{\overline{V}} \tag{6}$$
+
+
+$$K^{-1} \cdot (\mathbf{r} - \lambda_C \mathbf{1}) = 2 \lambda_{V} \mathbf{w}^* \tag{5}$$
+
+$$K^{-1} \cdot [\mathbf{r}, \: \mathbf{1}] \left[\begin{matrix} 1 \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \mathbf{w}^* \tag{6}$$
 
 $$ M\left[\begin{matrix}
-    1 \\
-    -\lambda_C \\
-    \end{matrix} \right] = 2 \lambda_{V} \left[\begin{matrix}
-    R \\
-    \bar{C} \\
-    \end{matrix} \right] \tag{7}$$
+1 \\
+-\lambda_C \\
+\end{matrix} \right] = 2 \lambda_{V} \left[\begin{matrix}
+R \\
+\bar{C} \\
+\end{matrix} \right] \tag{7}$$
 
 where 
 
-$$M = [\mathbf{r}, \: \mathbf{1}]' \cdot \Sigma^{-1} \cdot [\mathbf{r}, \: \mathbf{1}] \tag{8}$$
+$$M = [\mathbf{r}, \: \mathbf{1}]' \cdot K^{-1} \cdot [\mathbf{r}, \: \mathbf{1}] \tag{8}$$
 
 $$\left[\begin{matrix}
-    1 \\
-    -\lambda_C \\
-    \end{matrix} \right] = 2 \lambda_{V} M^{-1} \left[\begin{matrix}
-    R \\
-    \bar{C} \\
-    \end{matrix} \right] \tag{9}$$
+1 \\
+-\lambda_C \\
+\end{matrix} \right] = 2 \lambda_{V} M^{-1} \left[\begin{matrix}
+R \\
+\bar{C} \\
+\end{matrix} \right] \tag{9}$$
 
 However, mean returns are notoriously difficult to measure.
 
-$$\Sigma = P \Lambda P' \tag{11}$$
+$$\mathbf{r} = \tilde{P} \tilde{\Lambda} \cdot \mathbf{1}= \lambda_{1} \mathbf{p_1} + \lambda_{2} \mathbf{p_2} + \cdots +\lambda_{k} \mathbf{p_k} \tag{10}$$
 
-$$\mathbf{r} = \lambda_{p1} \mathbf{p_1} + \lambda_{p2} \mathbf{p_2} + \cdots +\lambda_{pk} \mathbf{p_k} \tag{10}$$
+$$K = P \Lambda P' \tag{11}$$
 
-$$M = [\tilde{P}, \: \mathbf{1}]' \cdot \Sigma^{-1} \cdot [\tilde{P}, \: \mathbf{1}] = \underline{\tilde{\Lambda}}^{-1} \tag{12}$$
+
+$$M = [\tilde{P}, \: \mathbf{1}]' \cdot K^{-1} \cdot [\tilde{P}, \: \mathbf{1}] = \underline{\tilde{\Lambda}}^{-1} \tag{12}$$
 where
 
-$$\underline{\tilde{\Lambda}} = \left[\begin{matrix} \lambda_{p1} & 0 & \cdots & 0 & \mathbf{p_1} \cdot \Lambda \cdot \mathbf{1} \\ 0 & \lambda_{p2} & \cdots & 0 & \mathbf{p_2} \cdot \Lambda \cdot \mathbf{1} \\ \vdots & \vdots & \ddots & 0 & \vdots \\ 0 & 0 & 0 & \lambda_{pk} & \mathbf{p_k} \cdot \Lambda \cdot \mathbf{1}  \\ \mathbf{1} \cdot \Lambda \cdot \mathbf{p_1} & \mathbf{1} \cdot \Lambda \cdot \mathbf{p_2} & \cdots & \mathbf{1} \cdot \Lambda \cdot \mathbf{p_k} & \mathbf{1} \cdot \Lambda \cdot \mathbf{1} \end{matrix} \right]$$
+$$\underline{\tilde{\Lambda}} = \left[\begin{matrix} \lambda_{p1} & 0 & \cdots & 0 & \mathbf{p_1} \cdot K \cdot \mathbf{1} \\ 0 & \lambda_{p2} & \cdots & 0 & \mathbf{p_2} \cdot K \cdot \mathbf{1} \\ \vdots & \vdots & \ddots & 0 & \vdots \\ 0 & 0 & 0 & \lambda_{pk} & \mathbf{p_k} \cdot K \cdot \mathbf{1}  \\ \mathbf{1} \cdot K \cdot \mathbf{p_1} & \mathbf{1} \cdot K \cdot \mathbf{p_2} & \cdots & \mathbf{1} \cdot K \cdot \mathbf{p_k} & \mathbf{1} \cdot K \cdot \mathbf{1} \end{matrix} \right]$$
 
-$$\left[\begin{matrix} \lambda_{p1} \\ \lambda_{p2} \\ \vdots \\ \lambda_{pk} \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \tilde{\Lambda} \left[\begin{matrix} r_1 \\ r_2 \\ \vdots \\ r_k \\ \bar{C} \\ \end{matrix} \right] \tag{13}$$
+$$\left[\begin{matrix} \lambda_{1} \\ \lambda_{2} \\ \vdots \\ \lambda_{k} \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \tilde{\Lambda} \left[\begin{matrix} r_1 \\ r_2 \\ \vdots \\ r_k \\ \bar{C} \\ \end{matrix} \right] \tag{13}$$
 
 
-$$ \Lambda^{-1}[\mathbf{1}] \left[\begin{matrix} \lambda_{p1} \\ \lambda_{p2} \\ \vdots \\ \lambda_{pk} \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \mathbf{w}^* \tag{14}$$
+$$ P\Lambda^{-1} \cdot [...P'\mathbf{1}] \left[\begin{matrix} \lambda_{1} \\ \lambda_{2} \\ \vdots \\ \lambda_{k} \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \mathbf{w}^* \tag{14}$$
 
 $$$$
 
@@ -178,7 +250,7 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
   # }
   #------------------------------------------------------------
   # Plot loadings barcharts
-  df_plot <- data.frame(ts = col_order, mat_signal_eigvecs)
+  df_plot <- data.frame(ts_id = col_order, mat_signal_eigvecs)
   signal_id <- paste("Signal", c(1:n_signals))
   colnames(df_plot)[2:(n_signals + 1)] <- signal_id
   gathercols <- as.character(signal_id)
@@ -194,10 +266,10 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
     # df_plot$Type <- as.factor(df_plot$Type)
     df_plot$Type <- factor(group_vec)
     xx <- df_plot$Type
-    df_plot$ts <- factor(df_plot$ts, levels = unique(df_plot$ts[order(xx)]))
-    gg <- ggplot(df_plot, aes(x = ts, y = Loading, fill = Type))
+    df_plot$ts_id <- factor(df_plot$ts_id, levels = unique(df_plot$ts[order(xx)]))
+    gg <- ggplot(df_plot, aes(x = ts_id, y = Loading, fill = Type))
   }else{
-    gg <- ggplot(df_plot, aes(x = ts, y = Loading))
+    gg <- ggplot(df_plot, aes(x = ts_id, y = Loading))
   }
   #--
   gg <- gg + geom_bar(stat = "identity", position = "dodge")
@@ -431,7 +503,13 @@ list_sigs <- Signals_from_noise(mat_in, list_tsTypes = list_tsTypes,
                                 sig_corr_plot = F,
                                 yearly = F)
 
-mat_sig_eigvecs <- as.matrix(list_sigs[[2]])
+
+```
+
+
+```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
+
+mat_sig_eigvecs <- list_sigs[[2]]
 mat_sig_ts <- mat_ts %*% mat_sig_eigvecs
 mat_sig_ts <- scale(mat_sig_ts)
 ts_avg <- rowMeans(mat_ts)
@@ -454,111 +532,218 @@ gg <- gg + scale_x_discrete(breaks = xAxis_labels)
 gg <- gg + facet_wrap(~Signal, ncol = 1)
 gg
 
-mat_eigvecs <- eigen(cor(mat_in))$vectors
-eigvals_all <- eigen(cor(mat_in))$values
+
+mat_eigvecs <- list_sigs[[5]]
+eigvals <- list_sigs[[4]]
 ones_vec <- rep(1, nrow(mat_eigvecs))
+
 mat_sig_eigvecs_aug <- cbind(mat_sig_eigvecs, ones_vec)
-
 Q <- t(mat_sig_eigvecs_aug) %*% mat_eigvecs
-M <- round(Q %*% diag(eigvals_all) %*% t(Q), 3)
+# M <- round(Q %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs_aug, 6)
+M <- round(Q %*% diag(1 / eigvals) %*% t(Q), 4)
 M
+M_inv <- round(solve(M), 5)
 
-t(ones_vec) %*% mat_eigvecs %*% diag(eigvals_all) %*% t(mat_eigvecs) %*% mat_eigvecs[, 1]
+#-----------------------------------------------
+#-----------------------------------------------
+# l_C <- -0.001
+# targ_vec <-  c(0.15 * rep(1, n_sigs), 1)
+# #targ_vec <- c(0.06, 0.06, 0.02, 0.02, 1)
+# x <- -2 * M_inv %*% targ_vec
+# x
+# l_V <- l_C / x[length(x)]
+# l_V <- l_V * (-sign(l_V))
+# l_V
+# lambdas <- l_V * x
+# lambdas
+# cormat <- cor(mat_in)
+# cormat_inv <- solve(cormat)
+# w_star <- -1 / (2 * l_V) * cormat_inv %*% mat_sig_eigvecs_aug %*% lambdas
+# sum(w_star)
 
-t(ones_vec) %*% cov(mat_in) %*% mat_eigvecs[, 1]
-
-eigen(cov(mat_in))$vectors[,1] / eigen(cor(mat_in))$vectors[,1]
-
-
-# eigvals_sig <- list_sigs[[3]]
-# r <- mat_sig_eigvecs %*% eigvals_sig
-# vec_sig_ts <- log10(mat_ts %*% r)
-# ts_avg <- rowMeans(mat_ts)
-# df_plot3 <- data.frame(Date = row.names(mat_sig_ts), ts_avg, vec_sig_ts)
-# 
-# gg <- ggplot()
-# gg <- gg + geom_line(data = df_plot3, aes(x = Date, y = ts_avg, group = 1), color = "orange", lwd = 2)
-# gg <- gg + geom_line(data = df_plot3, aes(x = Date, y = vec_sig_ts, group = 1))
-# gg  
-
-```
-
-
-```{r, echo=F}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-mat_sig_ts <- as.matrix(list_sigs[[1]])
-mat_sig_eigvecs <- as.matrix(list_sigs[[2]])
-eigvals_sig <- list_sigs[[3]]
-eigvals_all <- list_sigs[[4]]
-mat_all_eigvecs <- as.matrix(list_sigs[[5]])
-#--
-targ_vec <- c(0.05, 1, 1, 0.5)
-l_s2 <- 1
-# diag(1 / eigvals_sig) %*% t(mat_sig_eigvecs) %*% mat_all_eigvecs %*% diag(eigvals_all) %*% t(mat_all_eigvecs) - t(mat_sig_eigvecs)
-
-Cvec <- diag(1 / eigvals_sig) %*% t(mat_sig_eigvecs) %*% rep(1, nrow(mat_sig_eigvecs))
-
-l_vec <- 2 * l_s2 * targ_vec + Cvec
-
-w_star <- 1 / (2 * l_s2) * mat_all_eigvecs %*% diag(1 / eigvals_all) %*% t(mat_all_eigvecs) %*% mat_sig_eigvecs %*% l_vec - mat_all_eigvecs %*% diag(1 / eigvals_all) %*% t(mat_all_eigvecs) %*% rep(1, nrow(mat_sig_eigvecs))
-
+l_R <- 1
+targ_vec <-  c(0.15 * rep(1, n_sigs), 1)
+#targ_vec <- c(0.06, 0.06, 0.02, 0.02, 1)
+x <- -2 * M_inv %*% targ_vec
+x
+l_V <- l_R / x[1]
+l_V <- l_V * (-sign(l_V))
+l_V
+lambdas <- l_V * x
+lambdas
+cormat <- cor(mat_in)
+cormat_inv <- solve(cormat)
+w_star <- -1 / (2 * l_V) * cormat_inv %*% mat_sig_eigvecs_aug %*% lambdas
 sum(w_star)
+#-----------------------------------------------
+#-----------------------------------------------
 
-t(mat_all_eigvecs) %*% mat_sig_eigvecs
 
-# hist(colMeans(mat_in))
-# hist(df_sigs_PC$PC_sigs.1)
+
+col_order <- colnames(mat_in)
+df_plot <- data.frame(ts_id = col_order, mat_sig_eigvecs, w_star)
+signal_id <- paste("Signal", c(1:n_sigs))
+colnames(df_plot)[2:(n_sigs + 1)] <- signal_id
+colnames(df_plot)[ncol(df_plot)] <- "Portfolio weights"
+gathercols <- colnames(df_plot)[-1]
+df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
+#--
+n_ts <- ncol(mat_in)
+group_vec <- rep(NA, n_ts)
+for(i in 1:length(list_tsTypes)){
+  this_tsType_vec <- list_tsTypes[[i]]
+  this_tsType_name <- tsType_names[i]
+  group_vec[which(col_order %in% this_tsType_vec)] <- this_tsType_name
+  
+}
+
+df_plot$Type <- factor(group_vec)
+xx <- df_plot$Type
+df_plot$ts_id <- factor(df_plot$ts_id, levels = unique(df_plot$ts_id[order(xx)]))
+gg <- ggplot(df_plot, aes(x = ts_id, y = Loading, fill = Type))
+#--
+gg <- gg + geom_bar(stat = "identity", position = "dodge")
+gg <- gg + facet_wrap(~ Signal, nrow = 1)
+#gg <- gg + labs(title = )
+gg <- gg + theme(axis.text.y = element_text(face = "bold", size = 10),
+                 axis.text.x = element_text(face = "bold", size = 10),
+                 axis.title.y = element_text(face = "bold", size = 10),
+                 axis.title.x = element_text(face = "bold", size = 10))
+gg <- gg + coord_equal()
+# if(N_c <= 50){
+#   gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
+#                    axis.title.y = element_blank())
+# }else{
+#   gg <- gg + theme(axis.text.x = element_blank(),
+#                    axis.title.y = element_blank())
+# }
+gg <- gg + coord_flip()
+gg
+
+#colSums(cbind(mat_sig_eigvecs, w_star))
+
+
+ts_wstar <- scale(mat_ts %*% w_star)
+# Plot signal ts against average
+df_plot1 <- data.frame(Date = row.names(mat_sig_ts), ts_avg)
+df_plot2 <- data.frame(Date = row.names(mat_sig_ts), cbind(mat_sig_ts, ts_wstar))
+colnames(df_plot2)[ncol(df_plot2)] <- "Portfolio weights"
+df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
+df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
+xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
+signal_id <- paste("Signal", c(1:n_sigs))
+colnames(df_plot2)[2:(n_sigs + 1)] <- signal_id
+gathercols <- colnames(df_plot2)
+df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+gg <- ggplot()
+gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = ts_avg, group = 1), color = "orange", lwd = 2)
+gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
+gg <- gg + scale_x_discrete(breaks = xAxis_labels)
+gg <- gg + facet_wrap(~ Signal, ncol = 1)
+gg <- gg + theme(axis.title.y = element_blank())
+gg
+
+
+
+# eigvals_sigs <- list_sigs[[3]]
+# (eigvals_sigs) / lambdas[-length(lambdas)]
+
+
+
 
 ```
 
 
 
 
+```{r, fig.width=10, fig.height=4, fig.align='center', echo = FALSE }
+
+#l_C <- -0.001
+#l_R <- 1
+l_V <- -1.1
+r_lev <- seq(0.02, 0.3, length.out = 40)
+NR_vec <- c()
+V_vec <- c()
+lC_vec <- c()
+lV_vec <- c()
+list_wStar <- list()
+list_wStar_eNormd <- list()
+last_ewStarNmd <- 0
+for(i in 1:length(r_lev)){
+  targ_vec <- c(r_lev[i] * rep(1, n_sigs), 1)
+  x <- -2 * M_inv %*% targ_vec
+  #l_V <- l_C / x[length(x)]
+  #l_V <- l_R / x[1]
+  #l_V <- l_V * (-sign(l_V))
+  l_C <- l_V * x[length(x)]
+  lambdas <- l_V * x
+  #l_C <- lambdas[length(lambdas)]
+  l_C <- l_C * (-sign(l_V))
+  NR_star <- targ_vec %*% lambdas
+  V_tol_implicit <- -1 / 2 *  NR_star / l_V
+  w_star <- -1 / (2 * l_V) * cormat_inv %*% mat_sig_eigvecs_aug %*% lambdas
+  #sum(w_star)
+  ew_star <- exp(w_star)
+  ew_star_normed <- ew_star / sum(ew_star)
+  print(round(sum(last_ewStarNmd - ew_star_normed)^2, 3))
+  last_ewStarNmd <- ew_star_normed
+
+
+  V_check <- t(w_star) %*% cormat %*% w_star
+  
+  #print(V_tol_implicit - V_check)
+  #print(lambdas)
+  
+  NR_vec[i] <- NR_star
+  V_vec[i] <- V_tol_implicit
+  lC_vec[i] <- l_C
+  lV_vec[i] <- l_V
+  list_wStar[[i]] <- w_star
+  list_wStar_eNormd[[i]] <- ew_star_normed
+}
+
+df_plot <- data.frame(V = V_vec, NR = NR_vec, lC = lC_vec, lV = lV_vec)
+gg <- ggplot(df_plot, aes(x = V, y = NR))
+gg <- gg + geom_point()
+gg
+
+
+df_wStack <- data.frame(V = NA, NR = NA, Security = NA, Type = NA, w = NA, ew_normd = NA)
+for(i in 1:nrow(df_plot)){df_wStack <- rbind(df_wStack, data.frame(V = df_plot$V[i], NR = df_plot$NR[i], Security = col_order, Type = group_vec, w = c(list_wStar[[i]]), ew_normd = c(list_wStar_eNormd[[i]])))}
+#for(i in 1:nrow(df)){df_wStack <- rbind(df_wStack, data.frame(Risk = df$Risk[i], EUr = df$EUr[i], Project = c(1:n_proj), w = c(w_norm[[i]])))}
+#df_wStack <- df_wStack %>% group_by()
+df_wStack <- df_wStack[-1, ]
+
+# #df_wStack$Security <- as.character(df_wStack$Security)
+# #df_wStack$w <- df_wStack$w / df$C[ind]
+# #ind_opt <- which(df$EUr == max(df$EUr))
+# df_wStack$ew <- exp(df_wStack$w)
+# df_wStack$Type <- factor(df_wStack$Type)
+# xx <- df_wStack$Type
+# df_wStack$Security <- factor(df_wStack$Security, levels = unique(df_wStack$Security[order(xx)]))
+# 
+# 
+# 
+# df_wStack$ew <- factor(df_wStack$ew,
+#                        levels = unique(df_wStack$Type[order(xx)]),
+#                        ordered = T)
+
+gg <- ggplot(df_wStack, aes(x = V, y = ew_normd)) + geom_area(aes(fill = Security))
+#gg <- gg + geom_vline(xintercept = df$Risk[ind_opt], color = "green", lwd = 2)
+gg <- gg + labs(x = "Potfolio Risk", y = "Project Budget Weights")
+gg <- gg + theme(legend.position = "none")
+gg
 
 
 
 
 
 
+```
 
 
 
 
-
-
-
-## I. Introduction
-### I.i Problem background
-At the most abstract levels of strategic planning, it is customary for large development agencies and donor organizations to carefully define a manageable number of thematic areas for investment that broadly cover all aspects of development. The 17 Sustainable Development Goals (SDG), for example, are grouped  Persons (poverty reduction and human rights), Environmental Sustainability, Economic Prosperity, Peace, and Alliances ().
-
-* Economic growth
-
-* Economic equality, poverty reduction
-
-* Food and nutritional security
-
-* Environmental protection, conservation, reduced C02 emissions, etc.
-
-* Health
 
 
 
