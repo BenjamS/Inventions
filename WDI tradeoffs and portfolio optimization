@@ -266,7 +266,7 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
     # df_plot$Type <- as.factor(df_plot$Type)
     df_plot$Type <- factor(group_vec)
     xx <- df_plot$Type
-    df_plot$ts_id <- factor(df_plot$ts_id, levels = unique(df_plot$ts[order(xx)]))
+    df_plot$ts_id <- factor(df_plot$ts_id, levels = unique(df_plot$ts_id[order(xx)]))
     gg <- ggplot(df_plot, aes(x = ts_id, y = Loading, fill = Type))
   }else{
     gg <- ggplot(df_plot, aes(x = ts_id, y = Loading))
