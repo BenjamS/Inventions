@@ -137,9 +137,11 @@ $$\gamma_i = 2 \gamma_v \lambda_i r_i + \gamma_c \mathbf{p}_i \cdot \mathbf{1} \
 
 $$\gamma_c =  \gamma_1 / \lambda_1 \mathbf{1} \cdot \mathbf{p_1} + \gamma_2 / \lambda_2 \mathbf{1} \cdot \mathbf{p_2} + \cdots + \gamma_k / \lambda_k \mathbf{1} \cdot \mathbf{p_k} + \gamma_c \mathbf{1} \cdot K \cdot \mathbf{1}$$
 
-$$ P\Lambda^{-1} \cdot [...P'\mathbf{1}] \left[\begin{matrix} \lambda_{1} \\ \lambda_{2} \\ \vdots \\ \lambda_{k} \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \mathbf{w}^* \tag{14}$$
+$$ -\frac{1}{2 \gamma_v}[\tilde{P}\tilde{\Lambda}^{-1}, \mathbf{1}] \left[\begin{matrix} \gamma_{1} \\ \gamma_{2} \\ \vdots \\ \gamma_{k} \\ -\gamma_c \\ \end{matrix} \right] = \mathbf{w}^* \tag{14}$$
 
-$$$$
+$$-\frac{1}{2 \gamma_v}[\tilde{P}\tilde{\Lambda}^{-1}, \mathbf{1}] \cdot \mathbf{\gamma} =  \mathbf{w}^* \tag{5}$$
+
+
 
 
 ```{r, fig.width=10, fig.height=4, fig.align='center', echo = FALSE}
@@ -534,13 +536,17 @@ mse
 sse
 #((cor(mat_in)) / (L %*% t(L)))[1:4, 1:4]
 
+# out <- varimax(L)
+# L_rot <- out[[1]]
+# rotmat <- out[[2]]
+# L %*% rotmat - L_rot
+# round(L %*% rotmat, 2)
+# L_rot <- L %*% rotmat
+# round(L %*% t(L) - L_rot %*% t(L_rot), 2)
 
 
-
-
-
-colSums(mat_Loads[,1:n_sigs])
-colSums(mat_Loads_rot[,1:n_sigs])
+# colSums(mat_Loads[,1:n_sigs])
+# colSums(mat_Loads_rot[,1:n_sigs])
 mat_sig_eigvecs <- list_sigs[[2]]
 n_sigs <- ncol(mat_sig_eigvecs)
 mat_eigvecs <- as.matrix(list_sigs[[3]])
@@ -582,52 +588,76 @@ Q <- t(mat_sig_eigvecs_aug) %*% mat_eigvecs
 M <- round(Q %*% diag(1 / eigvals) %*% t(Q), 7)
 M
 M_inv <- round(solve(M), 5)
+M_inv
+
+# round(t(mat_sig_eigvecs) %*% mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs, 3)
+# round(t(mat_sig_eigvecs) %*% mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% ones_vec, 3)
+# round(t(ones_vec) %*% mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs, 3)
+# round(t(ones_vec) %*% mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% ones_vec, 3)
+# 
+# round(t(mat_sig_eigvecs) %*% mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs, 3)
 
 
+
+#eigvals_sig / diag(M_inv)
 # t(mat_eigvecs[, 1]) %*% mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs)
 # 1 / eigvals[1] * t(mat_eigvecs[, 1]) %*% ones_vec
 #-----------------------------------------------
 #-----------------------------------------------
-l_C <- -0.02
-targ_vec <-  c(0.25 * rep(1, n_sigs), 1)
+budget <- 10^5
+l_C <- -1 / budget * 10^1
+targ_vec <-  c(0.8 * rep(1, n_sigs), 1)
 #targ_vec <- c(0.06, 0.06, 0.02, 0.02, 1)
 x <- -2 * M_inv %*% targ_vec
-x
 l_V <- l_C / x[length(x)]
 l_V <- l_V * (-sign(l_V))
 l_V
 lambdas <- l_V * x
 lambdas
+lambdas * budget
+l_V * budget
 # cormat <- cor(mat_in)
 # cormat_inv <- solve(cormat)
 # w_star <- -1 / (2 * l_V) * cormat_inv %*% mat_sig_eigvecs_aug %*% lambdas
 # sum(w_star)
 
-l_R <- 1
-targ_vec <-  c(0.15 * rep(1, n_sigs), 1)
-#targ_vec <- c(0.06, 0.06, 0.02, 0.02, 1)
-x <- -2 * M_inv %*% targ_vec
-x
-l_V <- l_R / x[1]
-l_V <- l_V * (-sign(l_V))
-l_V
-lambdas <- l_V * x
-lambdas
-cormat <- cor(mat_in)
-cormat_inv <- solve(cormat)
+# l_R <- 1
+# targ_vec <-  c(0.15 * rep(1, n_sigs), 1)
+# #targ_vec <- c(0.06, 0.06, 0.02, 0.02, 1)
+# x <- -2 * M_inv %*% targ_vec
+# x
+# l_V <- l_R / x[1]
+# l_V <- l_V * (-sign(l_V))
+# l_V
+# lambdas <- l_V * x
+# lambdas
 
 w_star <- -1 / (2 * l_V) * mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs_aug %*% lambdas
-sum(w_star)
 
-w_star <- -1 / (2 * l_V) * cormat_inv %*% mat_sig_eigvecs_aug %*% lambdas
+w_star_check <- -1 / (2 * l_V) * (mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs %*% lambdas[1:n_sigs] + l_C * mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% ones_vec)
+w_star - w_star_check
 sum(w_star)
+sum(w_star_check)
+# w_star <- -w_star
+# sum(w_star)
+# cormat <- cor(mat_in)
+# cormat_inv <- solve(cormat)
+# w_star <- -1 / (2 * l_V) * cormat_inv %*% mat_sig_eigvecs_aug %*% lambdas
+# sum(w_star)
 #-----------------------------------------------
 #-----------------------------------------------
+# mat_Loads <- list_sigs[[4]]
+# colMeans(mat_in)
+# mat_sig_eigvecs %*% eigvals_sig / colMeans(mat_in)
 
 
 
+
+mat_Loads_rot <- list_sigs[[5]]
+mat_Loads_rot_normd <- apply(mat_Loads_rot, 2, function(x) x / sum(x))
+w_star_normd <- w_star / max(abs(w_star))
 col_order <- colnames(mat_in)
-df_plot <- data.frame(ts_id = col_order, mat_sig_eigvecs, w_star)
+df_plot <- data.frame(ts_id = col_order, mat_Loads_rot, w_star_normd)
 signal_id <- paste("Signal", c(1:n_sigs))
 colnames(df_plot)[2:(n_sigs + 1)] <- signal_id
 colnames(df_plot)[ncol(df_plot)] <- "Portfolio weights"
@@ -640,7 +670,7 @@ for(i in 1:length(list_tsTypes)){
   this_tsType_vec <- list_tsTypes[[i]]
   this_tsType_name <- tsType_names[i]
   group_vec[which(col_order %in% this_tsType_vec)] <- this_tsType_name
-  
+
 }
 
 df_plot$Type <- factor(group_vec)
@@ -655,7 +685,7 @@ gg <- gg + theme(axis.text.y = element_text(face = "bold", size = 10),
                  axis.text.x = element_text(face = "bold", size = 10),
                  axis.title.y = element_text(face = "bold", size = 10),
                  axis.title.x = element_text(face = "bold", size = 10))
-gg <- gg + coord_equal()
+#gg <- gg + coord_equal()
 # if(N_c <= 50){
 #   gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
 #                    axis.title.y = element_blank())
@@ -667,9 +697,48 @@ gg <- gg + coord_flip()
 gg
 
 #colSums(cbind(mat_sig_eigvecs, w_star))
+mat_sig_ts <- mat_in %*% mat_Loads_rot_normd
+#mat_sig_ts <- mat_in %*% mat_sig_eigvecs %*% diag(1 / sqrt(eigvals_sig))
+#mat_sig_ts <- scale(mat_sig_ts)
+ts_avg <- rowMeans(mat_in)
+#ts_avg <- scale(ts_avg)
+
+ts_wstar <- mat_in %*% w_star
+
+mat_comp_ts <- cbind(ts_avg, ts_wstar, mat_sig_ts)
+colSums(mat_comp_ts)
+colMeans(mat_comp_ts)
+apply(mat_comp_ts, 2, sd) / colMeans(mat_comp_ts)
+apply(mat_comp_ts, 2, sd)
 
 
-ts_wstar <- scale(mat_ts %*% w_star)
+
+
+
+
+
+
+mat_plot <- apply(cbind(ts_wstar, mat_sig_ts), 2, function(x) x - ts_avg)
+colMeans(mat_plot)
+colSums(mat_plot)
+df_plot <- data.frame(Date = row.names(mat_sig_ts), mat_plot)
+colnames(df_plot)[2] <- "Portfolio weights"
+df_plot$Date <- factor(format(df_plot$Date, format = "%y-%m-%d%"), ordered = T)
+xAxis_labels <- df_plot$Date[seq(1, nrow(df_plot), length.out = 10)]
+signal_id <- paste("Signal", c(1:n_sigs))
+colnames(df_plot)[3:ncol(df_plot)] <- signal_id
+gathercols <- colnames(df_plot)[2:ncol(df_plot)]
+df_plot <- df_plot %>% gather_("Signal", "Value", gathercols)
+gg <- ggplot(df_plot, aes(x = Date, y = Value, group = 1))
+gg <- gg + geom_line()
+gg <- gg <- gg + scale_x_discrete(breaks = xAxis_labels)
+gg <- gg + facet_wrap(~ Signal, ncol = 1)
+gg <- gg + theme(axis.title.y = element_blank())
+gg
+
+
+
+
 # Plot signal ts against average
 df_plot1 <- data.frame(Date = row.names(mat_sig_ts), ts_avg)
 df_plot2 <- data.frame(Date = row.names(mat_sig_ts), cbind(mat_sig_ts, ts_wstar))
@@ -679,7 +748,7 @@ df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T
 xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
 signal_id <- paste("Signal", c(1:n_sigs))
 colnames(df_plot2)[2:(n_sigs + 1)] <- signal_id
-gathercols <- colnames(df_plot2)
+gathercols <- colnames(df_plot2)[2:(n_sigs + 2)]
 df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
 gg <- ggplot()
 gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = ts_avg, group = 1), color = "orange", lwd = 2)
@@ -691,10 +760,6 @@ gg
 
 
 
-# eigvals_sigs <- list_sigs[[3]]
-# (eigvals_sigs) / lambdas[-length(lambdas)]
-
-
 
 
 ```
@@ -704,38 +769,41 @@ gg
 
 ```{r, fig.width=10, fig.height=4, fig.align='center', echo = FALSE }
 
-#l_C <- -0.001
+
+budget <- 10^5
+l_C <- -1 / budget * 10^2
 #l_R <- 1
-l_V <- -1.1
-r_lev <- seq(0.02, 0.3, length.out = 40)
+#l_V <- -1.1
+r_lev <- seq(0.11, 1.2, length.out = 100)
 NR_vec <- c()
 V_vec <- c()
 lC_vec <- c()
 lV_vec <- c()
 list_wStar <- list()
 list_wStar_eNormd <- list()
+list_lambdas <- list()
 last_ewStarNmd <- 0
 for(i in 1:length(r_lev)){
   targ_vec <- c(r_lev[i] * rep(1, n_sigs), 1)
   x <- -2 * M_inv %*% targ_vec
-  #l_V <- l_C / x[length(x)]
+  l_V <- l_C / x[length(x)]
   #l_V <- l_R / x[1]
-  #l_V <- l_V * (-sign(l_V))
-  l_C <- l_V * x[length(x)]
+  l_V <- l_V * (-sign(l_V))
+  #l_C <- l_V * x[length(x)]
   lambdas <- l_V * x
   #l_C <- lambdas[length(lambdas)]
-  l_C <- l_C * (-sign(l_V))
+  #l_C <- l_C * (-sign(l_V))
   NR_star <- targ_vec %*% lambdas
   V_tol_implicit <- -1 / 2 *  NR_star / l_V
-  w_star <- -1 / (2 * l_V) * cormat_inv %*% mat_sig_eigvecs_aug %*% lambdas
+  #w_star <- -1 / (2 * l_V) * cormat_inv %*% mat_sig_eigvecs_aug %*% lambdas
+  w_star <- -1 / (2 * l_V) * mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs_aug %*% lambdas
   #sum(w_star)
   ew_star <- exp(w_star)
   ew_star_normed <- ew_star / sum(ew_star)
   print(round(sum(last_ewStarNmd - ew_star_normed)^2, 3))
   last_ewStarNmd <- ew_star_normed
 
-
-  V_check <- t(w_star) %*% cormat %*% w_star
+  V_check <- t(w_star) %*% cormat %*% w_star - V_tol_implicit
   
   #print(V_tol_implicit - V_check)
   #print(lambdas)
@@ -746,16 +814,33 @@ for(i in 1:length(r_lev)){
   lV_vec[i] <- l_V
   list_wStar[[i]] <- w_star
   list_wStar_eNormd[[i]] <- ew_star_normed
+  list_lambdas[[i]] <- lambdas[-length(lambdas)]
 }
 
 df_plot <- data.frame(V = V_vec, NR = NR_vec, lC = lC_vec, lV = lV_vec)
-gg <- ggplot(df_plot, aes(x = V, y = NR))
+gg <- ggplot(df_plot, aes(x = V, y = NR, color = r_lev))
 gg <- gg + geom_point()
 gg
 
 
+
+
+df_lStack <- data.frame(V = NA, NR = NA, id = NA, l = NA)
+for(i in 1:nrow(df_plot)){df_lStack <- rbind(df_lStack, data.frame(V = df_plot$V[i], NR = df_plot$NR[i], id = as.character(1:n_sigs), l = c(list_lambdas[[i]])))}
+
+gg <- ggplot(df_lStack, aes(x = V, y = l)) + geom_area(aes(fill = id))
+#gg <- gg + geom_vline(xintercept = df$Risk[ind_opt], color = "green", lwd = 2)
+gg <- gg + labs(x = "Potfolio Risk", y = "lambdas")
+#gg <- gg + theme(legend.position = "none")
+gg
+
+
+
+
+
+
 df_wStack <- data.frame(V = NA, NR = NA, Security = NA, Type = NA, w = NA, ew_normd = NA)
-for(i in 1:nrow(df_plot)){df_wStack <- rbind(df_wStack, data.frame(V = df_plot$V[i], NR = df_plot$NR[i], Security = col_order, Type = group_vec, w = c(list_wStar[[i]]), ew_normd = c(list_wStar_eNormd[[i]])))}
+for(i in 1:nrow(df_plot)){df_wStack <- rbind(df_wStack, data.frame(V = df_plot$V[i], NR = df_plot$NR[i], Security = row.names(mat_sig_eigvecs), Type = group_vec, w = c(list_wStar[[i]]), ew_normd = c(list_wStar_eNormd[[i]])))}
 #for(i in 1:nrow(df)){df_wStack <- rbind(df_wStack, data.frame(Risk = df$Risk[i], EUr = df$EUr[i], Project = c(1:n_proj), w = c(w_norm[[i]])))}
 #df_wStack <- df_wStack %>% group_by()
 df_wStack <- df_wStack[-1, ]
@@ -774,7 +859,7 @@ df_wStack <- df_wStack[-1, ]
 #                        levels = unique(df_wStack$Type[order(xx)]),
 #                        ordered = T)
 
-gg <- ggplot(df_wStack, aes(x = V, y = ew_normd)) + geom_area(aes(fill = Security))
+gg <- ggplot(df_wStack, aes(x = V, y = w)) + geom_area(aes(fill = Security))
 #gg <- gg + geom_vline(xintercept = df$Risk[ind_opt], color = "green", lwd = 2)
 gg <- gg + labs(x = "Potfolio Risk", y = "Project Budget Weights")
 gg <- gg + theme(legend.position = "none")
