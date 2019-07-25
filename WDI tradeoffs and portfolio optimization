@@ -123,13 +123,19 @@ $$\mathbf{r} = \tilde{P} \tilde{\Lambda} \cdot \mathbf{1}= \lambda_{1} \mathbf{p
 $$K = P \Lambda P' \tag{11}$$
 
 
-$$M = [\tilde{P}, \: \mathbf{1}]' \cdot K^{-1} \cdot [\tilde{P}, \: \mathbf{1}] = \underline{\tilde{\Lambda}}^{-1} \tag{12}$$
-where
+$$M = [\tilde{P}, \: \mathbf{1}]' \cdot K^{-1} \cdot [\tilde{P}, \: \mathbf{1}] \tag{12}$$
 
-$$\underline{\tilde{\Lambda}} = \left[\begin{matrix} \lambda_{p1} & 0 & \cdots & 0 & \mathbf{p_1} \cdot K \cdot \mathbf{1} \\ 0 & \lambda_{p2} & \cdots & 0 & \mathbf{p_2} \cdot K \cdot \mathbf{1} \\ \vdots & \vdots & \ddots & 0 & \vdots \\ 0 & 0 & 0 & \lambda_{pk} & \mathbf{p_k} \cdot K \cdot \mathbf{1}  \\ \mathbf{1} \cdot K \cdot \mathbf{p_1} & \mathbf{1} \cdot K \cdot \mathbf{p_2} & \cdots & \mathbf{1} \cdot K \cdot \mathbf{p_k} & \mathbf{1} \cdot K \cdot \mathbf{1} \end{matrix} \right]$$
 
-$$\left[\begin{matrix} \lambda_{1} \\ \lambda_{2} \\ \vdots \\ \lambda_{k} \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \tilde{\Lambda} \left[\begin{matrix} r_1 \\ r_2 \\ \vdots \\ r_k \\ \bar{C} \\ \end{matrix} \right] \tag{13}$$
+or
 
+$$M = \left[\begin{matrix} 1/ \lambda_{1} & 0 & \cdots & 0 & 1/ \lambda_1 \mathbf{p_1} \cdot \mathbf{1} \\ 0 & 1/ \lambda_{2} & \cdots & 0 & 1/ \lambda_2 \mathbf{p_2} \cdot \mathbf{1} \\ \vdots & \vdots & \ddots & 0 & \vdots \\ 0 & 0 & 0 & 1/ \lambda_{k} & 1/ \lambda_k \mathbf{p_k} \cdot \mathbf{1}  \\ 1/ \lambda_1 \mathbf{1} \cdot \mathbf{p_1} & 1/ \lambda_2 \mathbf{1} \cdot \mathbf{p_2} & \cdots & 1/ \lambda_k \mathbf{1} \cdot \mathbf{p_k} & \mathbf{1} \cdot K \cdot \mathbf{1} \end{matrix} \right]$$
+
+<!-- $$\left[\begin{matrix} \gamma_{1} \\ \gamma_{2} \\ \vdots \\ \gamma_{k} \\ -\gamma_C \\ \end{matrix} \right] = 2 \gamma_v \tilde{\Lambda} \left[\begin{matrix} r_1 \\ r_2 \\ \vdots \\ r_k \\ \bar{C} \\ \end{matrix} \right] - \gamma_c \left[ \begin{matrix} \mathbf{p}_1 \cdot \mathbf{1} \end{matrix} \right] \tag{13}$$ -->
+
+
+$$\gamma_i = 2 \gamma_v \lambda_i r_i + \gamma_c \mathbf{p}_i \cdot \mathbf{1} \: ; \:\:\: i=1,2,\cdots,k \tag{}$$
+
+$$\gamma_c =  \gamma_1 / \lambda_1 \mathbf{1} \cdot \mathbf{p_1} + \gamma_2 / \lambda_2 \mathbf{1} \cdot \mathbf{p_2} + \cdots + \gamma_k / \lambda_k \mathbf{1} \cdot \mathbf{p_k} + \gamma_c \mathbf{1} \cdot K \cdot \mathbf{1}$$
 
 $$ P\Lambda^{-1} \cdot [...P'\mathbf{1}] \left[\begin{matrix} \lambda_{1} \\ \lambda_{2} \\ \vdots \\ \lambda_{k} \\ -\lambda_C \\ \end{matrix} \right] = 2 \lambda_{V} \mathbf{w}^* \tag{14}$$
 
@@ -151,7 +157,8 @@ library(corrplot)
 library(tidyquant)
 #-------------------------------------------------------------
 
-Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
+Signals_from_noise <- function(mat_in, varimax_rot = T,
+                               list_tsTypes = NULL,
                                tsType_names = NULL,
                                pca_var_plot = F,
                                pca_ind_plot = F,
@@ -213,9 +220,12 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
     print(gg)
   }
   #-----------------------------------------
-  ind_deviating_from_noise <- which(lam_cor > (lamrand_max + 5 * 10^-1))
-  mat_PCs <- res$var$coord
-  mat_eigvecs <-  mat_PCs %*% diag(1 / sqrt(lam_cor))
+  ind_deviating_from_noise <- which(lam_cor > lamrand_max)# (lamrand_max + 5 * 10^-1))
+  mat_Loads <- res$var$coord
+  mat_signal_Loads <- mat_Loads[, ind_deviating_from_noise]
+  mat_Loads_rot <- varimax(mat_Loads)[[1]]
+  mat_signal_Loads_rot <- mat_Loads_rot[, ind_deviating_from_noise]
+  mat_eigvecs <-  mat_Loads %*% diag(1 / sqrt(lam_cor))
   lam_signals <- lam_cor[ind_deviating_from_noise]
   n_signals <- length(lam_signals)
   print(paste("Number of signals: ", n_signals))
@@ -250,7 +260,11 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
   # }
   #------------------------------------------------------------
   # Plot loadings barcharts
-  df_plot <- data.frame(ts_id = col_order, mat_signal_eigvecs)
+  if(varimax_rot){
+      df_plot <- data.frame(ts_id = col_order, mat_signal_Loads_rot)
+  }else{
+      df_plot <- data.frame(ts_id = col_order, mat_signal_Loads)
+  }
   signal_id <- paste("Signal", c(1:n_signals))
   colnames(df_plot)[2:(n_signals + 1)] <- signal_id
   gathercols <- as.character(signal_id)
@@ -321,8 +335,8 @@ Signals_from_noise <- function(mat_in, list_tsTypes = NULL,
   }
   #---------------------------------
   df_sig_ts <- data.frame(date = date_vec, ts_sigs = mat_signal_ts)
-  df_sig_eigvecs <- data.frame(PC_sigs = mat_signal_eigvecs)
-  list_out <- list(df_sig_ts, df_sig_eigvecs, lam_signals, lam_cor, mat_eigvecs)
+  #df_sig_eigvecs <- data.frame(Loadings_sigs_rot = mat_signal_Loads_rot)
+  list_out <- list(df_sig_ts, mat_signal_eigvecs, mat_eigvecs, mat_signal_Loads, mat_signal_Loads_rot, lam_signals, lam_cor)
   return(list_out)
 }
 
@@ -495,7 +509,8 @@ gg
 
 
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
-list_sigs <- Signals_from_noise(mat_in, list_tsTypes = list_tsTypes,
+list_sigs <- Signals_from_noise(mat_in, varimax_rot = T,
+                                list_tsTypes = list_tsTypes,
                                 tsType_names = tsType_names,
                                 pca_var_plot = T,
                                 pca_ind_plot = T,
@@ -509,7 +524,33 @@ list_sigs <- Signals_from_noise(mat_in, list_tsTypes = list_tsTypes,
 
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 
+# list(df_sig_ts, mat_sig_eigvecs, mat_eigvecs, mat_signal_Loads, mat_signal_Loads_rot, lam_signals, lam_cor, mat_eigvecs)
+
+L <- list_sigs[[4]]
+#t(L) %*% L
+mse <- mean((cor(mat_in) - L %*% t(L))^2)
+sse <- sum((cor(mat_in) - L %*% t(L))^2)
+mse
+sse
+#((cor(mat_in)) / (L %*% t(L)))[1:4, 1:4]
+
+
+
+
+
+
+colSums(mat_Loads[,1:n_sigs])
+colSums(mat_Loads_rot[,1:n_sigs])
 mat_sig_eigvecs <- list_sigs[[2]]
+n_sigs <- ncol(mat_sig_eigvecs)
+mat_eigvecs <- as.matrix(list_sigs[[3]])
+eigvals_sig <- eigvals <- list_sigs[[6]]
+eigvals <- list_sigs[[7]]
+ones_vec <- rep(1, nrow(mat_eigvecs))
+mat_sig_eigvecs_aug <- cbind(mat_sig_eigvecs, ones_vec)
+
+# t(mat_sig_eigvecs) %*% mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% ones_vec
+
 mat_sig_ts <- mat_ts %*% mat_sig_eigvecs
 mat_sig_ts <- scale(mat_sig_ts)
 ts_avg <- rowMeans(mat_ts)
@@ -533,29 +574,30 @@ gg <- gg + facet_wrap(~Signal, ncol = 1)
 gg
 
 
-mat_eigvecs <- list_sigs[[5]]
-eigvals <- list_sigs[[4]]
-ones_vec <- rep(1, nrow(mat_eigvecs))
 
-mat_sig_eigvecs_aug <- cbind(mat_sig_eigvecs, ones_vec)
+
+
 Q <- t(mat_sig_eigvecs_aug) %*% mat_eigvecs
 # M <- round(Q %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs_aug, 6)
-M <- round(Q %*% diag(1 / eigvals) %*% t(Q), 4)
+M <- round(Q %*% diag(1 / eigvals) %*% t(Q), 7)
 M
 M_inv <- round(solve(M), 5)
 
+
+# t(mat_eigvecs[, 1]) %*% mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs)
+# 1 / eigvals[1] * t(mat_eigvecs[, 1]) %*% ones_vec
 #-----------------------------------------------
 #-----------------------------------------------
-# l_C <- -0.001
-# targ_vec <-  c(0.15 * rep(1, n_sigs), 1)
-# #targ_vec <- c(0.06, 0.06, 0.02, 0.02, 1)
-# x <- -2 * M_inv %*% targ_vec
-# x
-# l_V <- l_C / x[length(x)]
-# l_V <- l_V * (-sign(l_V))
-# l_V
-# lambdas <- l_V * x
-# lambdas
+l_C <- -0.02
+targ_vec <-  c(0.25 * rep(1, n_sigs), 1)
+#targ_vec <- c(0.06, 0.06, 0.02, 0.02, 1)
+x <- -2 * M_inv %*% targ_vec
+x
+l_V <- l_C / x[length(x)]
+l_V <- l_V * (-sign(l_V))
+l_V
+lambdas <- l_V * x
+lambdas
 # cormat <- cor(mat_in)
 # cormat_inv <- solve(cormat)
 # w_star <- -1 / (2 * l_V) * cormat_inv %*% mat_sig_eigvecs_aug %*% lambdas
@@ -573,6 +615,10 @@ lambdas <- l_V * x
 lambdas
 cormat <- cor(mat_in)
 cormat_inv <- solve(cormat)
+
+w_star <- -1 / (2 * l_V) * mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs_aug %*% lambdas
+sum(w_star)
+
 w_star <- -1 / (2 * l_V) * cormat_inv %*% mat_sig_eigvecs_aug %*% lambdas
 sum(w_star)
 #-----------------------------------------------
