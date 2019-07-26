@@ -415,13 +415,15 @@ o <- apply(mat_ts, 2, function(x) length(which(is.na(x))))
 #table(o)
 #which(o==1)
 xts_ts <- xts(mat_ts, date_vec)
-xts_ts <- to.weekly(xts_ts, OHLC = F)
+# mat_ts_mo <- as.matrix(to.monthly(xts_ts, OHLC = F))
+# mat_ts_wk <- as.matrix(to.weekly(xts_ts, OHLC = F))
 date_vec <- index(xts_ts)
-mat_ts <- as.matrix(xts_ts)
+mat_ts <- mat_ts
 #ind_rm_ema <- 1:(per_ema - 1)
 # mat_in <- apply(mat_in, 2, function(x) x - EMA(x, per_ema))
 # mat_in <- mat_in[-ind_rm_ema, ]
 # date_vec <- df$date[-c(ind_rm_ema, ind_rm_na)]
+mat_diff_mo <- diff(mat_ts_mo) / mat_ts_mo[-nrow(mat_ts_mo), ] * 100
 mat_in <- diff(mat_ts) / mat_ts[-nrow(mat_ts), ] * 100
 date_vec <- date_vec[-1]
 #length(date_vec)
@@ -524,7 +526,7 @@ list_sigs <- Signals_from_noise(mat_in, varimax_rot = T,
 ```
 
 
-```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
+```{r, fig.width=13, fig.height=11, fig.align='center', echo=FALSE}
 
 # list(df_sig_ts, mat_sig_eigvecs, mat_eigvecs, mat_signal_Loads, mat_signal_Loads_rot, lam_signals, lam_cor, mat_eigvecs)
 
@@ -557,29 +559,33 @@ mat_sig_eigvecs_aug <- cbind(mat_sig_eigvecs, ones_vec)
 
 # t(mat_sig_eigvecs) %*% mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% ones_vec
 
-mat_sig_ts <- mat_ts %*% mat_sig_eigvecs
-mat_sig_ts <- scale(mat_sig_ts)
-ts_avg <- rowMeans(mat_ts)
-ts_avg <- scale(ts_avg)
-n_sigs <- ncol(mat_sig_eigvecs)
-df_plot1 <- data.frame(Date = row.names(mat_sig_ts), ts_avg)
-colnames(df_plot1)[2] <- "Average"
-df_plot2 <- data.frame(Date = row.names(mat_sig_ts), mat_sig_ts)
-df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
-df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
-#df_plot2$PC_sigs.2 <- -df_plot2$PC_sigs.2
-xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
-colnames(df_plot2)[2:ncol(df_plot2)] <- paste("Signal", c(1:n_sigs))
-gathercols <- colnames(df_plot2)[2:ncol(df_plot2)]
-df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
-gg <- ggplot()
-gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = Average, group = 1), color = "orange", lwd = 2)
-gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
-gg <- gg + scale_x_discrete(breaks = xAxis_labels)
-gg <- gg + facet_wrap(~Signal, ncol = 1)
-gg
+# mat_sig_ts <- mat_ts %*% mat_sig_eigvecs
+# mat_sig_ts <- scale(mat_sig_ts)
+# ts_avg <- rowMeans(mat_ts)
+# ts_avg <- scale(ts_avg)
+# n_sigs <- ncol(mat_sig_eigvecs)
+# df_plot1 <- data.frame(Date = row.names(mat_sig_ts), ts_avg)
+# colnames(df_plot1)[2] <- "Average"
+# df_plot2 <- data.frame(Date = row.names(mat_sig_ts), mat_sig_ts)
+# df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
+# df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
+# #df_plot2$PC_sigs.2 <- -df_plot2$PC_sigs.2
+# xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
+# colnames(df_plot2)[2:ncol(df_plot2)] <- paste("Signal", c(1:n_sigs))
+# gathercols <- colnames(df_plot2)[2:ncol(df_plot2)]
+# df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+# gg <- ggplot()
+# gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = Average, group = 1), color = "orange", lwd = 2)
+# gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
+# gg <- gg + scale_x_discrete(breaks = xAxis_labels)
+# gg <- gg + facet_wrap(~Signal, ncol = 1)
+# gg
 
 
+
+
+# r_trad <- xts
+# M_trad <- 
 
 
 
@@ -606,11 +612,10 @@ M_inv
 #-----------------------------------------------
 budget <- 10^5
 l_C <- -1 / budget * 10^1
-targ_vec <-  c(0.8 * rep(1, n_sigs), 1)
+targ_vec <-  c(0.15 * rep(1, n_sigs), 1)
 #targ_vec <- c(0.06, 0.06, 0.02, 0.02, 1)
 x <- -2 * M_inv %*% targ_vec
 l_V <- l_C / x[length(x)]
-l_V <- l_V * (-sign(l_V))
 l_V
 lambdas <- l_V * x
 lambdas
@@ -654,7 +659,6 @@ sum(w_star_check)
 
 
 mat_Loads_rot <- list_sigs[[5]]
-mat_Loads_rot_normd <- apply(mat_Loads_rot, 2, function(x) x / sum(x))
 w_star_normd <- w_star / max(abs(w_star))
 col_order <- colnames(mat_in)
 df_plot <- data.frame(ts_id = col_order, mat_Loads_rot, w_star_normd)
@@ -696,70 +700,153 @@ gg <- gg + theme(axis.text.y = element_text(face = "bold", size = 10),
 gg <- gg + coord_flip()
 gg
 
-#colSums(cbind(mat_sig_eigvecs, w_star))
-mat_sig_ts <- mat_in %*% mat_Loads_rot_normd
-#mat_sig_ts <- mat_in %*% mat_sig_eigvecs %*% diag(1 / sqrt(eigvals_sig))
-#mat_sig_ts <- scale(mat_sig_ts)
-ts_avg <- rowMeans(mat_in)
-#ts_avg <- scale(ts_avg)
 
-ts_wstar <- mat_in %*% w_star
-
+# Backtesting
+mat_Loads_rot_normd <- apply(mat_Loads_rot, 2, function(x) x / sum(x))
+#-------------------------------------
+# Monthly
+mat_diff_mo <- diff(mat_ts) / mat_ts[-nrow(mat_ts), ] * 100
+mat_sig_ts_mo <- mat_diff_mo %*% mat_Loads_rot_normd
+ts_avg <- rowMeans(mat_diff_mo)
+ts_wstar <- mat_diff_mo %*% w_star
 mat_comp_ts <- cbind(ts_avg, ts_wstar, mat_sig_ts)
-colSums(mat_comp_ts)
-colMeans(mat_comp_ts)
-apply(mat_comp_ts, 2, sd) / colMeans(mat_comp_ts)
-apply(mat_comp_ts, 2, sd)
-
-
-
-
-
-
-
-
-mat_plot <- apply(cbind(ts_wstar, mat_sig_ts), 2, function(x) x - ts_avg)
-colMeans(mat_plot)
-colSums(mat_plot)
-df_plot <- data.frame(Date = row.names(mat_sig_ts), mat_plot)
-colnames(df_plot)[2] <- "Portfolio weights"
-df_plot$Date <- factor(format(df_plot$Date, format = "%y-%m-%d%"), ordered = T)
-xAxis_labels <- df_plot$Date[seq(1, nrow(df_plot), length.out = 10)]
-signal_id <- paste("Signal", c(1:n_sigs))
-colnames(df_plot)[3:ncol(df_plot)] <- signal_id
-gathercols <- colnames(df_plot)[2:ncol(df_plot)]
-df_plot <- df_plot %>% gather_("Signal", "Value", gathercols)
-gg <- ggplot(df_plot, aes(x = Date, y = Value, group = 1))
-gg <- gg + geom_line()
-gg <- gg <- gg + scale_x_discrete(breaks = xAxis_labels)
-gg <- gg + facet_wrap(~ Signal, ncol = 1)
-gg <- gg + theme(axis.title.y = element_blank())
-gg
-
-
-
-
-# Plot signal ts against average
-df_plot1 <- data.frame(Date = row.names(mat_sig_ts), ts_avg)
-df_plot2 <- data.frame(Date = row.names(mat_sig_ts), cbind(mat_sig_ts, ts_wstar))
-colnames(df_plot2)[ncol(df_plot2)] <- "Portfolio weights"
-df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
-df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
-xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
-signal_id <- paste("Signal", c(1:n_sigs))
-colnames(df_plot2)[2:(n_sigs + 1)] <- signal_id
-gathercols <- colnames(df_plot2)[2:(n_sigs + 2)]
-df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+xts_comp_ts <- xts(mat_comp_ts, date_vec)
+mat_comp_ts_mo <- as.matrix(to.monthly(xts_comp_ts, OHLC = F))
+mat_comp_ts_mo_perform <- apply(mat_comp_ts_mo, 2, function(x) x - mat_comp_ts_mo[, 1])
+df_plot <- data.frame(Date = row.names(mat_comp_ts_mo_perform), mat_comp_ts_mo_perform)
+#df_plot <- data.frame(Date = row.names(mat_comp_ts_mo), mat_comp_ts_mo)
+colnames(df_plot)[-1] <- c("Average", "Optimal Portfolio", paste("Eigenportfolio", 1:n_sigs))
+df_plot_base <- df_plot[, c("Date", "Average")]
+df_plot$Average <- NULL
+gathercols <- colnames(df_plot)[-1]
+#df_plot <- df_plot %>% gather_("Type", "Monthly Return (%)", gathercols)
+df_plot <- df_plot %>% gather_("Type", "Performance (Pct. point diff. from average)", gathercols)
 gg <- ggplot()
-gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = ts_avg, group = 1), color = "orange", lwd = 2)
-gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
-gg <- gg + scale_x_discrete(breaks = xAxis_labels)
-gg <- gg + facet_wrap(~ Signal, ncol = 1)
-gg <- gg + theme(axis.title.y = element_blank())
+gg <- gg + geom_line(data = df_plot_base, aes(x = Date, y = Average, group = 1), color = "orange", lwd = 2)
+gg <- gg + geom_line(data = df_plot, aes(x = Date, y = `Performance (Pct. point diff. from average)`, group = 1))
+gg <- gg + facet_wrap(~Type, ncol = 1, scales = "free")
+gg <- gg + labs(y = "Performance (Pct. point diff. from average)")
 gg
 
+n_positive_mos <- apply(mat_comp_ts_mo_perform, 2, function(x) length(which(x > 0)))
+sd_perform <- apply(mat_comp_ts_mo_perform, 2, function(x) sd(x[which(x > 0)]))
+mu_perform <- apply(mat_comp_ts_mo_perform, 2, function(x) mean(x[which(x > 0)]))
+sd_perform <- apply(mat_comp_ts_mo_perform, 2, sd)
+mu_perform <- colMeans(mat_comp_ts_mo_perform)
+cv_perform <- sd_perform / mu_perform
+knitr::kable(data.frame(n_positive_mos, mu_perform, cv_perform, sd_perform))
+mu_ret <- colMeans(mat_comp_ts_mo)
+sd_ret <- apply(mat_comp_ts_mo, 2, sd)
+cv_ret <- sd_ret / mu_ret
+knitr::kable(data.frame(n_positive_mos, mu_ret, cv_ret, sd_ret))
+#-------------------------------------
+# Weekly
+mat_comp_ts_wk <- as.matrix(to.weekly(xts_comp_ts, OHLC = F))
+mat_comp_ts_wk_perform <- apply(mat_comp_ts_wk, 2, function(x) x - mat_comp_ts_wk[, 1])
+df_plot <- data.frame(Date = row.names(mat_comp_ts_wk_perform), mat_comp_ts_wk_perform)
+#df_plot <- data.frame(Date = row.names(mat_comp_ts_wk), mat_comp_ts_wk)
+colnames(df_plot)[-1] <- c("Average", "Optimal Portfolio", paste("Eigenportfolio", 1:n_sigs))
+df_plot_base <- df_plot[, c("Date", "Average")]
+df_plot$Average <- NULL
+gathercols <- colnames(df_plot)[-1]
+#df_plot <- df_plot %>% gather_("Type", "Monthly Return (%)", gathercols)
+df_plot <- df_plot %>% gather_("Type", "Performance (Pct. point diff. from average)", gathercols)
+gg <- ggplot()
+gg <- gg + geom_line(data = df_plot_base, aes(x = Date, y = Average, group = 1), color = "orange", lwd = 2)
+gg <- gg + geom_line(data = df_plot, aes(x = Date, y = `Performance (Pct. point diff. from average)`, group = 1))
+gg <- gg + facet_wrap(~Type, ncol = 1, scales = "free")
+gg <- gg + labs(y = "Performance (Pct. point diff. from average)")
+gg
+
+n_positive_wks <- apply(mat_comp_ts_wk_perform, 2, function(x) length(which(x > 0)))
+sd_perform <- apply(mat_comp_ts_wk_perform, 2, function(x) sd(x[which(x > 0)]))
+mu_perform <- apply(mat_comp_ts_wk_perform, 2, function(x) mean(x[which(x > 0)]))
+sd_perform <- apply(mat_comp_ts_wk_perform, 2, sd)
+mu_perform <- colMeans(mat_comp_ts_wk_perform)
+cv_perform <- sd_perform / mu_perform
+knitr::kable(data.frame(n_positive_wks, mu_perform, cv_perform, sd_perform))
+mu_ret <- colMeans(mat_comp_ts_wk)
+sd_ret <- apply(mat_comp_ts_wk, 2, sd)
+cv_ret <- sd_ret / mu_ret
+knitr::kable(data.frame(n_positive_wks, mu_ret, cv_ret, sd_ret))
+#-------------------------------------
+# Daily
+mat_comp_ts_perform <- apply(mat_comp_ts, 2, function(x) x - mat_comp_ts[, 1])
+df_plot <- data.frame(Date = row.names(mat_comp_ts_perform), mat_comp_ts_perform)
+#df_plot <- data.frame(Date = row.names(mat_comp_ts), mat_comp_ts)
+colnames(df_plot)[-1] <- c("Average", "Optimal Portfolio", paste("Eigenportfolio", 1:n_sigs))
+df_plot_base <- df_plot[, c("Date", "Average")]
+df_plot$Average <- NULL
+gathercols <- colnames(df_plot)[-1]
+#df_plot <- df_plot %>% gather_("Type", "Monthly Return (%)", gathercols)
+df_plot <- df_plot %>% gather_("Type", "Performance (Pct. point diff. from average)", gathercols)
+gg <- ggplot()
+gg <- gg + geom_line(data = df_plot_base, aes(x = Date, y = Average, group = 1), color = "orange", lwd = 2)
+gg <- gg + geom_line(data = df_plot, aes(x = Date, y = `Performance (Pct. point diff. from average)`, group = 1))
+gg <- gg + facet_wrap(~Type, ncol = 1, scales = "free")
+gg <- gg + labs(y = "Performance (Pct. point diff. from average)")
+gg
+
+n_positive <- apply(mat_comp_ts_perform, 2, function(x) length(which(x > 0)))
+sd_perform <- apply(mat_comp_ts_perform, 2, function(x) sd(x[which(x > 0)]))
+mu_perform <- apply(mat_comp_ts_perform, 2, function(x) mean(x[which(x > 0)]))
+sd_perform <- apply(mat_comp_ts_perform, 2, sd)
+mu_perform <- colMeans(mat_comp_ts_perform)
+cv_perform <- sd_perform / mu_perform
+knitr::kable(data.frame(n_positive, mu_perform, cv_perform, sd_perform))
+mu_ret <- colMeans(mat_comp_ts)
+sd_ret <- apply(mat_comp_ts, 2, sd)
+cv_ret <- sd_ret / mu_ret
+knitr::kable(data.frame(n_positive, mu_ret, cv_ret, sd_ret))
 
 
+
+
+
+
+
+
+
+
+# mat_plot <- apply(cbind(ts_wstar, mat_sig_ts), 2, function(x) x - ts_avg)
+# colMeans(mat_plot)
+# colSums(mat_plot)
+# df_plot <- data.frame(Date = row.names(mat_sig_ts), mat_plot)
+# colnames(df_plot)[2] <- "Portfolio weights"
+# df_plot$Date <- factor(format(df_plot$Date, format = "%y-%m-%d%"), ordered = T)
+# xAxis_labels <- df_plot$Date[seq(1, nrow(df_plot), length.out = 10)]
+# signal_id <- paste("Signal", c(1:n_sigs))
+# colnames(df_plot)[3:ncol(df_plot)] <- signal_id
+# gathercols <- colnames(df_plot)[2:ncol(df_plot)]
+# df_plot <- df_plot %>% gather_("Signal", "Value", gathercols)
+# gg <- ggplot(df_plot, aes(x = Date, y = Value, group = 1))
+# gg <- gg + geom_line()
+# gg <- gg <- gg + scale_x_discrete(breaks = xAxis_labels)
+# gg <- gg + facet_wrap(~ Signal, ncol = 1)
+# gg <- gg + theme(axis.title.y = element_blank())
+# gg
+# 
+# 
+# 
+# 
+# # Plot signal ts against average
+# df_plot1 <- data.frame(Date = row.names(mat_sig_ts), ts_avg)
+# df_plot2 <- data.frame(Date = row.names(mat_sig_ts), cbind(mat_sig_ts, ts_wstar))
+# colnames(df_plot2)[ncol(df_plot2)] <- "Portfolio weights"
+# df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
+# df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
+# xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
+# signal_id <- paste("Signal", c(1:n_sigs))
+# colnames(df_plot2)[2:(n_sigs + 1)] <- signal_id
+# gathercols <- colnames(df_plot2)[2:(n_sigs + 2)]
+# df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+# gg <- ggplot()
+# gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = ts_avg, group = 1), color = "orange", lwd = 2)
+# gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
+# gg <- gg + scale_x_discrete(breaks = xAxis_labels)
+# gg <- gg + facet_wrap(~ Signal, ncol = 1)
+# gg <- gg + theme(axis.title.y = element_blank())
+# gg
 
 
 ```
