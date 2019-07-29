@@ -421,21 +421,21 @@ mat_ts_dy <- na.approx(df[, -1])
 #which(o==1)
 #xts_ts_dy <- xts(mat_ts_dy, date_vec)
 #date_vec <- index(xts_ts_dy)
-mat_diff_dy <- diff(mat_ts_dy) / mat_ts_dy[-nrow(mat_ts_dy), ] * 100
+mat_diff_dy <- diff(mat_ts_dy) / mat_ts_dy[-nrow(mat_ts_dy), ]
 row.names(mat_diff_dy) <- as.character(date_vec[-1])
 ts_avg_dy <- rowMeans(mat_diff_dy)
 mu_ret_dy <- colMeans(mat_diff_dy)
 sd_ret_dy <- apply(mat_diff_dy, 2, sd)
 
 mat_ts_wk <- to.weekly(xts(mat_ts_dy, date_vec), OHLC = F)
-mat_diff_wk <- diff(mat_ts_wk) / mat_ts_wk[-nrow(mat_ts_wk), ] * 100
+mat_diff_wk <- diff(mat_ts_wk) / mat_ts_wk[-nrow(mat_ts_wk), ]
 mat_diff_wk <- as.matrix(mat_diff_wk[-1, ])
 ts_avg_wk <- rowMeans(mat_diff_wk)
 mu_ret_wk <- colMeans(mat_diff_wk)
 sd_ret_wk <- apply(mat_diff_wk, 2, sd)
 
 mat_ts_mo <- to.monthly(xts(mat_ts_dy, date_vec), OHLC = F)
-mat_diff_mo <- diff(mat_ts_mo) / mat_ts_mo[-nrow(mat_ts_mo), ] * 100
+mat_diff_mo <- diff(mat_ts_mo) / mat_ts_mo[-nrow(mat_ts_mo), ]
 mat_diff_mo <- as.matrix(mat_diff_mo[-1, ])
 ts_avg_mo <- rowMeans(mat_diff_mo)
 mu_ret_mo <- colMeans(mat_diff_mo)
@@ -458,10 +458,10 @@ gg
 # mat_in <- mat_in[-ind_rm_ema, ]
 # date_vec <- df$date[-c(ind_rm_ema, ind_rm_na)]
 #----------------------------------------------
-ts_avg_in <- ts_avg_wk
-mat_diff_in <- mat_diff_wk
-mu_ret_in <- mu_ret_wk
-sd_ret_in <- sd_ret_wk
+ts_avg_in <- ts_avg_dy
+mat_diff_in <- mat_diff_dy
+nab_mu_ret_in <- mu_ret_dy
+sd_ret_in <- sd_ret_dy
 #----------------------------------------------
 mat_in <- mat_diff_in
 date_vec <- row.names(mat_in)
@@ -552,7 +552,13 @@ gg
 
 
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
-list_sigs <- Signals_from_noise(mat_in, varimax_rot = T,
+ind_train <- 1:round(nrow(mat_in) * 2 / 3)
+ind_test <- setdiff(1:nrow(mat_in), ind_train)
+mat_train <- mat_in[ind_train, ]
+mat_test <- mat_in[ind_test, ]
+ts_avg_test <- ts_avg_in[ind_test]
+date_vec_test <- date_vec[ind_test]
+list_sigs <- Signals_from_noise(mat_train, varimax_rot = T,
                                 list_tsTypes = list_tsTypes,
                                 tsType_names = tsType_names,
                                 pca_var_plot = T,
@@ -565,27 +571,28 @@ list_sigs <- Signals_from_noise(mat_in, varimax_rot = T,
 ```
 
 
-```{r, fig.width=13, fig.height=11, fig.align='center', echo=FALSE}
+```{r, echo=F}
 
 # list(df_sig_ts, mat_sig_eigvecs, mat_eigvecs, mat_signal_Loads, mat_signal_Loads_rot, lam_signals, lam_cor, mat_eigvecs)
 mat_Loads <- list_sigs[[4]]
 mat_Loads_rot <- list_sigs[[5]]
 mat_Loads_rot_normd <- apply(mat_Loads_rot, 2, function(x) x / sum(x))
-mat_diff_sig_in <- mat_diff_in %*% mat_Loads_rot_normd
+mat_train_sig <- mat_train %*% mat_Loads_rot
+mat_test_sig <- mat_test %*% mat_Loads_rot
+mat_eigenportfolio_test <- mat_test %*% mat_Loads_rot_normd
 #mat_diff_sig_in <- mat_diff_in %*% mat_Loads_rot
-mu_ret_sigs <- colMeans(mat_diff_sig_in)
-sd_ret_sigs <- apply(mat_diff_sig_in, 2, sd)
-cv_ret_sigs <- sd_ret_sigs / mu_ret_sigs
-sum_ret_sigs <- colSums(mat_diff_sig_in)
-mu_ret_sigs
+nab_mu_ret_sigs <- colMeans(mat_train_sig)
+sd_ret_sigs <- apply(mat_train_sig, 2, sd)
+cv_ret_sigs <- sd_ret_sigs / nab_mu_ret_sigs
+sum_ret_sigs <- colSums(mat_train_sig)
+nab_mu_ret_sigs
 cv_ret_sigs
 sum_ret_sigs
 #t(mat_Loads) %*% mat_Loads
-mse <- mean((cor(mat_in) - mat_Loads %*% t(mat_Loads))^2)
+mse <- mean((cor(mat_train) - mat_Loads %*% t(mat_Loads))^2)
 sse <- sum((cor(mat_in) - mat_Loads %*% t(mat_Loads))^2)
 mse
 sse
-
 
 mat_sig_eigvecs <- list_sigs[[2]]
 n_sigs <- ncol(mat_sig_eigvecs)
@@ -595,139 +602,76 @@ eigvals <- list_sigs[[7]]
 ones_vec <- rep(1, nrow(mat_eigvecs))
 mat_sig_eigvecs_aug <- cbind(mat_sig_eigvecs, ones_vec)
 
+```
+
+
+
+
+```{r, fig.width=13, fig.height=11, fig.align='center', echo=FALSE}
+
+optimizePortfolio <- function(cormat, mat_nab, targ_vec, mat_test){
+  cormat_inv <- solve(cormat)
+  M <- t(mat_nab) %*% cormat_inv %*% mat_nab
+  M_inv <- solve(M)
+  x <- -2 * M_inv %*% targ_vec
+  l_V <- 1 / x[1]
+  lambdas <- l_V * x
+  wStar <- -1 / (2 * l_V) * cormat_inv %*% mat_nab %*% lambdas
+  sum(wStar)
+  ts_wStar <- mat_test %*% wStar
+  V <- t(wStar) %*% cormat %*% wStar
+  list_out <- list(wStar, lambdas, ts_wStar, V, l_V)
+  return(list_out)
+}
 #-----------------------------------------------
 ret_targ <- 0.2
+C_targ <- 1
+targ_vec <- c(ret_targ, C_targ)
+nab_C <- rep(1, nrow(mat_sig_eigvecs))
+nab_C_sigs <- rep(1, n_sigs)
 #-----------------------------------------------
-cormat_sig1 <- cor(mat_diff_sig_in)
-cormat_sig1_inv <- solve(cormat_sig1)
-mat_nab <- cbind(mu_ret_sigs, rep(1, n_sigs))
-M_sig1 <- t(mat_nab) %*% cormat_sig1_inv %*% mat_nab
-M_sig1_inv <- solve(M_sig1)
-targ_vec <- c(ret_targ, 1)
-x <- -2 * M_sig1_inv %*% targ_vec
-l_V_sig1 <- 1 / x[1]
-lambdas_sig1 <- l_V_sig1 * x
-l_C_sig1 <- lambdas_sig1[2]
-lambdas_sig1
-# lambdas * budget
-# l_V * budget
-wStar_sig1 <- -1 / (2 * l_V_sig1) * cormat_sig1_inv %*% mat_nab %*% lambdas_sig1
-sum(wStar_sig1)
-ts_wStar_sig1 <- mat_diff_sig_in %*% wStar_sig1
+cormat <- cor(mat_train)
+mat_nab <- cbind(nab_mu_ret_in, nab_C)
+list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_test = mat_test)
+wStar_conv <- list_out[[1]]
+lambdas_conv <- list_out[[2]]
+ts_wStar_conv <- list_out[[3]]
+ts_wStar_conv_e <- mat_test %*% exp(wStar_conv) / sum(exp(wStar_conv))
 #-----------------------------------------------
-cormat_trad <- cor(mat_diff_in)
-cormat_trad_inv <- solve(cormat_trad)
-mat_nab <- cbind(mu_ret_in, ones_vec)
-M_trad <- t(mat_nab) %*% cormat_trad_inv %*% mat_nab
-M_trad_inv <- solve(M_trad)
-targ_vec <- c(ret_targ, 1)
-x <- -2 * M_trad_inv %*% targ_vec
-l_V_trad <- 1 / x[1]
-lambdas_trad <- l_V_trad * x
-l_C_trad <- lambdas_trad[2]
-lambdas_trad
-# lambdas * budget
-# l_V * budget
-wStar_trad <- -1 / (2 * l_V_trad) * cormat_trad_inv %*% mat_nab %*% lambdas_trad
-sum(wStar_trad)
-ts_wStar_trad <- mat_diff_in %*% wStar_trad
+cormat <- cor(mat_train_sig)
+mat_nab <- cbind(nab_mu_ret_sigs, nab_C_sigs)
+list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_test = mat_test_sig)
+wStar_sigs <- list_out[[1]]
+lambdas_sigs <- list_out[[2]]
+ts_wStar_sigs <- list_out[[3]]
 #-----------------------------------------------
-cormat_sig <- round(mat_Loads %*% t(mat_Loads), 8)
-cormat_sig_inv <- solve(cormat_sig)
-mat_nab <- cbind(mu_ret_in, ones_vec)
-M_sig <- t(mat_nab) %*% cormat_sig_inv %*% mat_nab
-M_sig_inv <- solve(M_sig)
-targ_vec <- c(ret_targ, 1)
-x <- -2 * M_sig_inv %*% targ_vec
-l_V_sig <- 1 / x[1]
-lambdas_sig <- l_V_sig * x
-l_C_sig <- lambdas_sig[2]
-lambdas_sig
-# lambdas * budget
-# l_V * budget
-wStar_sig <- -1 / (2 * l_V_sig) * cormat_sig_inv %*% mat_nab %*% lambdas_sig
-sum(wStar_sig)
-ts_wStar_sig <- mat_diff_in %*% wStar_sig
+cormat <- round(mat_Loads %*% t(mat_Loads), 8)
+nab_mu_ret_eigs <- mat_Loads_rot %*% sqrt(1 / eigvals_sig)
+mat_nab <- cbind(nab_mu_ret_eigs, nab_C)
+list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_test = mat_test)
+wStar_exp <- list_out[[1]]
+lambdas_exp <- list_out[[2]]
+ts_wStar_exp <- list_out[[3]]
 #-----------------------------------------------
-
-
-
-cormat_inv <- cormat_sig_inv
-p_ret <- mat_sig_eigvecs %*% rep(1, n_sigs) #(eigvals_sig)
-mat_nab <- cbind(p_ret, ones_vec)
-M <- t(mat_nab) %*% cormat_inv %*% mat_nab
-M_inv <- solve(M)
-targ_vec <- c(ret_targ, 1)
-x <- -2 * M_inv %*% targ_vec
-l_V <- 1 / x[1]
-lambdas <- l_V * x
-l_C <- lambdas[2]
-lambdas
-# lambdas * budget
-# l_V * budget
-wStar_sig2 <- -1 / (2 * l_V) * cormat_inv %*% mat_nab %*% lambdas
-sum(wStar_sig2)
-ts_wStar_sig2 <- mat_diff_in %*% wStar_sig2
-mean(ts_wStar_sig2)
-sum(ts_wStar_sig2)
-  
-#-----------------------------------------------
-
-wStar_normd <- wStar_sig2 / max(abs(wStar_sig2))
-#w_star_normd <- wStar_trad / max(abs(wStar_trad))
-col_order <- colnames(mat_in)
-df_plot <- data.frame(ts_id = col_order, mat_Loads_rot, wStar_normd)
-signal_id <- paste("Signal", c(1:n_sigs))
-colnames(df_plot)[2:(n_sigs + 1)] <- signal_id
-colnames(df_plot)[ncol(df_plot)] <- "Portfolio weights"
-gathercols <- colnames(df_plot)[-1]
-df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
-#--
-n_ts <- ncol(mat_in)
-group_vec <- rep(NA, n_ts)
-for(i in 1:length(list_tsTypes)){
-  this_tsType_vec <- list_tsTypes[[i]]
-  this_tsType_name <- tsType_names[i]
-  group_vec[which(col_order %in% this_tsType_vec)] <- this_tsType_name
-
-}
-
-df_plot$Type <- factor(group_vec)
-xx <- df_plot$Type
-df_plot$ts_id <- factor(df_plot$ts_id, levels = unique(df_plot$ts_id[order(xx)]))
-gg <- ggplot(df_plot, aes(x = ts_id, y = Loading, fill = Type))
-#--
-gg <- gg + geom_bar(stat = "identity", position = "dodge")
-gg <- gg + facet_wrap(~ Signal, nrow = 1)
-#gg <- gg + labs(title = )
-gg <- gg + theme(axis.text.y = element_text(face = "bold", size = 10),
-                 axis.text.x = element_text(face = "bold", size = 10),
-                 axis.title.y = element_text(face = "bold", size = 10),
-                 axis.title.x = element_text(face = "bold", size = 10))
-gg <- gg + coord_flip()
-gg
-
-
 # Backtesting
-#-------------------------------------
-mat_comp_ts <- cbind(ts_avg_in, ts_wStar_sig, ts_wStar_sig2, ts_wStar_trad, mat_diff_sig_in)
-colnames(mat_comp_ts) <- c("Average", "Opt New 1", "Opt New 2", "Opt Conventional", paste("Eigenportfolio", 1:n_sigs))
+#-----------------------------------------------
+mat_comp_ts <- cbind(ts_avg_test, ts_wStar_conv, ts_wStar_sigs, ts_wStar_exp, mat_eigenportfolio_test)
+colnames(mat_comp_ts) <- c("Average", "Opt conv", "Opt sigs", "Opt exp", paste("Eigenportfolio", 1:n_sigs))
 
 mat_comp_ts_perform <- apply(mat_comp_ts, 2, function(x) x - mat_comp_ts[, 1])
-df_plot <- data.frame(Date = date_vec, mat_comp_ts_perform)
+df_plot <- data.frame(Date = date_vec_test, mat_comp_ts_perform)
 df_plot_base <- df_plot[, c("Date", "Average")]
 df_plot$Average <- NULL
 gathercols <- colnames(df_plot)[-1]
 #df_plot <- df_plot %>% gather_("Type", "Monthly Return (%)", gathercols)
 df_plot <- df_plot %>% gather_("Type", "Performance (Pct. point diff. from average)", gathercols)
-df_plot <- subset(df_plot, Type %in% c("Opt.New.1", "Opt.New.2", "Opt.Conventional"))
+df_plot <- subset(df_plot, Type %in% c("Opt.sigs", "Opt.exp", "Opt.conv"))
 gg <- ggplot()
 gg <- gg + geom_line(data = df_plot_base, aes(x = Date, y = Average, group = 1), color = "orange", lwd = 2)
 gg <- gg + geom_line(data = df_plot, aes(x = Date, y = `Performance (Pct. point diff. from average)`, group = 1))
 gg <- gg + facet_wrap(~Type, ncol = 1, scales = "free")
 gg <- gg + labs(y = "Performance (Pct. point diff. from average)")
 gg
-
 #------------
 n_positive <- apply(mat_comp_ts, 2, function(x) length(which(x > 0)))
 mu_ret <- colMeans(mat_comp_ts)
@@ -736,15 +680,15 @@ sd_ret <- apply(mat_comp_ts, 2, sd)
 cv_ret <- sd_ret / mu_ret
 knitr::kable(data.frame(n_positive, sum_ret, mu_ret, cv_ret, sd_ret))
 #------------
-mu_ret_pos <- apply(mat_comp_ts, 2, function(x) mean(x[which(x > 0)]))
-sd_ret_pos <- apply(mat_comp_ts, 2, function(x) sd(x[which(x > 0)]))
-cv_ret_pos <- sd_ret_pos / mu_ret_pos
-knitr::kable(data.frame(n_positive, mu_ret_pos, cv_ret_pos, sd_ret_pos))
-#------------
-mu_ret_neg <- apply(mat_comp_ts, 2, function(x) mean(x[which(x < 0)]))
-sd_ret_neg <- apply(mat_comp_ts, 2, function(x) sd(x[which(x < 0)]))
-cv_ret_neg <- sd_ret_neg / mu_ret_neg
-knitr::kable(data.frame(n_positive, mu_ret_neg, cv_ret_neg, sd_ret_neg))
+# mu_ret_pos <- apply(mat_comp_ts, 2, function(x) mean(x[which(x > 0)]))
+# sd_ret_pos <- apply(mat_comp_ts, 2, function(x) sd(x[which(x > 0)]))
+# cv_ret_pos <- sd_ret_pos / mu_ret_pos
+# knitr::kable(data.frame(n_positive, mu_ret_pos, cv_ret_pos, sd_ret_pos))
+# #------------
+# mu_ret_neg <- apply(mat_comp_ts, 2, function(x) mean(x[which(x < 0)]))
+# sd_ret_neg <- apply(mat_comp_ts, 2, function(x) sd(x[which(x < 0)]))
+# cv_ret_neg <- sd_ret_neg / mu_ret_neg
+# knitr::kable(data.frame(n_positive, mu_ret_neg, cv_ret_neg, sd_ret_neg))
 #------------
 n_positive <- apply(mat_comp_ts_perform, 2, function(x) length(which(x > 0)))
 sd_perform <- apply(mat_comp_ts_perform, 2, function(x) sd(x[which(x > 0)]))
@@ -755,50 +699,6 @@ cv_perform <- sd_perform / mu_perform
 knitr::kable(data.frame(n_positive, mu_perform, cv_perform, sd_perform))
 
 
-
-
-
-# mat_plot <- apply(cbind(ts_wstar, mat_sig_ts), 2, function(x) x - ts_avg)
-# colMeans(mat_plot)
-# colSums(mat_plot)
-# df_plot <- data.frame(Date = row.names(mat_sig_ts), mat_plot)
-# colnames(df_plot)[2] <- "Portfolio weights"
-# df_plot$Date <- factor(format(df_plot$Date, format = "%y-%m-%d%"), ordered = T)
-# xAxis_labels <- df_plot$Date[seq(1, nrow(df_plot), length.out = 10)]
-# signal_id <- paste("Signal", c(1:n_sigs))
-# colnames(df_plot)[3:ncol(df_plot)] <- signal_id
-# gathercols <- colnames(df_plot)[2:ncol(df_plot)]
-# df_plot <- df_plot %>% gather_("Signal", "Value", gathercols)
-# gg <- ggplot(df_plot, aes(x = Date, y = Value, group = 1))
-# gg <- gg + geom_line()
-# gg <- gg <- gg + scale_x_discrete(breaks = xAxis_labels)
-# gg <- gg + facet_wrap(~ Signal, ncol = 1)
-# gg <- gg + theme(axis.title.y = element_blank())
-# gg
-# 
-# 
-# 
-# 
-# # Plot signal ts against average
-# df_plot1 <- data.frame(Date = row.names(mat_sig_ts), ts_avg)
-# df_plot2 <- data.frame(Date = row.names(mat_sig_ts), cbind(mat_sig_ts, ts_wstar))
-# colnames(df_plot2)[ncol(df_plot2)] <- "Portfolio weights"
-# df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
-# df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
-# xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
-# signal_id <- paste("Signal", c(1:n_sigs))
-# colnames(df_plot2)[2:(n_sigs + 1)] <- signal_id
-# gathercols <- colnames(df_plot2)[2:(n_sigs + 2)]
-# df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
-# gg <- ggplot()
-# gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = ts_avg, group = 1), color = "orange", lwd = 2)
-# gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
-# gg <- gg + scale_x_discrete(breaks = xAxis_labels)
-# gg <- gg + facet_wrap(~ Signal, ncol = 1)
-# gg <- gg + theme(axis.title.y = element_blank())
-# gg
-
-
 ```
 
 
@@ -807,57 +707,87 @@ knitr::kable(data.frame(n_positive, mu_perform, cv_perform, sd_perform))
 ```{r, fig.width=10, fig.height=4, fig.align='center', echo = FALSE }
 
 
-budget <- 10^5
-l_C <- -1 / budget * 10^2
-#l_R <- 1
-#l_V <- -1.1
-r_lev <- seq(0.11, 1.2, length.out = 100)
-NR_vec <- c()
-V_vec <- c()
-lC_vec <- c()
-lV_vec <- c()
-list_wStar <- list()
-list_wStar_eNormd <- list()
-list_lambdas <- list()
-last_ewStarNmd <- 0
-for(i in 1:length(r_lev)){
-  targ_vec <- c(r_lev[i] * rep(1, n_sigs), 1)
-  x <- -2 * M_inv %*% targ_vec
-  l_V <- l_C / x[length(x)]
-  #l_V <- l_R / x[1]
-  l_V <- l_V * (-sign(l_V))
-  #l_C <- l_V * x[length(x)]
-  lambdas <- l_V * x
-  #l_C <- lambdas[length(lambdas)]
-  #l_C <- l_C * (-sign(l_V))
-  NR_star <- targ_vec %*% lambdas
-  V_tol_implicit <- -1 / 2 *  NR_star / l_V
-  #w_star <- -1 / (2 * l_V) * cormat_inv %*% mat_sig_eigvecs_aug %*% lambdas
-  w_star <- -1 / (2 * l_V) * mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs_aug %*% lambdas
-  #sum(w_star)
-  ew_star <- exp(w_star)
-  ew_star_normed <- ew_star / sum(ew_star)
-  print(round(sum(last_ewStarNmd - ew_star_normed)^2, 3))
-  last_ewStarNmd <- ew_star_normed
 
-  V_check <- t(w_star) %*% cormat %*% w_star - V_tol_implicit
-  
-  #print(V_tol_implicit - V_check)
-  #print(lambdas)
-  
-  NR_vec[i] <- NR_star
-  V_vec[i] <- V_tol_implicit
-  lC_vec[i] <- l_C
-  lV_vec[i] <- l_V
-  list_wStar[[i]] <- w_star
-  list_wStar_eNormd[[i]] <- ew_star_normed
-  list_lambdas[[i]] <- lambdas[-length(lambdas)]
+R_vec <- c()
+V_conv_vec <- c()
+lV_conv_vec <- c()
+wStar_conv_list <- list()
+V_sigs_vec <- c()
+lV_sigs_vec <- c()
+wStar_sigs_list <- list()
+backtest_muRet_conv_vec <- c()
+backtest_muRet_sigs_vec <- c()
+backtest_sdRet_conv_vec <- c()
+backtest_sdRet_sigs_vec <- c()
+Rtarg_vec <- seq(0.01, 3, length.out = 50)
+for(i in 1:length(Rtarg_vec)){
+this_Rtarg <- Rtarg_vec[i]
+targ_vec <- c(this_Rtarg, C_targ)
+  #-----------------------------------------------
+cormat <- cor(mat_train)
+mat_nab <- cbind(nab_mu_ret_in, nab_C)
+list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_test = mat_test)
+wStar_conv <- list_out[[1]]
+lambdas_conv <- list_out[[2]]
+ts_wStar_conv <- list_out[[3]]
+V_conv <- list_out[[4]]
+lV_conv <- list_out[[5]]
+V_conv_vec[i] <- V_conv
+lV_conv_vec[i] <- lV_conv
+wStar_conv_list[[i]] <- wStar_conv
+backtest_muRet_conv_vec[i] <- mean(ts_wStar_conv)
+backtest_sdRet_conv_vec[i] <- sd(ts_wStar_conv)
+#-----------------------------------------------
+cormat <- cor(mat_train_sig)
+mat_nab <- cbind(nab_mu_ret_sigs, nab_C_sigs)
+list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_test = mat_test_sig)
+wStar_sigs <- list_out[[1]]
+lambdas_sigs <- list_out[[2]]
+ts_wStar_sigs <- list_out[[3]]
+V_sigs <- list_out[[4]]
+lV_sigs <- list_out[[5]]
+V_sigs_vec[i] <- V_sigs
+lV_sigs_vec[i] <- lV_sigs
+wStar_sigs_list[[i]] <- wStar_sigs
+backtest_muRet_sigs_vec[i] <- mean(ts_wStar_sigs)
+backtest_sdRet_sigs_vec[i] <- sd(ts_wStar_sigs)
+#-----------------------------------------------
+# print(lambdas_conv[2])
+# print(lambdas_sigs[2])
+# print(lV_conv)
+# print(lV_sigs)
 }
 
-df_plot <- data.frame(V = V_vec, NR = NR_vec, lC = lC_vec, lV = lV_vec)
-gg <- ggplot(df_plot, aes(x = V, y = NR, color = r_lev))
+df_plot <- data.frame(Return = Rtarg_vec, Conventional = V_conv_vec, Experiment = V_sigs_vec)
+df_plot <- df_plot %>% gather(Type, Variance, Conventional:Experiment)
+gg <- ggplot(df_plot, aes(x = Variance, y = Return, group = Type, color = Type))
 gg <- gg + geom_point()
 gg
+
+df_plot <- data.frame(Return = Rtarg_vec, Conventional = backtest_muRet_conv_vec, Experiment = backtest_muRet_sigs_vec)
+df_plot <- df_plot %>% gather(Type, Backtest, Conventional:Experiment)
+gg <- ggplot(df_plot, aes(x = Return, y = Backtest, group = Type, color = Type))
+gg <- gg + geom_point()
+gg
+
+df_plot <- data.frame(Return = Rtarg_vec, Conventional = backtest_sdRet_conv_vec, Experiment = backtest_sdRet_sigs_vec)
+df_plot <- df_plot %>% gather(Type, Backtest, Conventional:Experiment)
+gg <- ggplot(df_plot, aes(x = Return, y = Backtest, group = Type, color = Type))
+gg <- gg + geom_point()
+gg
+
+
+
+df_look <- data.frame(Return = Rtarg_vec, Conventional = backtest_sdRet_conv_vec, Experiment = backtest_sdRet_sigs_vec)
+df_look$Conventional / df_look$Return
+df_look$Experiment / df_look$Return
+
+df_look <- data.frame(Return = Rtarg_vec, Conventional = backtest_muRet_conv_vec, Experiment = backtest_muRet_sigs_vec)
+df_look$Conventional / df_look$Return
+df_look$Experiment / df_look$Return
+
+
+
 
 
 
@@ -1344,6 +1274,41 @@ mu_r <- apply(mat_x, 2, mean)
 mu_r
 
 
+
+
+# wStar_normd <- wStar_sig1 / max(abs(wStar_sig1))
+# #w_star_normd <- wStar_trad / max(abs(wStar_trad))
+# col_order <- colnames(mat_in)
+# df_plot <- data.frame(ts_id = col_order, mat_Loads_rot, wStar_normd)
+# signal_id <- paste("Signal", c(1:n_sigs))
+# colnames(df_plot)[2:(n_sigs + 1)] <- signal_id
+# colnames(df_plot)[ncol(df_plot)] <- "Portfolio weights"
+# gathercols <- colnames(df_plot)[-1]
+# df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
+# #--
+# n_ts <- ncol(mat_in)
+# group_vec <- rep(NA, n_ts)
+# for(i in 1:length(list_tsTypes)){
+#   this_tsType_vec <- list_tsTypes[[i]]
+#   this_tsType_name <- tsType_names[i]
+#   group_vec[which(col_order %in% this_tsType_vec)] <- this_tsType_name
+# 
+# }
+# 
+# df_plot$Type <- factor(group_vec)
+# xx <- df_plot$Type
+# df_plot$ts_id <- factor(df_plot$ts_id, levels = unique(df_plot$ts_id[order(xx)]))
+# gg <- ggplot(df_plot, aes(x = ts_id, y = Loading, fill = Type))
+# #--
+# gg <- gg + geom_bar(stat = "identity", position = "dodge")
+# gg <- gg + facet_wrap(~ Signal, nrow = 1)
+# #gg <- gg + labs(title = )
+# gg <- gg + theme(axis.text.y = element_text(face = "bold", size = 10),
+#                  axis.text.x = element_text(face = "bold", size = 10),
+#                  axis.title.y = element_text(face = "bold", size = 10),
+#                  axis.title.x = element_text(face = "bold", size = 10))
+# gg <- gg + coord_flip()
+# gg
 
 
 
