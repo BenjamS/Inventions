@@ -624,7 +624,7 @@ optimizePortfolio <- function(cormat, mat_nab, targ_vec, mat_test){
   return(list_out)
 }
 #-----------------------------------------------
-ret_targ <- 0.2
+ret_targ <- 0.45
 C_targ <- 1
 targ_vec <- c(ret_targ, C_targ)
 nab_C <- rep(1, nrow(mat_sig_eigvecs))
@@ -636,7 +636,9 @@ list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_test = mat_test)
 wStar_conv <- list_out[[1]]
 lambdas_conv <- list_out[[2]]
 ts_wStar_conv <- list_out[[3]]
-ts_wStar_conv_e <- mat_test %*% exp(wStar_conv) / sum(exp(wStar_conv))
+lV_conv <- list_out[[5]]
+wStar_conv_e <- exp(wStar_conv) / sum(exp(wStar_conv))
+ts_wStar_conv_e <- mat_test %*% wStar_conv_e
 #-----------------------------------------------
 cormat <- cor(mat_train_sig)
 mat_nab <- cbind(nab_mu_ret_sigs, nab_C_sigs)
@@ -644,19 +646,30 @@ list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_test = mat_test_sig
 wStar_sigs <- list_out[[1]]
 lambdas_sigs <- list_out[[2]]
 ts_wStar_sigs <- list_out[[3]]
+wStar_sigs_e <- exp(wStar_sigs) / sum(exp(wStar_sigs))
+ts_wStar_sigs_e <- mat_test_sig %*% wStar_sigs_e
 #-----------------------------------------------
-cormat <- round(mat_Loads %*% t(mat_Loads), 8)
-nab_mu_ret_eigs <- mat_Loads_rot %*% sqrt(1 / eigvals_sig)
-mat_nab <- cbind(nab_mu_ret_eigs, nab_C)
-list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_test = mat_test)
-wStar_exp <- list_out[[1]]
-lambdas_exp <- list_out[[2]]
-ts_wStar_exp <- list_out[[3]]
+# cormat <- round(mat_Loads %*% t(mat_Loads), 8)
+# nab_mu_ret_eigs <- mat_Loads_rot %*% sqrt(1 / eigvals_sig)
+# mat_nab <- cbind(nab_mu_ret_eigs, nab_C)
+# list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_test = mat_test)
+# wStar_exp <- list_out[[1]]
+# lambdas_exp <- list_out[[2]]
+# ts_wStar_exp <- list_out[[3]]
+#-----------------------------------------------
+# cormat <- cor(mat_train)
+# mat_nab <- cbind(nab_mu_ret_in, nab_C)
+# list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_test = mat_test)
+# wStar_conv <- list_out[[1]]
+# lambdas_conv <- list_out[[2]]
+# ts_wStar_conv <- list_out[[3]]
+# ts_wStar_conv_e <- mat_test %*% exp(wStar_conv) / sum(exp(wStar_conv))
+
 #-----------------------------------------------
 # Backtesting
 #-----------------------------------------------
-mat_comp_ts <- cbind(ts_avg_test, ts_wStar_conv, ts_wStar_sigs, ts_wStar_exp, mat_eigenportfolio_test)
-colnames(mat_comp_ts) <- c("Average", "Opt conv", "Opt sigs", "Opt exp", paste("Eigenportfolio", 1:n_sigs))
+mat_comp_ts <- cbind(ts_avg_test, ts_wStar_conv_e, ts_wStar_sigs_e, mat_eigenportfolio_test)
+colnames(mat_comp_ts) <- c("Average", "Opt conv", "Opt sigs", paste("Eigenportfolio", 1:n_sigs))
 
 mat_comp_ts_perform <- apply(mat_comp_ts, 2, function(x) x - mat_comp_ts[, 1])
 df_plot <- data.frame(Date = date_vec_test, mat_comp_ts_perform)
@@ -665,7 +678,7 @@ df_plot$Average <- NULL
 gathercols <- colnames(df_plot)[-1]
 #df_plot <- df_plot %>% gather_("Type", "Monthly Return (%)", gathercols)
 df_plot <- df_plot %>% gather_("Type", "Performance (Pct. point diff. from average)", gathercols)
-df_plot <- subset(df_plot, Type %in% c("Opt.sigs", "Opt.exp", "Opt.conv"))
+df_plot <- subset(df_plot, Type %in% c("Opt.sigs", "Opt.conv"))
 gg <- ggplot()
 gg <- gg + geom_line(data = df_plot_base, aes(x = Date, y = Average, group = 1), color = "orange", lwd = 2)
 gg <- gg + geom_line(data = df_plot, aes(x = Date, y = `Performance (Pct. point diff. from average)`, group = 1))
@@ -723,7 +736,7 @@ Rtarg_vec <- seq(0.01, 3, length.out = 50)
 for(i in 1:length(Rtarg_vec)){
 this_Rtarg <- Rtarg_vec[i]
 targ_vec <- c(this_Rtarg, C_targ)
-  #-----------------------------------------------
+#-----------------------------------------------
 cormat <- cor(mat_train)
 mat_nab <- cbind(nab_mu_ret_in, nab_C)
 list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_test = mat_test)
@@ -778,9 +791,9 @@ gg
 
 
 
-df_look <- data.frame(Return = Rtarg_vec, Conventional = backtest_sdRet_conv_vec, Experiment = backtest_sdRet_sigs_vec)
-df_look$Conventional / df_look$Return
-df_look$Experiment / df_look$Return
+df_look <- data.frame(Return = Rtarg_vec, Conventional = backtest_sdRet_conv_vec, Conventional_sd = sqrt(V_conv_vec), Experiment = backtest_sdRet_sigs_vec, Experiment_sd = sqrt(V_sigs_vec))
+df_look$Conventional / df_look$Conventional_sd
+df_look$Experiment / df_look$Experiment_sd
 
 df_look <- data.frame(Return = Rtarg_vec, Conventional = backtest_muRet_conv_vec, Experiment = backtest_muRet_sigs_vec)
 df_look$Conventional / df_look$Return
