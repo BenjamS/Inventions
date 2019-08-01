@@ -151,7 +151,7 @@ Yahoo data ...The data below are intended to be representative of what a broad-m
 WDI data . This is the data that the UN (SDG Tracker) uses to track progress towards SDGs. As mentioned above...low resolution...we are coming to a point where there are enough years of enough variables that we can begin to glimpse the contours of the main components. It will be exciting...as the picture comes slowly into greater and greater focus.
 
 
-```{r, fig.width=13, fig.height=11, fig.align='center', echo = FALSE}
+```{r, fig.width=10, fig.height=8, fig.align='center', echo = FALSE}
 #setwd("D:/OneDrive - CGIAR/Documents")
 #options(warn = -1); options(scipen = 999)
 #-------------------------------------------------------------
@@ -188,8 +188,8 @@ signals_from_noise <- function(mat_PCA_in,
   #---------------------------------------------------------
   # Apply random matrix theory () to determine eigenvalue distribution of a 
   # correlation matrix of random data.
-  n_obs <- nrow(res$ind$coord)
-  n_var <- ncol(mat_loads)
+  n_obs <- nrow(mat_PCA_in)
+  n_var <- ncol(mat_PCA_in)
   Q <- n_obs / n_var
   s_sq <- 1 - eigval_max / n_var
   #s_sq <- 1
@@ -198,6 +198,19 @@ signals_from_noise <- function(mat_PCA_in,
   lam <- seq(eigval_rand_min, eigval_rand_max, 0.001)
   eigval_rand_density <- Q / (2 * pi * s_sq) * sqrt((eigval_rand_max - lam) * (lam - eigval_rand_min)) / lam
   df_plot <- data.frame(Eigenvalues = eigvals)
+  
+  #   N_t <- nrow(mat_PCA_in)
+  # N_c <- ncol(mat_PCA_in)
+  # Q <- N_t / N_c
+  # s_sq <- 1 - eigval_max / N_c
+  # #s_sq <- 1
+  # eigval_rand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
+  # eigval_rand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
+  # lam <- seq(eigval_rand_min, eigval_rand_max, 0.001)
+  # dens_rand <- Q / (2 * pi * s_sq) * sqrt((eigval_rand_max - lam) * (lam - eigval_rand_min)) / lam
+  # df_e <- data.frame(eigenvalues = eigvals)
+
+  
   #---------------------------------------------------------
   # Plot eigenvalue density vs. random matrix eigenvalue density
   if(eigenvalue_density_plot){
@@ -214,9 +227,9 @@ signals_from_noise <- function(mat_PCA_in,
   ind_deviating_from_noise <- which(eigvals > eigval_rand_max) # (eigval_rand_max + 5 * 10^-1))
   #---------------------------------------------------------
   # Extract signal loadings matrix from noise
-  #mat_loads_sig_rot <- mat_loads_rot[, ind_deviating_from_noise]
   mat_loads_sig <- mat_loads[, ind_deviating_from_noise]
   eigvals_sig <- eigvals[ind_deviating_from_noise]
+  mat_loads_rot_sig <- mat_loads_rot[, ind_deviating_from_noise]
   #---------------------------------------------------------
   n_signals <- length(eigvals_sig)
   if(!quietly){print(paste("Number of signals: ", n_signals))}
@@ -259,7 +272,7 @@ signals_from_noise <- function(mat_PCA_in,
   # These plots include grouping info, if available
   varNames_ordered <- row.names(mat_loads_sig)
   if(!is.null(list_groups)){
-    group_vec <- rep(NA, n_obs)
+    group_vec <- rep(NA, n_var)
     for(i in 1:length(list_groups)){
       this_group_vec <- list_groups[[i]]
       this_group_name <- group_names[i]
@@ -268,15 +281,8 @@ signals_from_noise <- function(mat_PCA_in,
     }
   }
   #---------------------------------------------------------
-  # Plot of signals
+  # Plot signal data against average
   if(signals_plot){ 
-    if(n_signals == 1){
-      mat_inData_sig <- mat_inData_sig / eigvals_sig
-    }else{
-      mat_inData_sig <- mat_inData_sig %*% diag(1 / eigvals_sig)
-    }
-    #---------------------------------------------------------
-    # Plot signal data against average
     date_vec <- row.names(mat_PCA_in)
     df_plot1 <- data.frame(Date = date_vec, inData_avg)
     df_plot2 <- data.frame(Date = date_vec, mat_inData_sig)
@@ -293,12 +299,13 @@ signals_from_noise <- function(mat_PCA_in,
     gg <- gg + scale_x_discrete(breaks = xAxis_labels)
     gg <- gg + facet_wrap(~ Signal, ncol = 1)
     gg <- gg + theme(axis.title.y = element_blank(),
-                     axis.text.x = element_text(angle = 60))
+                     axis.text.x = element_text(angle = 60, hjust = 1))
     gg_signals <- gg
     if(!eigenvalue_density_plot){
       print(gg_signals)
     }else{
-      gg_together <- ggpubr::ggarrange(gg_eigenval_density, gg_signals, 
+      gg_together <- ggpubr::ggarrange(gg_eigenval_density, gg_signals,
+                                       #align = "v",
                         #labels = c("A", "B"),
                         ncol = 2, nrow = 1)
       print(gg_together)
@@ -326,7 +333,7 @@ signals_from_noise <- function(mat_PCA_in,
   # View(mc$classification)
   # factoextra::fviz_cluster(mc, frame.type = "norm", geom = "text")
   #---------------------------------------------------------
-  list_out <- list(mat_loads_sig, mat_inData_sig, eigvals_sig, mat_eigvecs_sig)
+  list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig)
   return(list_out)
   
 }
@@ -365,25 +372,17 @@ signals_from_noise <- function(mat_PCA_in,
 #   
 # }
 #=======================================================================
-interpret_loadings <- function(mat_loads_sig,
+interpret_loadings <- function(mat_loads_rot_sig,
                                list_groups = NULL,
                                group_names = NULL,
-                               signal_names = NULL,
-                               rotate = T){
+                               signal_names = NULL){
   #---------------------------------------------------------
-  n_signals <- ncol(mat_loads_sig)
-  varNames_ordered <- row.names(mat_loads_sig)
-  #---------------------------------------------------------
-  # Rotate loadings to facilitate interpretation
-  if(rotate){
-    mat_loads_sig <- varimax(mat_loads_sig)[[1]]
-    mat_loads_sig <- matrix(as.numeric(mat_loads_sig),
-                            attributes(mat_loads_sig)$dim,
-                            dimnames = attributes(mat_loads_sig)$dimnames)
-    }
+  n_var <- nrow(mat_loads_rot_sig)
+  n_signals <- ncol(mat_loads_rot_sig)
+  varNames_ordered <- row.names(mat_loads_rot_sig)
   #------------------------------------------------------------
   # Plot loadings barcharts
-  df_plot <- data.frame(id = varNames_ordered, mat_loads_sig)
+  df_plot <- data.frame(id = varNames_ordered, mat_loads_rot_sig)
   #--------------
   # Name the signals, if names provided
   if(is.null(signal_names)){
@@ -395,10 +394,12 @@ interpret_loadings <- function(mat_loads_sig,
   colnames(df_plot)[2:(n_signals + 1)] <- signal_id
   gathercols <- as.character(signal_id) 
   df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
+  df_plot <- transform(df_plot,
+       Signal = factor(Signal,levels = gathercols))
   #--------------
   # Group the vars if group info is provided
   if(!is.null(list_groups)){
-    group_vec <- rep(NA, n_obs)
+    group_vec <- rep(NA, n_var)
     for(i in 1:length(list_groups)){
       this_group_vec <- list_groups[[i]]
       this_group_name <- group_names[i]
@@ -439,203 +440,8 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec, mat_pctDiff_test = NUL
   return(list_out)
 }
 #=======================================================================
-
-
+# End function definition
 #=======================================================================
-#=======================================================================
-#=======================================================================
-
-
-# Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
-#                                list_groups = NULL,
-#                                group_names = NULL,
-#                                pca_var_plot = F,
-#                                pca_ind_plot = F,
-#                                eigenvalue_density_plot = F,
-#                                loadings_plot = T,
-#                                sig_ts_plot = F,
-#                                sig_corr_plot = F,
-#                                yearly = F){
-#   varNames_ordered <- colnames(mat_PCA_in)
-#   date_vec <- row.names(mat_PCA_in)
-#   if(yearly){date_vec <- as.integer(date_vec)}
-#   n_obs <- ncol(mat_PCA_in)
-#   #----
-#   if(!is.null(list_groups)){
-#     group_vec <- rep(NA, n_obs)
-#     for(i in 1:length(list_groups)){
-#       this_group_vec <- list_groups[[i]]
-#       this_group_name <- group_names[i]
-#       group_vec[which(varNames_ordered %in% this_group_vec)] <- this_group_name
-#       
-#     }
-#   }
-#   #----
-#   if(pca_ind_plot){
-#     res <- FactoMineR::PCA(t(mat_PCA_in), graph = F)
-#     gg <- factoextra::fviz_pca_ind(res, habillage = factor(group_vec), addEllipses = T)
-#     print(gg)
-#   }
-#   #----
-#   res <- FactoMineR::PCA(mat_PCA_in, ncp = ncol(mat_PCA_in), graph = F)
-#   #----
-#   if(pca_var_plot){
-#     gg <- factoextra::fviz_pca_var(res, habillage = factor(group_vec))
-#     print(gg)
-#   }
-#   # library(mclust)
-#   # mc <- Mclust(t(mat_PCA_in))
-#   # summary(mc)
-#   # View(mc$classification)
-#   # factoextra::fviz_cluster(mc, frame.type = "norm", geom = "text")
-#   #--Extraction of signals (main PCs)
-#   eigvals <- as.data.frame(res$eig)$eigenvalue
-#   eigval_max <- max(eigvals)
-#   N_t <- nrow(mat_PCA_in)
-#   N_c <- ncol(mat_PCA_in)
-#   Q <- N_t / N_c
-#   s_sq <- 1 - eigval_max / N_c
-#   #s_sq <- 1
-#   eigval_rand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
-#   eigval_rand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
-#   lam <- seq(eigval_rand_min, eigval_rand_max, 0.001)
-#   dens_rand <- Q / (2 * pi * s_sq) * sqrt((eigval_rand_max - lam) * (lam - eigval_rand_min)) / lam
-#   df_e <- data.frame(eigenvalues = eigvals)
-#   #--Eigenvalue density vs. random matrix eigenvalue density
-#   if(eigenvalue_density_plot){
-#     gg <- ggplot()
-#     gg <- gg + geom_density(data = df_e, aes(x = eigenvalues, color = "Correlation Matrix"), lwd = 1.1)
-#     gg <- gg + geom_line(data = data.frame(x = lam, y = dens_rand), aes(x = x, y = y, color = "Random matrix"), lwd = 1.1)
-#     gg <- gg + scale_colour_manual(name = "Eigenvalue density", 
-#                                    values = c(`Correlation Matrix` = "blue", `Random matrix` = "orange"))
-#     print(gg)
-#   }
-#   #-----------------------------------------
-#   ind_deviating_from_noise <- which(eigvals > eigval_rand_max)# (eigval_rand_max + 5 * 10^-1))
-#   mat_Loads <- res$var$coord
-#   mat_signal_Loads <- mat_Loads[, ind_deviating_from_noise]
-#   mat_Loads_rot <- varimax(mat_Loads)[[1]]
-#   mat_signal_Loads_rot <- mat_Loads_rot[, ind_deviating_from_noise]
-#   mat_eigvecs <-  mat_Loads %*% diag(1 / sqrt(eigvals))
-#   eigvals_sig <- eigvals[ind_deviating_from_noise]
-#   n_signals <- length(eigvals_sig)
-#   print(paste("Number of signals: ", n_signals))
-#   mat_signal_eigvecs <- mat_eigvecs[, ind_deviating_from_noise]
-#   mat_signal_ts <- mat_PCA_in %*% mat_signal_eigvecs
-#   if(n_signals == 1){
-#     mat_signal_ts <- mat_signal_ts / eigvals_sig
-#   }else{
-#     mat_signal_ts <- mat_signal_ts %*% diag(1 / eigvals_sig)
-#   }
-#   # Set sign of eigenvectors such that they
-#   # best conform to the input time series
-#   #inData_avg <- mat_PCA_in %*% rep(1, n_obs) * 1 / n_obs
-#   inData_avg <- rowMeans(mat_PCA_in)
-#   if(n_signals == 1){
-#     #sse <- sum((mat_signal_ts - inData_avg)^2)
-#     #sse_neg <- sum((-mat_signal_ts - inData_avg)^2)
-#     mse <- mean((mat_signal_ts - inData_avg)^2)
-#     mse_neg <- mean((-mat_signal_ts - inData_avg)^2)
-#     if(mse_neg < mse){
-#       mat_signal_eigvecs <- -mat_signal_eigvecs
-#       mat_signal_ts <- -mat_signal_ts
-#     }
-#   }else{
-#     for(i in 1:n_signals){
-#       # sse <- sum((mat_signal_ts[, i] - inData_avg)^2)
-#       # sse_neg <- sum((-mat_signal_ts[, i] - inData_avg)^2)
-#       # sse_vec <- c(sse, sse_neg)
-#       mse <- mean((mat_signal_ts[, i] - inData_avg)^2)
-#       mse_neg <- mean((-mat_signal_ts[, i] - inData_avg)^2)
-#       if(mse_neg < mse){
-#         mat_signal_eigvecs[, i] <- -mat_signal_eigvecs[, i]
-#         mat_signal_ts[, i] <- -mat_signal_ts[, i]
-#       }
-#     }
-#     
-#   }
-#   #------------------------------------------------------------
-#   # Plot loadings barcharts
-#   if(varimax_rot){
-#     df_plot <- data.frame(ts_id = varNames_ordered, mat_signal_Loads_rot)
-#   }else{
-#     df_plot <- data.frame(ts_id = varNames_ordered, mat_signal_Loads)
-#   }
-#   signal_id <- paste("Signal", c(1:n_signals))
-#   colnames(df_plot)[2:(n_signals + 1)] <- signal_id
-#   gathercols <- as.character(signal_id)
-#   df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
-#   #--
-#   if(!is.null(list_groups)){
-#     # df_plot$Type <- NA
-#     # u <- as.character(df_plot$ts)
-#     # for(i in 1:length(list_groups)){
-#     #   ind <- which(u %in% list_groups[[i]])
-#     #   df_plot$Type[ind] <- group_names[i]
-#     # }
-#     # df_plot$Type <- as.factor(df_plot$Type)
-#     df_plot$Type <- factor(group_vec)
-#     xx <- df_plot$Type
-#     df_plot$ts_id <- factor(df_plot$ts_id, levels = unique(df_plot$ts_id[order(xx)]))
-#     gg <- ggplot(df_plot, aes(x = ts_id, y = Loading, fill = Type))
-#   }else{
-#     gg <- ggplot(df_plot, aes(x = ts_id, y = Loading))
-#   }
-#   #--
-#   gg <- gg + geom_bar(stat = "identity", position = "dodge")
-#   gg <- gg + facet_wrap(~ Signal, nrow = 1)
-#   #gg <- gg + labs(title = )
-#   gg <- gg + theme(axis.text.y = element_text(face = "bold", size = 10),
-#                    axis.text.x = element_text(face = "bold", size = 10),
-#                    axis.title.y = element_text(face = "bold", size = 10),
-#                    axis.title.x = element_text(face = "bold", size = 10))
-#   gg <- gg + coord_equal()
-#   # if(N_c <= 50){
-#   #   gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
-#   #                    axis.title.y = element_blank())
-#   # }else{
-#   #   gg <- gg + theme(axis.text.x = element_blank(),
-#   #                    axis.title.y = element_blank())
-#   # }
-#   gg <- gg + coord_flip()
-#   if(loadings_plot){print(gg)}
-#   #---------------------------------
-#   # Plot signal ts against average
-#   df_plot1 <- data.frame(Date = date_vec, inData_avg)
-#   df_plot2 <- data.frame(Date = date_vec, mat_signal_ts)
-#   df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
-#   df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
-#   xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
-#   signal_id <- paste("Signal", c(1:n_signals))
-#   colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
-#   gathercols <- signal_id
-#   df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
-#   gg <- ggplot()
-#   gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = inData_avg, group = 1), color = "orange", lwd = 2)
-#   gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
-#   gg <- gg + scale_x_discrete(breaks = xAxis_labels)
-#   gg <- gg + facet_wrap(~ Signal, ncol = 1)
-#   gg <- gg + theme(axis.title.y = element_blank())
-#   gg
-#   if(sig_ts_plot){print(gg)}
-#   #--Correlation matrix
-#   if(sig_corr_plot){
-#     # t(mat_signal_ts) %*% mat_signal_ts
-#     # t(mat_signal_eigvecs) %*% mat_signal_eigvecs
-#     rcorr_out <- rcorr(mat_signal_ts)
-#     cormat <- rcorr_out$r
-#     print(cormat)
-#     pmat <- rcorr_out$P
-#     corrplot(cormat, type="upper", order="hclust", p.mat = pmat, sig.level = 0.01, insig = "blank", tl.col = "black", tl.srt = 45)
-#     
-#   }
-#   #---------------------------------
-#   df_sig_ts <- data.frame(date = date_vec, ts_sigs = mat_signal_ts)
-#   #df_sig_eigvecs <- data.frame(Loadings_sigs_rot = mat_signal_Loads_rot)
-#   list_out <- list(df_sig_ts, mat_signal_eigvecs, mat_eigvecs, mat_signal_Loads, mat_signal_Loads_rot, eigvals_sig, eigvals)
-#   return(list_out)
-# }
-
 #=======================================================================
 
 spy_sector_symbs <- c("XLF", "XLC", "XLY", "XLP", "XLV", "XLK", "RWR",
@@ -731,21 +537,19 @@ mat_diff_mo <- as.matrix(mat_diff_mo[-1, ])
 ts_avg_mo <- rowMeans(mat_diff_mo)
 mu_ret_mo <- colMeans(mat_diff_mo)
 sd_ret_mo <- apply(mat_diff_mo, 2, sd)
-
-df_plot <- data.frame(ts_id = names(mu_ret_dy), mu_ret_dy, mu_ret_wk, mu_ret_mo)
-colnames(df_plot)[-1] <- c("Mean Daily Return", "Mean Weekly Return", "Mean Monthly Return")
-gathercols <- colnames(df_plot)[-1]
-df_plot <- df_plot %>% gather_("Return Type", "Value", gathercols)
-#gg <- ggplot(df_plot, aes(Value, fill = `Return Type`))
-gg <- ggplot(df_plot, aes(Value))
-gg <- gg + geom_density(alpha = 0.4)
-gg <- gg + facet_wrap(~`Return Type`, nrow = 1, scales = "free")
-#gg <- gg + coord_cartesian(xlim = c(-0.02, 0.02))
-gg
-
-
-
-
+#----------------------------------------------
+# Compare histograms of daily, weekly, and monthly returns
+# df_plot <- data.frame(ts_id = names(mu_ret_dy), mu_ret_dy, mu_ret_wk, mu_ret_mo)
+# colnames(df_plot)[-1] <- c("Mean Daily Return", "Mean Weekly Return", "Mean Monthly Return")
+# gathercols <- colnames(df_plot)[-1]
+# df_plot <- df_plot %>% gather_("Return Type", "Value", gathercols)
+# #gg <- ggplot(df_plot, aes(Value, fill = `Return Type`))
+# gg <- ggplot(df_plot, aes(Value))
+# gg <- gg + geom_density(alpha = 0.4)
+# gg <- gg + facet_wrap(~`Return Type`, nrow = 1, scales = "free")
+# #gg <- gg + coord_cartesian(xlim = c(-0.02, 0.02))
+# gg
+#----------------------------------------------
 #ind_rm_ema <- 1:(per_ema - 1)
 # mat_PCA_in <- apply(mat_PCA_in, 2, function(x) x - EMA(x, per_ema))
 # mat_PCA_in <- mat_PCA_in[-ind_rm_ema, ]
@@ -855,14 +659,13 @@ In figure ..., a density plot of the correlation matrix eigenvalues is compared 
 
 The signal time series are plotted against the data average in figure .... Here it is evident that the first signal reflects the average, while the subsequent signals reflect forces pushing and pulling on the average.
 
-```{r, fig.width=13, fig.height=10, fig.align='center', echo=FALSE}
+```{r, fig.width=12, fig.height=8, fig.align='center', echo=FALSE}
 ind_train <- 1:round(nrow(mat_PCA_in) * 2 / 3)
 ind_test <- setdiff(1:nrow(mat_PCA_in), ind_train)
 mat_pctDiff_train <- mat_PCA_in[ind_train, ]
 mat_pctDiff_test <- mat_PCA_in[ind_test, ]
 ts_avg_test <- ts_avg_in[ind_test]
 date_vec_test <- date_vec[ind_test]
-
 list_out <- signals_from_noise(mat_pctDiff_train,
                                eigenvalue_density_plot = T,
                                signals_plot = T,
@@ -871,8 +674,13 @@ list_out <- signals_from_noise(mat_pctDiff_train,
                                list_groups = list_groups,
                                group_names = group_names,
                                quietly = F)
-mat_loads_sig <- list_out[[1]]
-
+# list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig)
+mat_loads_sig_train <- list_out[[1]]
+mat_loads_rot_sig_train <- list_out[[2]]
+# mat_loads_train <- list_out[[3]]
+# mat_laods_rot_train <- list_out[[4]]
+eigvals_sig_train <- list_out[[6]]
+mat_eigvecs_sig_train <- list_out[[7]]
 ```
 
 
@@ -882,18 +690,12 @@ Average, mostly US sectors and.... Signal two
 
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 
-signal_names <- c("")
-interpret_loadings(mat_loads_sig,
+signal_names <- c("US / BRIC Markets,\nEnergy, Blockchain", "Prescious metals", "FOREX", "Bonds", "Agriculture", "Industrial metals")
+interpret_loadings(mat_loads_rot_sig_train,
                    list_groups = list_groups,
                    group_names = group_names,
-                   signal_names = NULL,#signal_names,
-                   rotate = T)
-```
+                   signal_names = signal_names)
 
-
-#### 4.1.3 
-
-```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 # ind_train <- 1:round(nrow(mat_PCA_in) * 2 / 3)
 # ind_test <- setdiff(1:nrow(mat_PCA_in), ind_train)
 # mat_pctDiff_train <- mat_PCA_in[ind_train, ]
@@ -911,59 +713,54 @@ interpret_loadings(mat_loads_sig,
 #                                 sig_corr_plot = F,
 #                                 yearly = F)
 
-
 ```
 
 
-```{r, echo=F}
+#### 4.1.3 
 
-# list(df_sig_ts, mat_sig_eigvecs, mat_eigvecs, mat_signal_Loads, mat_signal_Loads_rot, eigvals_sig, eigvals, mat_eigvecs)
-mat_Loads <- list_sigs[[4]]
-mat_Loads_rot <- list_sigs[[5]]
-mat_Loads_rot_normd <- apply(mat_Loads_rot, 2, function(x) x / sum(x))
-mat_pctDiff_train_sig <- mat_pctDiff_train %*% mat_Loads_rot
-mat_pctDiff_test_sig <- mat_pctDiff_test %*% mat_Loads_rot
-mat_eigenportfolio_test <- mat_pctDiff_test %*% mat_Loads_rot_normd
-#mat_diff_sig_in <- mat_diff_in %*% mat_Loads_rot
-nab_mu_ret_sigs <- colMeans(mat_pctDiff_train_sig)
-sd_ret_sigs <- apply(mat_pctDiff_train_sig, 2, sd)
-cv_ret_sigs <- sd_ret_sigs / nab_mu_ret_sigs
-sum_ret_sigs <- colSums(mat_pctDiff_train_sig)
-nab_mu_ret_sigs
-cv_ret_sigs
-sum_ret_sigs
-#t(mat_Loads) %*% mat_Loads
-mse <- mean((cor(mat_pctDiff_train) - mat_Loads %*% t(mat_Loads))^2)
-sse <- sum((cor(mat_PCA_in) - mat_Loads %*% t(mat_Loads))^2)
-mse
-sse
+```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 
-mat_sig_eigvecs <- list_sigs[[2]]
-n_sigs <- ncol(mat_sig_eigvecs)
-mat_eigvecs <- as.matrix(list_sigs[[3]])
-eigvals_sig <- eigvals <- list_sigs[[6]]
-eigvals <- list_sigs[[7]]
-ones_vec <- rep(1, nrow(mat_eigvecs))
-mat_sig_eigvecs_aug <- cbind(mat_sig_eigvecs, ones_vec)
+list_out <- signals_from_noise(mat_PCA_in,
+                               eigenvalue_density_plot = F,
+                               signals_plot = F,
+                               pca_var_plot = F,
+                               pca_ind_plot = F,
+                               list_groups = list_groups,
+                               group_names = group_names,
+                               quietly = F)
+mat_loads_sig_test <- list_out[[1]]
+mat_loads_rot_sig_test <- list_out[[2]]
+mat_pctDiff_sig_test <- mat_pctDiff_test %*% mat_loads_rot_sig_test
+mat_loads_rot_sig_normd <- apply(mat_loads_rot_sig, 2, function(x) x / sum(x))
+mat_eigenportfolio_test <- mat_pctDiff_test %*% mat_loads_rot_sig_normd
+
 
 ```
+
 
 
 
 
 ```{r, fig.width=13, fig.height=11, fig.align='center', echo=FALSE}
-
+mse <- mean((cor(mat_pctDiff_train) - mat_loads_sig_train %*% t(mat_loads_sig_train))^2)
+mse
+# sse <- sum((cor(mat_PCA_in) - mat_loads_sig_train %*% t(mat_loads_sig_train))^2)
+# sse
 #-----------------------------------------------
-ret_targ <- 0.01
+# Conventional optimization
+n_signals <- ncol(mat_loads_sig_train)
+n_vars <- nrow(mat_loads_sig_train)
+ret_targ <- 0.002
 C_targ <- 1
 targ_vec <- c(ret_targ, C_targ)
-nab_C <- rep(1, nrow(mat_sig_eigvecs))
-nab_C_sigs <- rep(1, n_sigs)
-#-----------------------------------------------
+nab_C <- rep(1, n_vars)
 cormat <- cor(mat_pctDiff_train)
-mat_nab <- cbind(nab_mu_ret_in, nab_C)
+#cormat <- round(mat_loads_sig %*% t(mat_loads_sig), 7)
+nab_mu_ret_train <- colMeans(mat_pctDiff_train)
+#nab_mu_ret_train <- mat_eigvecs_sig_train %*% eigvals_sig_train #rep(1, n_signals)
+mat_nab <- cbind(nab_mu_ret_train, nab_C)
 #mat_nab <- nab_mu_ret_in
-list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_test)
+list_out <- optimize_portfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_test)
 wStar_conv <- list_out[[1]]
 lambdas_conv <- list_out[[2]]
 ts_wStar_conv <- list_out[[3]]
@@ -972,21 +769,25 @@ wStar_conv_e <- exp(wStar_conv) / sum(exp(wStar_conv))
 ts_wStar_conv_e <- mat_pctDiff_test %*% wStar_conv_e
 sd_conv_e <- NA#sqrt(t(wStar_conv_e) %*% cormat %*% wStar_conv_e)
 #-----------------------------------------------
-cormat <- cor(mat_pctDiff_train_sig)
-mat_nab <- cbind(nab_mu_ret_sigs, nab_C_sigs)
-#mat_nab <- cbind(nab_mu_ret_sigs)
-list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_test_sig)
+# Optimization only over signals
+#mat_pctDiff_sig_train <- mat_pctDiff_train %*% mat_loads_sig_train
+mat_pctDiff_sig_train <- mat_pctDiff_train %*% mat_loads_rot_sig_train
+nab_mu_ret_sigs_train <- colMeans(mat_pctDiff_sig_train)
+nab_C_sigs <- rep(1, n_signals)
+cormat <- cor(mat_pctDiff_sig_train)
+mat_nab <- cbind(nab_mu_ret_sigs_train, nab_C_sigs)
+list_out <- optimize_portfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_sig_test)
 wStar_sigs <- list_out[[1]]
 lambdas_sigs <- list_out[[2]]
 ts_wStar_sigs <- list_out[[3]]
 wStar_sigs_e <- exp(wStar_sigs) / sum(exp(wStar_sigs))
-ts_wStar_sigs_e <- mat_pctDiff_test_sig %*% wStar_sigs_e
+ts_wStar_sigs_e <- mat_pctDiff_sig_test %*% wStar_sigs_e
 sd_sigs_e <- NA#sqrt(t(wStar_sigs_e) %*% cormat %*% wStar_sigs_e)
 #-----------------------------------------------
 # Backtesting
 #-----------------------------------------------
 mat_comp_ts <- cbind(ts_avg_test, ts_wStar_conv_e, ts_wStar_sigs_e, mat_eigenportfolio_test)
-colnames(mat_comp_ts) <- c("Average", "Opt conv", "Opt sigs", paste("Eigenportfolio", 1:n_sigs))
+colnames(mat_comp_ts) <- c("Average", "Opt conv", "Opt sigs", paste("Eigenportfolio", 1:n_signals))
 
 mat_comp_ts_perform <- apply(mat_comp_ts, 2, function(x) x - mat_comp_ts[, 1])
 #df_plot <- data.frame(Date = date_vec_test, mat_comp_ts_perform)
@@ -1010,7 +811,7 @@ mu_ret <- colMeans(mat_comp_ts)
 sum_ret <- colSums(mat_comp_ts)
 sd_ret <- apply(mat_comp_ts, 2, sd)
 cv_ret <- sd_ret / mu_ret
-sd_eigprtf_vec <- diag(sqrt(t(mat_Loads_rot_normd) %*% cor(mat_pctDiff_train) %*% mat_Loads_rot_normd))
+sd_eigprtf_vec <- diag(sqrt(t(mat_loads_rot_sig_normd) %*% cor(mat_pctDiff_train) %*% mat_loads_rot_sig_normd))
 sd_ret_calc <- c(NA, sd_conv_e, sd_sigs_e, sd_eigprtf_vec)
 knitr::kable(data.frame(n_positive, sum_ret, mu_ret, cv_ret, sd_ret, sd_ret_calc))
 #------------
@@ -1067,9 +868,9 @@ for(i in 1:length(Rtarg_vec)){
   #-----------------------------------------------
   cormat <- cor(mat_pctDiff_train)
   #cormat <- round(mat_Loads %*% t(mat_Loads), 7)
-  mat_nab <- cbind(nab_mu_ret_in, nab_C)
+  mat_nab <- cbind(nab_mu_ret_train, nab_C)
   #mat_nab <- cbind(nab_mu_ret_in)
-  list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_test)
+  list_out <- optimize_portfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_test)
   wStar_conv <- list_out[[1]]
   lambdas_conv <- list_out[[2]]
   ts_wStar_conv <- list_out[[3]]
@@ -1086,10 +887,10 @@ for(i in 1:length(Rtarg_vec)){
   backtest_muRet_conv_e_vec[i] <- mean(ts_wStar_conv_e)
   backtest_sdRet_conv_e_vec[i] <- sd(ts_wStar_conv_e)
   #-----------------------------------------------
-  cormat <- cor(mat_pctDiff_train_sig)
-  mat_nab <- cbind(nab_mu_ret_sigs, nab_C_sigs)
+  cormat <- cor(mat_pctDiff_sig_train)
+  mat_nab <- cbind(nab_mu_ret_sigs_train, nab_C_sigs)
   #mat_nab <- cbind(nab_mu_ret_sigs)
-  list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_test_sig)
+  list_out <- optimize_portfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_sig_test)
   wStar_sigs <- list_out[[1]]
   lambdas_sigs <- list_out[[2]]
   ts_wStar_sigs <- list_out[[3]]
@@ -1101,7 +902,7 @@ for(i in 1:length(Rtarg_vec)){
   backtest_muRet_sigs_vec[i] <- mean(ts_wStar_sigs)
   backtest_sdRet_sigs_vec[i] <- sd(ts_wStar_sigs)
   wStar_sigs_e <- exp(wStar_sigs) / sum(exp(wStar_sigs))
-  ts_wStar_sigs_e <- mat_pctDiff_test_sig %*% wStar_sigs_e
+  ts_wStar_sigs_e <- mat_pctDiff_sig_test %*% wStar_sigs_e
   wStar_sigs_e_list[[i]] <- wStar_sigs_e
   backtest_muRet_sigs_e_vec[i] <- mean(ts_wStar_sigs_e)
   backtest_sdRet_sigs_e_vec[i] <- sd(ts_wStar_sigs_e)
@@ -1120,7 +921,7 @@ gg <- gg + geom_point()
 gg
 
 
-df_x1 <- data.frame(R = Rtarg_vec,Conventional = backtest_muRet_conv_e_vec, Experiment = backtest_muRet_sigs_e_vec)
+df_x1 <- data.frame(R = Rtarg_vec, Conventional = backtest_muRet_conv_e_vec, Experiment = backtest_muRet_sigs_e_vec)
 df_x1 <- df_x1 %>% gather(Type, Backtest_mu, Conventional:Experiment)
 df_x2 <- data.frame(R = Rtarg_vec, Conventional = backtest_sdRet_conv_vec, Experiment = backtest_sdRet_sigs_vec)
 df_x2 <- df_x2 %>% gather(Type, Backtest_sd, Conventional:Experiment)
@@ -1165,7 +966,7 @@ df_look$Experiment / df_look$Return
 
 
 df_wStack <- data.frame(sd = NA, R = NA, Security = NA, w = NA)
-for(i in 1:length(Rtarg_vec)){df_wStack <- rbind(df_wStack, data.frame(sd = backtest_sdRet_sigs_e_vec[i], R = Rtarg_vec[i], Security = as.character(c(1:n_sigs)), w = c(wStar_sigs_e_list[[i]])))}
+for(i in 1:length(Rtarg_vec)){df_wStack <- rbind(df_wStack, data.frame(sd = backtest_sdRet_sigs_e_vec[i], R = Rtarg_vec[i], Security = as.character(c(1:n_signals)), w = c(wStar_sigs_e_list[[i]])))}
 df_wStack <- df_wStack[-1, ]
 
 
@@ -1264,7 +1065,7 @@ environmental_indicators <- c("CO2 emissions (metric tons per capita)",
                               "Adjusted savings: mineral depletion (% of GNI)",
                               "Adjusted savings: energy depletion (% of GNI)",
                               "Level of water stress: freshwater withdrawal as a proportion of available freshwater resources",
-                              "Access to clean fuels and technologies for cooking (% of population)",
+                              #"Access to clean fuels and technologies for cooking (% of population)",
                               "Renewable internal freshwater resources per capita (cubic meters)"
                               #"Water productivity, total (constant 2010 US$ GDP per cubic meter of total freshwater withdrawal)"
 )
@@ -1332,33 +1133,34 @@ peaceHRights_indicators <- c("Military expenditure (% of GDP)",
                              "School enrollment, primary (gross), gender parity index (GPI)",
                              "School enrollment, primary and secondary (gross), gender parity index (GPI)",
                              "School enrollment, secondary (gross), gender parity index (GPI)",
-                             "School enrollment, tertiary (gross), gender parity index (GPI)"  
+                             "School enrollment, tertiary (gross), gender parity index (GPI)",
+                             "Income share held by lowest 20%"
 )
 #-------------------------------------------------------------
-economic_equality_indicators <- c("Consumer price index (2010 = 100)",
-                                  "Income share held by lowest 10%",
-                                  "Income share held by lowest 20%",
-                                  #"GINI index (World Bank estimate)",
-                                  "Risk premium on lending (lending rate minus treasury bill rate, %)",
-                                  #"Poverty gap at $1.90 a day (2011 PPP) (%)",
-                                  "Poverty headcount ratio at $1.90 a day (2011 PPP) (% of population)",
-                                  "Number of people pushed below the $1.90 ($ 2011 PPP) poverty line by out-of-pocket health care expenditure",
-                                  "Number of people pushed below the $3.10 ($ 2011 PPP) poverty line by out-of-pocket health care expenditure",
-                                  "Number of people spending more than 10% of household consumption or income on out-of-pocket health care expenditure",
-                                  "Number of people spending more than 25% of household consumption or income on out-of-pocket health care expenditure",
-                                  "Mortality rate attributed to unsafe water, unsafe sanitation and lack of hygiene (per 100,000 population)",
-                                  "People using at least basic sanitation services (% of population)",
-                                  "People using at least basic sanitation services, rural (% of rural population)",
-                                  "People using at least basic sanitation services, urban (% of urban population)",
-                                  "People using safely managed sanitation services (% of population)",
-                                  "People using safely managed sanitation services, rural (% of rural population)",
-                                  "People using safely managed sanitation services, urban (% of urban population)",
-                                  "People using at least basic drinking water services (% of population)",
-                                  "People using at least basic drinking water services, rural (% of rural population)",
-                                  "People using at least basic drinking water services, urban (% of urban population)",
-                                  "Labor force with basic education, female (% of female working-age population with basic education)",
-                                  "Labor force with basic education, male (% of male working-age population with basic education)"
-)
+# economic_equality_indicators <- c("Consumer price index (2010 = 100)",
+#                                   "Income share held by lowest 10%",
+#                                   "Income share held by lowest 20%",
+#                                   #"GINI index (World Bank estimate)",
+#                                   "Risk premium on lending (lending rate minus treasury bill rate, %)",
+#                                   #"Poverty gap at $1.90 a day (2011 PPP) (%)",
+#                                   "Poverty headcount ratio at $1.90 a day (2011 PPP) (% of population)",
+#                                   "Number of people pushed below the $1.90 ($ 2011 PPP) poverty line by out-of-pocket health care expenditure",
+#                                   "Number of people pushed below the $3.10 ($ 2011 PPP) poverty line by out-of-pocket health care expenditure",
+#                                   "Number of people spending more than 10% of household consumption or income on out-of-pocket health care expenditure",
+#                                   "Number of people spending more than 25% of household consumption or income on out-of-pocket health care expenditure",
+#                                   "Mortality rate attributed to unsafe water, unsafe sanitation and lack of hygiene (per 100,000 population)",
+#                                   "People using at least basic sanitation services (% of population)",
+#                                   "People using at least basic sanitation services, rural (% of rural population)",
+#                                   "People using at least basic sanitation services, urban (% of urban population)",
+#                                   "People using safely managed sanitation services (% of population)",
+#                                   "People using safely managed sanitation services, rural (% of rural population)",
+#                                   "People using safely managed sanitation services, urban (% of urban population)",
+#                                   "People using at least basic drinking water services (% of population)",
+#                                   "People using at least basic drinking water services, rural (% of rural population)",
+#                                   "People using at least basic drinking water services, urban (% of urban population)",
+#                                   "Labor force with basic education, female (% of female working-age population with basic education)",
+#                                   "Labor force with basic education, male (% of male working-age population with basic education)"
+# )
 #-------------------------------------------------------------
 infrastructure_indicators <- c(#"Access to electricity (% of population)",
   "Access to electricity, urban (% of urban population)",
@@ -1415,16 +1217,16 @@ educ_indicators <- c("Government expenditure on education, total (% of GDP)",
 )
 #-------------------------------------------------------------
 indicator_vec <- c(healthPop_indicators, food_sec_indicators, educ_indicators,
-                   economic_growth_indicators, economic_equality_indicators,
+                   economic_growth_indicators, #economic_equality_indicators,
                    environmental_indicators, peaceHRights_indicators,
                    infrastructure_indicators)
 list_groups <- list(healthPop_indicators, food_sec_indicators, educ_indicators,
-                    economic_growth_indicators, economic_equality_indicators,
+                    economic_growth_indicators, #economic_equality_indicators,
                     environmental_indicators, peaceHRights_indicators,
                     infrastructure_indicators)
 group_names <- c("Health/Population", "Food Security", "Education",
-                 "Economic Growth", "Economic Equality",
-                 "Environmental Sustainability", "Peace and Human Rights", "Infrastructure")
+                 "Economic Growth", #"Economic Equality",
+                 "Environmental Sustainability", "Equality, Peace, Human Rights", "Infrastructure")
 names(list_groups) <- group_names
 #-------------------------------------------------------------
 #"Least developed countries: UN classification"
@@ -1489,7 +1291,7 @@ df_plot$Type[which(df_plot$Indicator %in% economic_growth_indicators)] <- "Econo
 df_plot$Type[which(df_plot$Indicator %in% environmental_indicators)] <- "Environmental Sustainability"
 df_plot$Type[which(df_plot$Indicator %in% food_sec_indicators)] <- "Food Security"
 df_plot$Type[which(df_plot$Indicator %in% infrastructure_indicators)] <- "Infrastructure"
-df_plot$Type[which(df_plot$Indicator %in% peaceHRights_indicators)] <- "Peace and Human Rights"
+df_plot$Type[which(df_plot$Indicator %in% peaceHRights_indicators)] <- "Equality, Peace, Human Rights"
 #------------------------------------------------------------
 # gg <- ggplot(df_plot, aes(x = Year, y = Value, group = Indicator, color = Indicator))
 # gg <- gg + geom_line()
@@ -1521,14 +1323,14 @@ gg <- gg + geom_point(size = 2)
 gg <- gg + labs(title = this_type)
 gg_econ <- gg
 gg
-this_type <- "Economic Equality"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg_employ <- gg
-gg
+# this_type <- "Economic Equality"
+# df_plot2 <- subset(df_plot, Type == this_type)
+# gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+# gg <- gg + geom_line(lwd = 1.1)
+# gg <- gg + geom_point(size = 2)
+# gg <- gg + labs(title = this_type)
+# gg_employ <- gg
+# gg
 this_type <- "Environmental Sustainability"
 df_plot2 <- subset(df_plot, Type == this_type)
 gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
@@ -1553,7 +1355,7 @@ gg <- gg + geom_point(size = 2)
 gg <- gg + labs(title = this_type)
 gg_infrastr <- gg
 gg
-this_type <- "Peace and Human Rights"
+this_type <- "Equality, Peace, Human Rights"
 df_plot2 <- subset(df_plot, Type == this_type)
 gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
 gg <- gg + geom_line(lwd = 1.1)
@@ -1565,21 +1367,27 @@ gg
 
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 #------------------------------------------------------------
+list_out <- signals_from_noise(mat_PCA_in,
+                               eigenvalue_density_plot = T,
+                               signals_plot = T,
+                               pca_var_plot = F,
+                               pca_ind_plot = F,
+                               list_groups = list_groups,
+                               group_names = group_names,
+                               quietly = F)
+#list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_inData_sig, eigvals_sig, mat_eigvecs_sig)
+mat_loads_sig <- list_out[[1]]
+mat_loads_rot_sig <- list_out[[2]]
 
-ind_train <- 1:nrow(mat_PCA_in)
-#ind_test <- setdiff(1:nrow(mat_PCA_in), ind_train)
-mat_pctDiff_train <- mat_PCA_in[ind_train, ]
-#mat_pctDiff_test <- mat_PCA_in[ind_test, ]
-#ts_avg_test <- ts_avg_in[ind_test]
-#date_vec_test <- date_vec[ind_test]
-list_sigs <- Signals_from_noise(mat_pctDiff_train, varimax_rot = T,
-                                list_groups = list_groups,
-                                group_names = group_names,
-                                pca_var_plot = F,
-                                pca_ind_plot = F,
-                                eigenvalue_density_plot = T,
-                                sig_corr_plot = T,
-                                yearly = F)
+
+# list_sigs <- Signals_from_noise(mat_PCA_in, varimax_rot = T,
+#                                 list_groups = list_groups,
+#                                 group_names = group_names,
+#                                 pca_var_plot = F,
+#                                 pca_ind_plot = F,
+#                                 eigenvalue_density_plot = T,
+#                                 sig_corr_plot = T,
+#                                 yearly = F)
 
 # colMeans(df_sigs[, -1])
 # sig_vec <- apply(df_sigs[, -1], 2, sd)
@@ -1588,6 +1396,17 @@ list_sigs <- Signals_from_noise(mat_pctDiff_train, varimax_rot = T,
 
 ```
 
+
+```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
+
+signal_names <- c("")
+interpret_loadings(mat_loads_rot_sig,
+                   list_groups = list_groups,
+                   group_names = group_names,
+                   signal_names = NULL)
+
+
+```
 
 ```{r, fig.width=12, fig.height=4, fig.align='center', echo=FALSE}
 
@@ -1839,6 +1658,199 @@ gg
 
 
 ```{r, echo=F}
+
+Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
+                               list_groups = NULL,
+                               group_names = NULL,
+                               pca_var_plot = F,
+                               pca_ind_plot = F,
+                               eigenvalue_density_plot = F,
+                               loadings_plot = T,
+                               sig_ts_plot = F,
+                               sig_corr_plot = F,
+                               yearly = F){
+  varNames_ordered <- colnames(mat_PCA_in)
+  date_vec <- row.names(mat_PCA_in)
+  if(yearly){date_vec <- as.integer(date_vec)}
+  n_obs <- ncol(mat_PCA_in)
+  #----
+  if(!is.null(list_groups)){
+    group_vec <- rep(NA, n_obs)
+    for(i in 1:length(list_groups)){
+      this_group_vec <- list_groups[[i]]
+      this_group_name <- group_names[i]
+      group_vec[which(varNames_ordered %in% this_group_vec)] <- this_group_name
+
+    }
+  }
+  #----
+  if(pca_ind_plot){
+    res <- FactoMineR::PCA(t(mat_PCA_in), graph = F)
+    gg <- factoextra::fviz_pca_ind(res, habillage = factor(group_vec), addEllipses = T)
+    print(gg)
+  }
+  #----
+  res <- FactoMineR::PCA(mat_PCA_in, ncp = ncol(mat_PCA_in), graph = F)
+  #----
+  if(pca_var_plot){
+    gg <- factoextra::fviz_pca_var(res, habillage = factor(group_vec))
+    print(gg)
+  }
+  # library(mclust)
+  # mc <- Mclust(t(mat_PCA_in))
+  # summary(mc)
+  # View(mc$classification)
+  # factoextra::fviz_cluster(mc, frame.type = "norm", geom = "text")
+  #--Extraction of signals (main PCs)
+  eigvals <- as.data.frame(res$eig)$eigenvalue
+  eigval_max <- max(eigvals)
+  N_t <- nrow(mat_PCA_in)
+  N_c <- ncol(mat_PCA_in)
+  Q <- N_t / N_c
+  s_sq <- 1 - eigval_max / N_c
+  #s_sq <- 1
+  eigval_rand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
+  eigval_rand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
+  lam <- seq(eigval_rand_min, eigval_rand_max, 0.001)
+  dens_rand <- Q / (2 * pi * s_sq) * sqrt((eigval_rand_max - lam) * (lam - eigval_rand_min)) / lam
+  df_e <- data.frame(eigenvalues = eigvals)
+  #--Eigenvalue density vs. random matrix eigenvalue density
+  if(eigenvalue_density_plot){
+    gg <- ggplot()
+    gg <- gg + geom_density(data = df_e, aes(x = eigenvalues, color = "Correlation Matrix"), lwd = 1.1)
+    gg <- gg + geom_line(data = data.frame(x = lam, y = dens_rand), aes(x = x, y = y, color = "Random matrix"), lwd = 1.1)
+    gg <- gg + scale_colour_manual(name = "Eigenvalue density",
+                                   values = c(`Correlation Matrix` = "blue", `Random matrix` = "orange"))
+    print(gg)
+  }
+  #-----------------------------------------
+  ind_deviating_from_noise <- which(eigvals > eigval_rand_max)# (eigval_rand_max + 5 * 10^-1))
+  mat_Loads <- res$var$coord
+  mat_signal_Loads <- mat_Loads[, ind_deviating_from_noise]
+  mat_Loads_rot <- varimax(mat_Loads)[[1]]
+  mat_signal_Loads_rot <- mat_Loads_rot[, ind_deviating_from_noise]
+  mat_eigvecs <-  mat_Loads %*% diag(1 / sqrt(eigvals))
+  eigvals_sig <- eigvals[ind_deviating_from_noise]
+  n_signals <- length(eigvals_sig)
+  print(paste("Number of signals: ", n_signals))
+  mat_signal_eigvecs <- mat_eigvecs[, ind_deviating_from_noise]
+  mat_signal_ts <- mat_PCA_in %*% mat_signal_eigvecs
+  if(n_signals == 1){
+    mat_signal_ts <- mat_signal_ts / eigvals_sig
+  }else{
+    mat_signal_ts <- mat_signal_ts %*% diag(1 / eigvals_sig)
+  }
+  # Set sign of eigenvectors such that they
+  # best conform to the input time series
+  #inData_avg <- mat_PCA_in %*% rep(1, n_obs) * 1 / n_obs
+  inData_avg <- rowMeans(mat_PCA_in)
+  if(n_signals == 1){
+    #sse <- sum((mat_signal_ts - inData_avg)^2)
+    #sse_neg <- sum((-mat_signal_ts - inData_avg)^2)
+    mse <- mean((mat_signal_ts - inData_avg)^2)
+    mse_neg <- mean((-mat_signal_ts - inData_avg)^2)
+    if(mse_neg < mse){
+      mat_signal_eigvecs <- -mat_signal_eigvecs
+      mat_signal_ts <- -mat_signal_ts
+    }
+  }else{
+    for(i in 1:n_signals){
+      # sse <- sum((mat_signal_ts[, i] - inData_avg)^2)
+      # sse_neg <- sum((-mat_signal_ts[, i] - inData_avg)^2)
+      # sse_vec <- c(sse, sse_neg)
+      mse <- mean((mat_signal_ts[, i] - inData_avg)^2)
+      mse_neg <- mean((-mat_signal_ts[, i] - inData_avg)^2)
+      if(mse_neg < mse){
+        mat_signal_eigvecs[, i] <- -mat_signal_eigvecs[, i]
+        mat_signal_ts[, i] <- -mat_signal_ts[, i]
+      }
+    }
+
+  }
+  #------------------------------------------------------------
+  # Plot loadings barcharts
+  if(varimax_rot){
+    df_plot <- data.frame(ts_id = varNames_ordered, mat_signal_Loads_rot)
+  }else{
+    df_plot <- data.frame(ts_id = varNames_ordered, mat_signal_Loads)
+  }
+  signal_id <- paste("Signal", c(1:n_signals))
+  colnames(df_plot)[2:(n_signals + 1)] <- signal_id
+  gathercols <- as.character(signal_id)
+  df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
+  #--
+  if(!is.null(list_groups)){
+    # df_plot$Type <- NA
+    # u <- as.character(df_plot$ts)
+    # for(i in 1:length(list_groups)){
+    #   ind <- which(u %in% list_groups[[i]])
+    #   df_plot$Type[ind] <- group_names[i]
+    # }
+    # df_plot$Type <- as.factor(df_plot$Type)
+    df_plot$Type <- factor(group_vec)
+    xx <- df_plot$Type
+    df_plot$ts_id <- factor(df_plot$ts_id, levels = unique(df_plot$ts_id[order(xx)]))
+    gg <- ggplot(df_plot, aes(x = ts_id, y = Loading, fill = Type))
+  }else{
+    gg <- ggplot(df_plot, aes(x = ts_id, y = Loading))
+  }
+  #--
+  gg <- gg + geom_bar(stat = "identity", position = "dodge")
+  gg <- gg + facet_wrap(~ Signal, nrow = 1)
+  #gg <- gg + labs(title = )
+  gg <- gg + theme(axis.text.y = element_text(face = "bold", size = 10),
+                   axis.text.x = element_text(face = "bold", size = 10),
+                   axis.title.y = element_text(face = "bold", size = 10),
+                   axis.title.x = element_text(face = "bold", size = 10))
+  gg <- gg + coord_equal()
+  # if(N_c <= 50){
+  #   gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
+  #                    axis.title.y = element_blank())
+  # }else{
+  #   gg <- gg + theme(axis.text.x = element_blank(),
+  #                    axis.title.y = element_blank())
+  # }
+  gg <- gg + coord_flip()
+  if(loadings_plot){print(gg)}
+  #---------------------------------
+  # Plot signal ts against average
+  df_plot1 <- data.frame(Date = date_vec, inData_avg)
+  df_plot2 <- data.frame(Date = date_vec, mat_signal_ts)
+  df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
+  df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
+  xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
+  signal_id <- paste("Signal", c(1:n_signals))
+  colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
+  gathercols <- signal_id
+  df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+  gg <- ggplot()
+  gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = inData_avg, group = 1), color = "orange", lwd = 2)
+  gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
+  gg <- gg + scale_x_discrete(breaks = xAxis_labels)
+  gg <- gg + facet_wrap(~ Signal, ncol = 1)
+  gg <- gg + theme(axis.title.y = element_blank())
+  gg
+  if(sig_ts_plot){print(gg)}
+  #--Correlation matrix
+  if(sig_corr_plot){
+    # t(mat_signal_ts) %*% mat_signal_ts
+    # t(mat_signal_eigvecs) %*% mat_signal_eigvecs
+    rcorr_out <- rcorr(mat_signal_ts)
+    cormat <- rcorr_out$r
+    print(cormat)
+    pmat <- rcorr_out$P
+    corrplot(cormat, type="upper", order="hclust", p.mat = pmat, sig.level = 0.01, insig = "blank", tl.col = "black", tl.srt = 45)
+
+  }
+  #---------------------------------
+  df_sig_ts <- data.frame(date = date_vec, ts_sigs = mat_signal_ts)
+  #df_sig_eigvecs <- data.frame(Loadings_sigs_rot = mat_signal_Loads_rot)
+  list_out <- list(df_sig_ts, mat_signal_eigvecs, mat_eigvecs, mat_signal_Loads, mat_signal_Loads_rot, eigvals_sig, eigvals)
+  return(list_out)
+}
+
+
+
 # wStar_normd <- wStar_sig1 / max(abs(wStar_sig1))
 # #w_star_normd <- wStar_trad / max(abs(wStar_trad))
 # varNames_ordered <- colnames(mat_PCA_in)
