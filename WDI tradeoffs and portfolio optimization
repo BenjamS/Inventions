@@ -1,7 +1,7 @@
 ---
 title: "Tradeoffs, risk, and optimization of investments across strategic objectives"
 author: "Ben Schiek"
-date: "July 18, 2019"
+date: "August 4, 2019"
 output:
   pdf_document:
     toc: true
@@ -16,8 +16,8 @@ knitr::opts_chunk$set(echo = FALSE)
 ```
 
 
-## I. Introduction
-### I.i Problem background
+## 1. Introduction
+### 1.1 Problem background
 At the most abstract levels of strategic planning, it is customary for large development agencies and donor organizations to carefully define a manageable number of thematic areas for investment that broadly cover all aspects of development. The 17 Sustainable Development Goals (SDG), for example, are grouped  Persons (poverty reduction and human rights), Environmental Sustainability, Economic Prosperity, Peace, and Alliances ().
 
 * Economic growth
@@ -33,49 +33,53 @@ At the most abstract levels of strategic planning, it is customary for large dev
 
 ...
 
-### Proposed solution
+### 1.2 Proposed solution
 
 In this paper, I propose a method to identify and quantify such tradeoffs in the SDG Tracker historical data. I then combine this with methods from financial analysis to determine a donor's optimal allocation of investments across the indicators given the donor's level of risk tolerance.
 
-#### Eigendecomposition of SDG Tracker data
+#### 1.2.1 Eigendecomposition of SDG Tracker data
 
 The method for identifying and quantifying tradeoffs is based on the eigendecomposition of the correlation matrix of SDG Tracker data. First, signals are separated from noise using a method developed in the analysis of physical systems (). The components of the retained eigenvectors are then interpreted as the magnitude and direction of the influence (a.k.a. "loading" or "score") of each SDG Tracker over the average movement of the dataset. Loadings with opposite signs indicate a tradeoff, while loadings with the same sign are indicative of synergy.
 
 Beyond tradeoffs, this method is also useful for identifying just a few key crosscutting tendencies that are broadly characteristic of the entire dataset. In other words, the loadings on each eigenvector tend to be thematically organized, such that each eigenvector captures a particular aspect of the overall evolution of the system. This effectively reduces the problem of making sense of several dozen complexly interacting indicators to the more mangeable problem of making sense of just a few crosscutting trends.
 
-#### Risk adjusted portfolio optimization
+#### 1.2.2 Risk adjusted portfolio optimization
 
 The identification of tradeoffs and key crosscutting trends is useful in and of itself for stimulating and orienting high level policy discussion. However, longstanding methods used in the analogous decisionmaking context of finance are motivation to aim for more. In particular, a variant of Minimum Variance (MV) analysis can be applied to determine the optimal allocation of a budget across the---potentially several dozen---SDG indicators, given a certain risk tolerance.
 
-It is worth taking a moment to emphasize that this goes far beyond the mere "priority setting", with which many donors, development agencies, and research for development (R4D) institutions may be familiar. The method proposed here, adapted from finance, determines, _precisely_, the portion of the donor's/development agency's/R4D research institution's budget that must be allocated in order to maximize net benefit, given a certain risk tolerance specified by the donor. (The budget can be a budget in the literal sense, or an "attention" or "enthusiasm", etc., budget.)
+It is worth taking a moment to emphasize that this goes far beyond the "priority setting", with which many donors, development agencies, and research for development (R4D) institutions may be familiar. The method proposed here, adapted from finance, determines, _precisely_, the portion of the donor's/development agency's/R4D research institution's budget that must be allocated in order to maximize net benefit, given a certain risk tolerance specified by the donor. (The budget can be a budget in the literal sense, or an "attention" or "enthusiasm", etc., budget.)
 
 MV analysis currently suffers under longstanding methodological issues that severely limit its usefulness in any context, financial or otherwise (). In a nutshell, noise in the data makes accurate estimation of returns and correlations difficult. This means that one is optimizing over a great deal of noise. In the present adaptation of MV analyis, I propose to define the returns vector as a linear combination of the retained correlation matrix eigenvectors. This, in turn, automatically purges the correlation matrix of noisy elements. The problem is then set up for optimization over signal, not noise.
 
-This set-up also results in a structuring of the problem that allows for non-market valuation of each of the cross-cutting tendencies associated with each eigenvector---i.e. it endogenously determines the development agency's implicit willingness to pay for more of this or that cross-cutting tendency. This could be used to determine a given agency's investment preferences based on their observed spending. It could also become important later on in the formation of SDG markets (analogous to carbon markets) and/or initial coin offerings.
+non-market valuation of each of the cross-cutting tendencies associated with each eigenvector---i.e. it endogenously determines the development agency's implicit willingness to pay for more of this or that cross-cutting tendency. This could be used to determine a given agency's investment preferences based on their observed spending. It could also become important later on in the formation of SDG markets (analogous to carbon markets) and/or initial coin offerings.
 
 Many in the international development community may be unfamiliar with MV analysis. To build motivation and intuition for its application in the development context, I first walk through an example of its application in the financial context where it originated.
 
-### Summary of results
+### 1.3 Summary of results
 
 In the SDG Tracker data, three signals are pulled from the noise. Loadings on the first eigenvector are evenly distributed. Loadings on the second eigenvector eigenvector captures agricultural and/or natural resource intensive development, associated with relatively higher emissions and low industrial development, trade, and overall GDP growth.
 ...
 
-## Method
-
-## Data
-
-Yahoo data
-
-WDI data . This is the data that the UN (SDG Tracker) uses to track progress towards SDGs.
-
-## Modified MV analysis in the financial context
-
-The data below are intended to be representative of what a broad-minded investor might have on their radar screen these days, covering a wide range of asset classes.
+Before addressing the problem of tradeoffs and optimization within the motivating context of this paper, it is instructive to first address these issues in the financial context where the methods employed here are rooted.
 
 
-## Mod-MV analysis to determine optimal investments across strategic objectives in the development context
+## 2. Methodological precedents
 
-## Conclusion
+### 2.1 Separating signal from noise
+
+Much of the present work is inspired by two papers in particular. In the first of these, so and so () showed how the important eigenvectors from noisy.... Their work, in turn, is adapted from the work of so and so (), who were interested in identifying the meaningful components of complex physical systems. A key theorem that emerged from this work says that the distribution of the eigenvalues of any random correlation matrix is a function of the dimensions of the underlying matrix (). It is therefore easy to compare the eigenvalue distribution of a given data correlation matrix against that of a randomly generated matrix. The eigenvalues of the data correlation matrix that lie outside of the random matrix eigenvalue distribution can be identified as corresponding to components of the system that can be meaningfully distinguished from noise.
+
+An important implication of the theorem is that signal extraction is as much a function of data quality (i.e. whether there really is structure in the observed system, and how well this is captured in the data) as it is of data quantity. If none or very few of the eigenvalues of a given data correlation matrix can be distinguished from noise, this may be either because there is no structure to be found in the observed system, or because there are not enough observations to fully flesh out the structure. Just as a low resolution image of a person is difficult to distinguish from an image of randomly shaded pixels, underlying structure in the SDG Tracker data may be difficult to discern due to the low number of observations currently available. As resolution (number of observations) increases, the components of the system become more clearly rendered. 
+
+It is surprising that the rigorous extraction method described above has not seen more uptake among data scientists. The problem of signal extraction extends far beyond the specific physical and financial settings addressed by so and so and so and so. It comes up every time someone conducts a principle components analysis (PCA) or factor analysis (FA). Moreover, the extraction methods appearing in published, peer reviewed PCA and FA studies are, by comparison, little more than arbitrary rules of thumb. "Keep only the signals that describe 90% of the variation", for example, or "the elbow rule", or "keep only those with eigenvalues greater than 1". The perils of such cavalier methods have been documented (), and yet they persist. Their persistence is made more perpliexing by the availability---since the 1960s---of the rigorous extraction method described above.
+
+### 2.2 Signal characterization
+
+So and so () did not go on to interpret the signals after presenting their method for extracting them. In the second paper inspiring the present work, so and so () addressed this question .
+
+Here I adapt and combine these two advances into a single workflow.
+
+### 2.3 Minimum variance analysis, and adaptation
 
 $$R = \mathbf{w \cdot r}, \:\:\: C=\mathbf{w\cdot1}, \:\:\: V = \mathbf{w\cdot K \cdot w} \tag{1}$$
 
@@ -122,9 +126,7 @@ $$\mathbf{r} = \tilde{P} \tilde{\Lambda} \cdot \mathbf{1}= \lambda_{1} \mathbf{p
 
 $$K = P \Lambda P' \tag{11}$$
 
-
 $$M = [\tilde{P}, \: \mathbf{1}]' \cdot K^{-1} \cdot [\tilde{P}, \: \mathbf{1}] \tag{12}$$
-
 
 or
 
@@ -142,9 +144,14 @@ $$ -\frac{1}{2 \gamma_v}[\tilde{P}\tilde{\Lambda}^{-1}, \mathbf{1}] \left[\begin
 $$-\frac{1}{2 \gamma_v}[\tilde{P}\tilde{\Lambda}^{-1}, \mathbf{1}] \cdot \mathbf{\gamma} =  \mathbf{w}^* \tag{5}$$
 
 
+## 3. Data
+
+Yahoo data ...The data below are intended to be representative of what a broad-minded investor might have on their radar screen these days, covering a wide range of asset classes.
+
+WDI data . This is the data that the UN (SDG Tracker) uses to track progress towards SDGs. As mentioned above...low resolution...we are coming to a point where there are enough years of enough variables that we can begin to glimpse the contours of the main components. It will be exciting...as the picture comes slowly into greater and greater focus.
 
 
-```{r, fig.width=10, fig.height=4, fig.align='center', echo = FALSE}
+```{r, fig.width=13, fig.height=11, fig.align='center', echo = FALSE}
 #setwd("D:/OneDrive - CGIAR/Documents")
 #options(warn = -1); options(scipen = 999)
 #-------------------------------------------------------------
@@ -157,197 +164,479 @@ library(factoextra)
 library(Hmisc)
 library(corrplot)
 library(tidyquant)
-#-------------------------------------------------------------
-
-Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
-                               list_tsTypes = NULL,
-                               tsType_names = NULL,
+#=======================================================================
+#=======================================================================
+# Define functions
+#=======================================================================
+signals_from_noise <- function(mat_PCA_in,
+                               eigenvalue_density_plot = T,
+                               signals_plot = T,
                                pca_var_plot = F,
                                pca_ind_plot = F,
-                               eigenvalue_density_plot = F,
-                               sig_corr_plot = F,
-                               yearly = F){
-  col_order <- colnames(mat_PCA_in)
-  date_vec <- row.names(mat_PCA_in)
-  if(yearly){date_vec <- as.integer(date_vec)}
-  n_ts <- ncol(mat_PCA_in)
-  #----
-  if(!is.null(list_tsTypes)){
-    group_vec <- rep(NA, n_ts)
-    for(i in 1:length(list_tsTypes)){
-      this_tsType_vec <- list_tsTypes[[i]]
-      this_tsType_name <- tsType_names[i]
-      group_vec[which(col_order %in% this_tsType_vec)] <- this_tsType_name
+                               list_groups = NULL,
+                               group_names = NULL,
+                               quietly = F){
+  #---------------------------------------------------------
+  # Separate signals from noise
+  #---------------------------------------------------------
+  res <- FactoMineR::PCA(mat_PCA_in, ncp = ncol(mat_PCA_in), graph = F)
+  eigvals <- as.data.frame(res$eig)$eigenvalue
+  eigval_max <- max(eigvals)
+  mat_loads <- res$var$coord
+  mat_loads_rot <- varimax(mat_loads)[[1]]
+  mat_eigvecs <- mat_loads %*% diag(1 / sqrt(eigvals))
+  #---------------------------------------------------------
+  # Apply random matrix theory () to determine eigenvalue distribution of a 
+  # correlation matrix of random data.
+  n_obs <- nrow(res$ind$coord)
+  n_var <- ncol(mat_loads)
+  Q <- n_obs / n_var
+  s_sq <- 1 - eigval_max / n_var
+  #s_sq <- 1
+  eigval_rand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
+  eigval_rand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
+  lam <- seq(eigval_rand_min, eigval_rand_max, 0.001)
+  eigval_rand_density <- Q / (2 * pi * s_sq) * sqrt((eigval_rand_max - lam) * (lam - eigval_rand_min)) / lam
+  df_plot <- data.frame(Eigenvalues = eigvals)
+  #---------------------------------------------------------
+  # Plot eigenvalue density vs. random matrix eigenvalue density
+  if(eigenvalue_density_plot){
+    gg <- ggplot()
+    gg <- gg + geom_density(data = df_plot, aes(x = Eigenvalues, color = "Correlation Matrix"), lwd = 1.1)
+    gg <- gg + geom_line(data = data.frame(x = lam, y = eigval_rand_density), aes(x = x, y = y, color = "Random matrix"), lwd = 1.1)
+    gg <- gg + scale_colour_manual(name = "Eigenvalue density", 
+                                   values = c(`Correlation Matrix` = "blue", `Random matrix` = "magenta"))
+    gg_eigenval_density <- gg
+    if(!signals_plot){print(gg_eigenval_density)}
+  }
+  #---------------------------------------------------------
+  # Which data eigenvalues can be meaningfully distinguished from noise?
+  ind_deviating_from_noise <- which(eigvals > eigval_rand_max) # (eigval_rand_max + 5 * 10^-1))
+  #---------------------------------------------------------
+  # Extract signal loadings matrix from noise
+  #mat_loads_sig_rot <- mat_loads_rot[, ind_deviating_from_noise]
+  mat_loads_sig <- mat_loads[, ind_deviating_from_noise]
+  eigvals_sig <- eigvals[ind_deviating_from_noise]
+  #---------------------------------------------------------
+  n_signals <- length(eigvals_sig)
+  if(!quietly){print(paste("Number of signals: ", n_signals))}
+  #---------------------------------------------------------
+  # Get dimensionally reduced version of original input data
+  mat_eigvecs_sig <- mat_eigvecs[, ind_deviating_from_noise]
+  mat_inData_sig <- mat_PCA_in %*% mat_eigvecs_sig
+  if(n_signals == 1){
+    mat_inData_sig <- mat_inData_sig / eigvals_sig
+  }else{
+    mat_inData_sig <- mat_inData_sig %*% diag(1 / eigvals_sig)
+  }
+  #---------------------------------------------------------
+  # Set sign of eigenvectors such that they
+  # best conform to the input time series
+  inData_avg <- rowMeans(mat_PCA_in)
+  if(n_signals == 1){
+    mse <- mean((mat_inData_sig - inData_avg)^2)
+    mse_neg <- mean((-mat_inData_sig - inData_avg)^2)
+    if(mse_neg < mse){
+      mat_eigvecs <- -mat_eigvecs
+      mat_inData_sig <- -mat_inData_sig
+    }
+  }else{
+    for(i in 1:n_signals){
+      mse <- mean((mat_inData_sig[, i] - inData_avg)^2)
+      mse_neg <- mean((-mat_inData_sig[, i] - inData_avg)^2)
+      if(mse_neg < mse){
+        mat_eigvecs_sig[, i] <- -mat_eigvecs_sig[, i]
+        mat_inData_sig[, i] <- -mat_inData_sig[, i]
+      }
+    }
+    
+  }
+  #---------------------------------------------------------
+  # Other plots:
+  # -Dimensionally reduced plot of data (signal plots)
+  # -Cluster plots (PCA)
+  #---------------------------------------------------------
+  # These plots include grouping info, if available
+  varNames_ordered <- row.names(mat_loads_sig)
+  if(!is.null(list_groups)){
+    group_vec <- rep(NA, n_obs)
+    for(i in 1:length(list_groups)){
+      this_group_vec <- list_groups[[i]]
+      this_group_name <- group_names[i]
+      group_vec[which(varNames_ordered %in% this_group_vec)] <- this_group_name
       
     }
   }
-  #----
+  #---------------------------------------------------------
+  # Plot of signals
+  if(signals_plot){ 
+    if(n_signals == 1){
+      mat_inData_sig <- mat_inData_sig / eigvals_sig
+    }else{
+      mat_inData_sig <- mat_inData_sig %*% diag(1 / eigvals_sig)
+    }
+    #---------------------------------------------------------
+    # Plot signal data against average
+    date_vec <- row.names(mat_PCA_in)
+    df_plot1 <- data.frame(Date = date_vec, inData_avg)
+    df_plot2 <- data.frame(Date = date_vec, mat_inData_sig)
+    df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
+    df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
+    xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
+    signal_id <- paste("Signal", c(1:n_signals))
+    colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
+    gathercols <- signal_id
+    df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+    gg <- ggplot()
+    gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = inData_avg, group = 1), color = "orange", lwd = 2)
+    gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
+    gg <- gg + scale_x_discrete(breaks = xAxis_labels)
+    gg <- gg + facet_wrap(~ Signal, ncol = 1)
+    gg <- gg + theme(axis.title.y = element_blank(),
+                     axis.text.x = element_text(angle = 60))
+    gg_signals <- gg
+    if(!eigenvalue_density_plot){
+      print(gg_signals)
+    }else{
+      gg_together <- ggpubr::ggarrange(gg_eigenval_density, gg_signals, 
+                        #labels = c("A", "B"),
+                        ncol = 2, nrow = 1)
+      print(gg_together)
+    }
+  }
+  #---------------------------------------------------------
+  # PCA cluster plots to examine natural grouping in the data
+  #---------------------------------------------------------
+  # By variable
+  if(pca_var_plot){
+    gg <- factoextra::fviz_pca_var(res, habillage = factor(group_vec))
+    print(gg)
+  }
+  #---------------------------------------------------------
+  # By individual
   if(pca_ind_plot){
     res <- FactoMineR::PCA(t(mat_PCA_in), graph = F)
     gg <- factoextra::fviz_pca_ind(res, habillage = factor(group_vec), addEllipses = T)
     print(gg)
   }
-  #----
-  res <- FactoMineR::PCA(mat_PCA_in, ncp = ncol(mat_PCA_in), graph = F)
-  #----
-  if(pca_var_plot){
-    gg <- factoextra::fviz_pca_var(res, habillage = factor(group_vec))
-    print(gg)
-  }
-  # library(mclust)
-  # mc <- Mclust(t(mat_PCA_in))
+  #---------------------------------------------------------
+  # Cluster plot using Mclust()
+  # mc <- mclust::Mclust(t(mat_PCA_in))
   # summary(mc)
   # View(mc$classification)
   # factoextra::fviz_cluster(mc, frame.type = "norm", geom = "text")
-  #--Extraction of signals (main PCs)
-  lam_cor <- as.data.frame(res$eig)$eigenvalue
-  lamcor_max <- max(lam_cor)
-  N_t <- nrow(mat_PCA_in)
-  N_c <- ncol(mat_PCA_in)
-  Q <- N_t / N_c
-  s_sq <- 1 - lamcor_max / N_c
-  #s_sq <- 1
-  lamrand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
-  lamrand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
-  lam <- seq(lamrand_min, lamrand_max, 0.001)
-  dens_rand <- Q / (2 * pi * s_sq) * sqrt((lamrand_max - lam) * (lam - lamrand_min)) / lam
-  df_e <- data.frame(eigenvalues = lam_cor)
-  #--Eigenvalue density vs. random matrix eigenvalue density
-  if(eigenvalue_density_plot){
-    gg <- ggplot()
-    gg <- gg + geom_density(data = df_e, aes(x = eigenvalues, color = "Correlation Matrix"), lwd = 1.1)
-    gg <- gg + geom_line(data = data.frame(x = lam, y = dens_rand), aes(x = x, y = y, color = "Random matrix"), lwd = 1.1)
-    gg <- gg + scale_colour_manual(name = "Eigenvalue density", 
-                                   values = c(`Correlation Matrix` = "blue", `Random matrix` = "orange"))
-    print(gg)
-  }
-  #-----------------------------------------
-  ind_deviating_from_noise <- which(lam_cor > lamrand_max)# (lamrand_max + 5 * 10^-1))
-  mat_Loads <- res$var$coord
-  mat_signal_Loads <- mat_Loads[, ind_deviating_from_noise]
-  mat_Loads_rot <- varimax(mat_Loads)[[1]]
-  mat_signal_Loads_rot <- mat_Loads_rot[, ind_deviating_from_noise]
-  mat_eigvecs <-  mat_Loads %*% diag(1 / sqrt(lam_cor))
-  lam_signals <- lam_cor[ind_deviating_from_noise]
-  n_signals <- length(lam_signals)
-  print(paste("Number of signals: ", n_signals))
-  mat_signal_eigvecs <- mat_eigvecs[, ind_deviating_from_noise]
-  mat_signal_ts <- mat_PCA_in %*% mat_signal_eigvecs
-  if(n_signals == 1){
-    mat_signal_ts <- mat_signal_ts / lam_signals
-  }else{
-    mat_signal_ts <- mat_signal_ts %*% diag(1 / lam_signals)
-  }
-  # Set sign of eigenvectors such that they
-  # best conform to the input time series
-  #ts_avg <- mat_PCA_in %*% rep(1, n_ts) * 1 / n_ts
-  ts_avg <- rowMeans(mat_PCA_in)
-  if(n_signals == 1){
-    #sse <- sum((mat_signal_ts - ts_avg)^2)
-    #sse_neg <- sum((-mat_signal_ts - ts_avg)^2)
-    mse <- mean((mat_signal_ts - ts_avg)^2)
-    mse_neg <- mean((-mat_signal_ts - ts_avg)^2)
-    if(mse_neg < mse){
-      mat_signal_eigvecs <- -mat_signal_eigvecs
-      mat_signal_ts <- -mat_signal_ts
+  #---------------------------------------------------------
+  list_out <- list(mat_loads_sig, mat_inData_sig, eigvals_sig, mat_eigvecs_sig)
+  return(list_out)
+  
+}
+#=======================================================================
+# plot_signals <- function(mat_PCA_in, mat_eigvecs_sig, eigvecs_sig){
+#   #---------------------------------------------------------
+#   inData_avg <- rowMeans(mat_PCA_in)
+#   n_signals <- length(eigvecs_sig)
+#   mat_inData_sig <- mat_PCA_in %*% mat_eigvecs_sig
+#   if(n_signals == 1){
+#     mat_inData_sig <- mat_inData_sig / eigvals_sig
+#   }else{
+#     mat_inData_sig <- mat_inData_sig %*% diag(1 / eigvals_sig)
+#   }
+#   #---------------------------------------------------------
+#   # Plot signal data against average
+#   date_vec <- row.names(mat_PCA_in)
+#   df_plot1 <- data.frame(Date = date_vec, inData_avg)
+#   df_plot2 <- data.frame(Date = date_vec, mat_inData_sig)
+#   df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
+#   df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
+#   xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
+#   signal_id <- paste("Signal", c(1:n_signals))
+#   colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
+#   gathercols <- signal_id
+#   df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+#   gg <- ggplot()
+#   gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = inData_avg, group = 1), color = "orange", lwd = 2)
+#   gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
+#   gg <- gg + scale_x_discrete(breaks = xAxis_labels)
+#   gg <- gg + facet_wrap(~ Signal, ncol = 1)
+#   gg <- gg + theme(axis.title.y = element_blank(),
+#                    axis.text.x = element_text(angle = 60))
+#   gg
+#   print(gg)
+#   
+# }
+#=======================================================================
+interpret_loadings <- function(mat_loads_sig,
+                               list_groups = NULL,
+                               group_names = NULL,
+                               signal_names = NULL,
+                               rotate = T){
+  #---------------------------------------------------------
+  n_signals <- ncol(mat_loads_sig)
+  varNames_ordered <- row.names(mat_loads_sig)
+  #---------------------------------------------------------
+  # Rotate loadings to facilitate interpretation
+  if(rotate){
+    mat_loads_sig <- varimax(mat_loads_sig)[[1]]
+    mat_loads_sig <- matrix(as.numeric(mat_loads_sig),
+                            attributes(mat_loads_sig)$dim,
+                            dimnames = attributes(mat_loads_sig)$dimnames)
     }
-  }else{
-    for(i in 1:n_signals){
-      # sse <- sum((mat_signal_ts[, i] - ts_avg)^2)
-      # sse_neg <- sum((-mat_signal_ts[, i] - ts_avg)^2)
-      # sse_vec <- c(sse, sse_neg)
-      mse <- mean((mat_signal_ts[, i] - ts_avg)^2)
-      mse_neg <- mean((-mat_signal_ts[, i] - ts_avg)^2)
-      if(mse_neg < mse){
-        mat_signal_eigvecs[, i] <- -mat_signal_eigvecs[, i]
-        mat_signal_ts[, i] <- -mat_signal_ts[, i]
-      }
-    }
-
-  }
   #------------------------------------------------------------
   # Plot loadings barcharts
-  if(varimax_rot){
-      df_plot <- data.frame(ts_id = col_order, mat_signal_Loads_rot)
+  df_plot <- data.frame(id = varNames_ordered, mat_loads_sig)
+  #--------------
+  # Name the signals, if names provided
+  if(is.null(signal_names)){
+    signal_id <- paste("Signal", c(1:n_signals))
   }else{
-      df_plot <- data.frame(ts_id = col_order, mat_signal_Loads)
+    signal_id <- signal_names
   }
-  signal_id <- paste("Signal", c(1:n_signals))
+  #--------------
   colnames(df_plot)[2:(n_signals + 1)] <- signal_id
-  gathercols <- as.character(signal_id)
+  gathercols <- as.character(signal_id) 
   df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
-  #--
-  if(!is.null(list_tsTypes)){
-    # df_plot$Type <- NA
-    # u <- as.character(df_plot$ts)
-    # for(i in 1:length(list_tsTypes)){
-    #   ind <- which(u %in% list_tsTypes[[i]])
-    #   df_plot$Type[ind] <- tsType_names[i]
-    # }
-    # df_plot$Type <- as.factor(df_plot$Type)
+  #--------------
+  # Group the vars if group info is provided
+  if(!is.null(list_groups)){
+    group_vec <- rep(NA, n_obs)
+    for(i in 1:length(list_groups)){
+      this_group_vec <- list_groups[[i]]
+      this_group_name <- group_names[i]
+      group_vec[which(varNames_ordered %in% this_group_vec)] <- this_group_name
+    }
+    #--------------
     df_plot$Type <- factor(group_vec)
     xx <- df_plot$Type
-    df_plot$ts_id <- factor(df_plot$ts_id, levels = unique(df_plot$ts_id[order(xx)]))
-    gg <- ggplot(df_plot, aes(x = ts_id, y = Loading, fill = Type))
+    df_plot$id <- factor(df_plot$id, levels = unique(df_plot$id[order(xx)]))
+    gg <- ggplot(df_plot, aes(x = id, y = Loading, fill = Type))
   }else{
-    gg <- ggplot(df_plot, aes(x = ts_id, y = Loading))
+    gg <- ggplot(df_plot, aes(x = id, y = Loading))
   }
-  #--
   gg <- gg + geom_bar(stat = "identity", position = "dodge")
   gg <- gg + facet_wrap(~ Signal, nrow = 1)
-  #gg <- gg + labs(title = )
   gg <- gg + theme(axis.text.y = element_text(face = "bold", size = 10),
                    axis.text.x = element_text(face = "bold", size = 10),
-                   axis.title.y = element_text(face = "bold", size = 10),
+                   axis.title.y = element_blank(),
                    axis.title.x = element_text(face = "bold", size = 10))
   gg <- gg + coord_equal()
-  # if(N_c <= 50){
-  #   gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
-  #                    axis.title.y = element_blank())
-  # }else{
-  #   gg <- gg + theme(axis.text.x = element_blank(),
-  #                    axis.title.y = element_blank())
-  # }
   gg <- gg + coord_flip()
   print(gg)
-  #---------------------------------
-  # Plot signal ts against average
-  df_plot1 <- data.frame(Date = date_vec, ts_avg)
-  df_plot2 <- data.frame(Date = date_vec, mat_signal_ts)
-  df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
-  df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
-  xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
-  signal_id <- paste("Signal", c(1:n_signals))
-  colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
-  gathercols <- signal_id
-  df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
-  gg <- ggplot()
-  gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = ts_avg, group = 1), color = "orange", lwd = 2)
-  gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
-  gg <- gg + scale_x_discrete(breaks = xAxis_labels)
-  gg <- gg + facet_wrap(~ Signal, ncol = 1)
-  gg <- gg + theme(axis.title.y = element_blank())
-  gg
-  print(gg)
-  #--Correlation matrix
-  if(sig_corr_plot){
-    # t(mat_signal_ts) %*% mat_signal_ts
-    # t(mat_signal_eigvecs) %*% mat_signal_eigvecs
-    rcorr_out <- rcorr(mat_signal_ts)
-    cormat <- rcorr_out$r
-    print(cormat)
-    pmat <- rcorr_out$P
-    corrplot(cormat, type="upper", order="hclust", p.mat = pmat, sig.level = 0.01, insig = "blank", tl.col = "black", tl.srt = 45)
-    
-  }
-  #---------------------------------
-  df_sig_ts <- data.frame(date = date_vec, ts_sigs = mat_signal_ts)
-  #df_sig_eigvecs <- data.frame(Loadings_sigs_rot = mat_signal_Loads_rot)
-  list_out <- list(df_sig_ts, mat_signal_eigvecs, mat_eigvecs, mat_signal_Loads, mat_signal_Loads_rot, lam_signals, lam_cor)
+  
+}
+#=======================================================================
+optimize_portfolio <- function(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL){
+  cormat_inv <- solve(cormat)
+  M <- t(mat_nab) %*% cormat_inv %*% mat_nab
+  M_inv <- solve(M)
+  x <- -2 * M_inv %*% targ_vec
+  l_V <- 1 / x[1]
+  lambdas <- l_V * x
+  wStar <- -1 / (2 * l_V) * cormat_inv %*% mat_nab %*% lambdas
+  sum(wStar)
+  if(!is.null(mat_pctDiff_test)){ts_wStar <- mat_pctDiff_test %*% wStar}else{ts_wStar <- NULL}
+  V <- t(wStar) %*% cormat %*% wStar
+  list_out <- list(wStar, lambdas, ts_wStar, V, l_V)
   return(list_out)
 }
+#=======================================================================
 
 
+#=======================================================================
+#=======================================================================
+#=======================================================================
+
+
+# Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
+#                                list_groups = NULL,
+#                                group_names = NULL,
+#                                pca_var_plot = F,
+#                                pca_ind_plot = F,
+#                                eigenvalue_density_plot = F,
+#                                loadings_plot = T,
+#                                sig_ts_plot = F,
+#                                sig_corr_plot = F,
+#                                yearly = F){
+#   varNames_ordered <- colnames(mat_PCA_in)
+#   date_vec <- row.names(mat_PCA_in)
+#   if(yearly){date_vec <- as.integer(date_vec)}
+#   n_obs <- ncol(mat_PCA_in)
+#   #----
+#   if(!is.null(list_groups)){
+#     group_vec <- rep(NA, n_obs)
+#     for(i in 1:length(list_groups)){
+#       this_group_vec <- list_groups[[i]]
+#       this_group_name <- group_names[i]
+#       group_vec[which(varNames_ordered %in% this_group_vec)] <- this_group_name
+#       
+#     }
+#   }
+#   #----
+#   if(pca_ind_plot){
+#     res <- FactoMineR::PCA(t(mat_PCA_in), graph = F)
+#     gg <- factoextra::fviz_pca_ind(res, habillage = factor(group_vec), addEllipses = T)
+#     print(gg)
+#   }
+#   #----
+#   res <- FactoMineR::PCA(mat_PCA_in, ncp = ncol(mat_PCA_in), graph = F)
+#   #----
+#   if(pca_var_plot){
+#     gg <- factoextra::fviz_pca_var(res, habillage = factor(group_vec))
+#     print(gg)
+#   }
+#   # library(mclust)
+#   # mc <- Mclust(t(mat_PCA_in))
+#   # summary(mc)
+#   # View(mc$classification)
+#   # factoextra::fviz_cluster(mc, frame.type = "norm", geom = "text")
+#   #--Extraction of signals (main PCs)
+#   eigvals <- as.data.frame(res$eig)$eigenvalue
+#   eigval_max <- max(eigvals)
+#   N_t <- nrow(mat_PCA_in)
+#   N_c <- ncol(mat_PCA_in)
+#   Q <- N_t / N_c
+#   s_sq <- 1 - eigval_max / N_c
+#   #s_sq <- 1
+#   eigval_rand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
+#   eigval_rand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
+#   lam <- seq(eigval_rand_min, eigval_rand_max, 0.001)
+#   dens_rand <- Q / (2 * pi * s_sq) * sqrt((eigval_rand_max - lam) * (lam - eigval_rand_min)) / lam
+#   df_e <- data.frame(eigenvalues = eigvals)
+#   #--Eigenvalue density vs. random matrix eigenvalue density
+#   if(eigenvalue_density_plot){
+#     gg <- ggplot()
+#     gg <- gg + geom_density(data = df_e, aes(x = eigenvalues, color = "Correlation Matrix"), lwd = 1.1)
+#     gg <- gg + geom_line(data = data.frame(x = lam, y = dens_rand), aes(x = x, y = y, color = "Random matrix"), lwd = 1.1)
+#     gg <- gg + scale_colour_manual(name = "Eigenvalue density", 
+#                                    values = c(`Correlation Matrix` = "blue", `Random matrix` = "orange"))
+#     print(gg)
+#   }
+#   #-----------------------------------------
+#   ind_deviating_from_noise <- which(eigvals > eigval_rand_max)# (eigval_rand_max + 5 * 10^-1))
+#   mat_Loads <- res$var$coord
+#   mat_signal_Loads <- mat_Loads[, ind_deviating_from_noise]
+#   mat_Loads_rot <- varimax(mat_Loads)[[1]]
+#   mat_signal_Loads_rot <- mat_Loads_rot[, ind_deviating_from_noise]
+#   mat_eigvecs <-  mat_Loads %*% diag(1 / sqrt(eigvals))
+#   eigvals_sig <- eigvals[ind_deviating_from_noise]
+#   n_signals <- length(eigvals_sig)
+#   print(paste("Number of signals: ", n_signals))
+#   mat_signal_eigvecs <- mat_eigvecs[, ind_deviating_from_noise]
+#   mat_signal_ts <- mat_PCA_in %*% mat_signal_eigvecs
+#   if(n_signals == 1){
+#     mat_signal_ts <- mat_signal_ts / eigvals_sig
+#   }else{
+#     mat_signal_ts <- mat_signal_ts %*% diag(1 / eigvals_sig)
+#   }
+#   # Set sign of eigenvectors such that they
+#   # best conform to the input time series
+#   #inData_avg <- mat_PCA_in %*% rep(1, n_obs) * 1 / n_obs
+#   inData_avg <- rowMeans(mat_PCA_in)
+#   if(n_signals == 1){
+#     #sse <- sum((mat_signal_ts - inData_avg)^2)
+#     #sse_neg <- sum((-mat_signal_ts - inData_avg)^2)
+#     mse <- mean((mat_signal_ts - inData_avg)^2)
+#     mse_neg <- mean((-mat_signal_ts - inData_avg)^2)
+#     if(mse_neg < mse){
+#       mat_signal_eigvecs <- -mat_signal_eigvecs
+#       mat_signal_ts <- -mat_signal_ts
+#     }
+#   }else{
+#     for(i in 1:n_signals){
+#       # sse <- sum((mat_signal_ts[, i] - inData_avg)^2)
+#       # sse_neg <- sum((-mat_signal_ts[, i] - inData_avg)^2)
+#       # sse_vec <- c(sse, sse_neg)
+#       mse <- mean((mat_signal_ts[, i] - inData_avg)^2)
+#       mse_neg <- mean((-mat_signal_ts[, i] - inData_avg)^2)
+#       if(mse_neg < mse){
+#         mat_signal_eigvecs[, i] <- -mat_signal_eigvecs[, i]
+#         mat_signal_ts[, i] <- -mat_signal_ts[, i]
+#       }
+#     }
+#     
+#   }
+#   #------------------------------------------------------------
+#   # Plot loadings barcharts
+#   if(varimax_rot){
+#     df_plot <- data.frame(ts_id = varNames_ordered, mat_signal_Loads_rot)
+#   }else{
+#     df_plot <- data.frame(ts_id = varNames_ordered, mat_signal_Loads)
+#   }
+#   signal_id <- paste("Signal", c(1:n_signals))
+#   colnames(df_plot)[2:(n_signals + 1)] <- signal_id
+#   gathercols <- as.character(signal_id)
+#   df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
+#   #--
+#   if(!is.null(list_groups)){
+#     # df_plot$Type <- NA
+#     # u <- as.character(df_plot$ts)
+#     # for(i in 1:length(list_groups)){
+#     #   ind <- which(u %in% list_groups[[i]])
+#     #   df_plot$Type[ind] <- group_names[i]
+#     # }
+#     # df_plot$Type <- as.factor(df_plot$Type)
+#     df_plot$Type <- factor(group_vec)
+#     xx <- df_plot$Type
+#     df_plot$ts_id <- factor(df_plot$ts_id, levels = unique(df_plot$ts_id[order(xx)]))
+#     gg <- ggplot(df_plot, aes(x = ts_id, y = Loading, fill = Type))
+#   }else{
+#     gg <- ggplot(df_plot, aes(x = ts_id, y = Loading))
+#   }
+#   #--
+#   gg <- gg + geom_bar(stat = "identity", position = "dodge")
+#   gg <- gg + facet_wrap(~ Signal, nrow = 1)
+#   #gg <- gg + labs(title = )
+#   gg <- gg + theme(axis.text.y = element_text(face = "bold", size = 10),
+#                    axis.text.x = element_text(face = "bold", size = 10),
+#                    axis.title.y = element_text(face = "bold", size = 10),
+#                    axis.title.x = element_text(face = "bold", size = 10))
+#   gg <- gg + coord_equal()
+#   # if(N_c <= 50){
+#   #   gg <- gg + theme(axis.text.x = element_text(angle = 60, hjust = 1),
+#   #                    axis.title.y = element_blank())
+#   # }else{
+#   #   gg <- gg + theme(axis.text.x = element_blank(),
+#   #                    axis.title.y = element_blank())
+#   # }
+#   gg <- gg + coord_flip()
+#   if(loadings_plot){print(gg)}
+#   #---------------------------------
+#   # Plot signal ts against average
+#   df_plot1 <- data.frame(Date = date_vec, inData_avg)
+#   df_plot2 <- data.frame(Date = date_vec, mat_signal_ts)
+#   df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
+#   df_plot2$Date <- factor(format(df_plot2$Date, format = "%y-%m-%d%"), ordered = T)
+#   xAxis_labels <- df_plot1$Date[seq(1, nrow(df_plot1), length.out = 10)]
+#   signal_id <- paste("Signal", c(1:n_signals))
+#   colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
+#   gathercols <- signal_id
+#   df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
+#   gg <- ggplot()
+#   gg <- gg + geom_line(data = df_plot1, aes(x = Date, y = inData_avg, group = 1), color = "orange", lwd = 2)
+#   gg <- gg + geom_line(data = df_plot2, aes(x = Date, y = Value, group = 1))
+#   gg <- gg + scale_x_discrete(breaks = xAxis_labels)
+#   gg <- gg + facet_wrap(~ Signal, ncol = 1)
+#   gg <- gg + theme(axis.title.y = element_blank())
+#   gg
+#   if(sig_ts_plot){print(gg)}
+#   #--Correlation matrix
+#   if(sig_corr_plot){
+#     # t(mat_signal_ts) %*% mat_signal_ts
+#     # t(mat_signal_eigvecs) %*% mat_signal_eigvecs
+#     rcorr_out <- rcorr(mat_signal_ts)
+#     cormat <- rcorr_out$r
+#     print(cormat)
+#     pmat <- rcorr_out$P
+#     corrplot(cormat, type="upper", order="hclust", p.mat = pmat, sig.level = 0.01, insig = "blank", tl.col = "black", tl.srt = 45)
+#     
+#   }
+#   #---------------------------------
+#   df_sig_ts <- data.frame(date = date_vec, ts_sigs = mat_signal_ts)
+#   #df_sig_eigvecs <- data.frame(Loadings_sigs_rot = mat_signal_Loads_rot)
+#   list_out <- list(df_sig_ts, mat_signal_eigvecs, mat_eigvecs, mat_signal_Loads, mat_signal_Loads_rot, eigvals_sig, eigvals)
+#   return(list_out)
+# }
+
+#=======================================================================
 
 spy_sector_symbs <- c("XLF", "XLC", "XLY", "XLP", "XLV", "XLK", "RWR",
                       "XLU", "XLI", "XBI", "IYT") #"TTEK"
@@ -381,12 +670,12 @@ df_symb_detail <- data.frame(symbol = ts_symb_vec, detail = ts_detail_vec)
 #--
 length(ts_symb_vec)
 #--
-# list_tsTypes <- list(spy_sector_symbs, minerals_symbs, agriculture_symbs, energy_symbs,
+# list_groups <- list(spy_sector_symbs, minerals_symbs, agriculture_symbs, energy_symbs,
 #                      currency_symbs, emerg_mkt_symbs, crypto_symbs, Tbond_symbs)
-list_tsTypes <- list(spy_sector_detail, minerals_detail, agriculture_detail, energy_detail,
-                     currency_detail, emerg_mkt_detail, crypto_detail, Tbond_detail)
-tsType_names <- c("US Sectors", "Minerals", "Agriculture", "Energy", "Major Currency Pairs",
-                  "Emerging Markets", "Cryptocurrencies/Blockchain", "T-Bonds")
+list_groups <- list(spy_sector_detail, minerals_detail, agriculture_detail, energy_detail,
+                    currency_detail, emerg_mkt_detail, crypto_detail, Tbond_detail)
+group_names <- c("US Sectors", "Minerals", "Agriculture", "Energy", "Major Currency Pairs",
+                 "Emerging Markets", "Cryptocurrencies/Blockchain", "T-Bonds")
 #--
 #per_ema <- 13
 #fromdate = Sys.Date() - 360
@@ -447,9 +736,11 @@ df_plot <- data.frame(ts_id = names(mu_ret_dy), mu_ret_dy, mu_ret_wk, mu_ret_mo)
 colnames(df_plot)[-1] <- c("Mean Daily Return", "Mean Weekly Return", "Mean Monthly Return")
 gathercols <- colnames(df_plot)[-1]
 df_plot <- df_plot %>% gather_("Return Type", "Value", gathercols)
-gg <- ggplot(df_plot, aes(Value, fill = `Return Type`))
+#gg <- ggplot(df_plot, aes(Value, fill = `Return Type`))
+gg <- ggplot(df_plot, aes(Value))
 gg <- gg + geom_density(alpha = 0.4)
-#gg <- gg + facet_wrap(~Variable, ncol = 1)
+gg <- gg + facet_wrap(~`Return Type`, nrow = 1, scales = "free")
+#gg <- gg + coord_cartesian(xlim = c(-0.02, 0.02))
 gg
 
 
@@ -471,7 +762,8 @@ date_vec <- row.names(mat_PCA_in)
 #length(date_vec)
 row.names(mat_PCA_in) <- as.character(date_vec)
 colnames(mat_PCA_in) <- as.character(df_symb_detail$detail[order(df_symb_detail$symbol)])
-
+check_on_data <- F
+if(check_on_data){
 df_plot <- as.data.frame(mat_PCA_in)
 gathercols <- colnames(df_plot)
 df_plot$Date <- date_vec
@@ -548,27 +840,76 @@ gg <- gg + geom_line(lwd = 1.1)
 gg <- gg + geom_point(size = 2)
 gg <- gg + labs(title = this_type)
 gg
-
+}
 
 ```
 
 
+## 4. Application to real world data
 
-```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
+### 4.1 An example from the financial context
+
+#### 4.1.1 Extraction of signals from noise
+
+In figure ..., a density plot of the correlation matrix eigenvalues is compared against one of eigenvalues derived from a random matrix. In this plot, it is evident that most eigenvalues are small and cannot be distinguished from noise, but a few extend beyond the random matrix eigenvalue density plot. These correspond to the eigenvectors that can be meaningfully distinguished from noise.
+
+The signal time series are plotted against the data average in figure .... Here it is evident that the first signal reflects the average, while the subsequent signals reflect forces pushing and pulling on the average.
+
+```{r, fig.width=13, fig.height=10, fig.align='center', echo=FALSE}
 ind_train <- 1:round(nrow(mat_PCA_in) * 2 / 3)
 ind_test <- setdiff(1:nrow(mat_PCA_in), ind_train)
 mat_pctDiff_train <- mat_PCA_in[ind_train, ]
 mat_pctDiff_test <- mat_PCA_in[ind_test, ]
 ts_avg_test <- ts_avg_in[ind_test]
 date_vec_test <- date_vec[ind_test]
-list_sigs <- Signals_from_noise(mat_pctDiff_train, varimax_rot = T,
-                                list_tsTypes = list_tsTypes,
-                                tsType_names = tsType_names,
-                                pca_var_plot = F,
-                                pca_ind_plot = F,
-                                eigenvalue_density_plot = T,
-                                sig_corr_plot = T,
-                                yearly = F)
+
+list_out <- signals_from_noise(mat_pctDiff_train,
+                               eigenvalue_density_plot = T,
+                               signals_plot = T,
+                               pca_var_plot = F,
+                               pca_ind_plot = F,
+                               list_groups = list_groups,
+                               group_names = group_names,
+                               quietly = F)
+mat_loads_sig <- list_out[[1]]
+
+```
+
+
+#### 4.1.2 Interpretation and characterization of the signals
+
+Average, mostly US sectors and.... Signal two 
+
+```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
+
+signal_names <- c("")
+interpret_loadings(mat_loads_sig,
+                   list_groups = list_groups,
+                   group_names = group_names,
+                   signal_names = NULL,#signal_names,
+                   rotate = T)
+```
+
+
+#### 4.1.3 
+
+```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
+# ind_train <- 1:round(nrow(mat_PCA_in) * 2 / 3)
+# ind_test <- setdiff(1:nrow(mat_PCA_in), ind_train)
+# mat_pctDiff_train <- mat_PCA_in[ind_train, ]
+# mat_pctDiff_test <- mat_PCA_in[ind_test, ]
+# ts_avg_test <- ts_avg_in[ind_test]
+# date_vec_test <- date_vec[ind_test]
+# list_sigs <- Signals_from_noise(mat_pctDiff_train, varimax_rot = T,
+#                                 list_groups = list_groups,
+#                                 group_names = group_names,
+#                                 pca_var_plot = F,
+#                                 pca_ind_plot = F,
+#                                 eigenvalue_density_plot = T,
+#                                 loadings_plot = F,
+#                                 sig_ts_plot = F,
+#                                 sig_corr_plot = F,
+#                                 yearly = F)
 
 
 ```
@@ -576,7 +917,7 @@ list_sigs <- Signals_from_noise(mat_pctDiff_train, varimax_rot = T,
 
 ```{r, echo=F}
 
-# list(df_sig_ts, mat_sig_eigvecs, mat_eigvecs, mat_signal_Loads, mat_signal_Loads_rot, lam_signals, lam_cor, mat_eigvecs)
+# list(df_sig_ts, mat_sig_eigvecs, mat_eigvecs, mat_signal_Loads, mat_signal_Loads_rot, eigvals_sig, eigvals, mat_eigvecs)
 mat_Loads <- list_sigs[[4]]
 mat_Loads_rot <- list_sigs[[5]]
 mat_Loads_rot_normd <- apply(mat_Loads_rot, 2, function(x) x / sum(x))
@@ -612,20 +953,6 @@ mat_sig_eigvecs_aug <- cbind(mat_sig_eigvecs, ones_vec)
 
 ```{r, fig.width=13, fig.height=11, fig.align='center', echo=FALSE}
 
-optimizePortfolio <- function(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL){
-  cormat_inv <- solve(cormat)
-  M <- t(mat_nab) %*% cormat_inv %*% mat_nab
-  M_inv <- solve(M)
-  x <- -2 * M_inv %*% targ_vec
-  l_V <- 1 / x[1]
-  lambdas <- l_V * x
-  wStar <- -1 / (2 * l_V) * cormat_inv %*% mat_nab %*% lambdas
-  sum(wStar)
-  if(!is.null(mat_pctDiff_test)){ts_wStar <- mat_pctDiff_test %*% wStar}else{ts_wStar <- NULL}
-  V <- t(wStar) %*% cormat %*% wStar
-  list_out <- list(wStar, lambdas, ts_wStar, V, l_V)
-  return(list_out)
-}
 #-----------------------------------------------
 ret_targ <- 0.01
 C_targ <- 1
@@ -734,55 +1061,55 @@ backtest_sdRet_conv_e_vec <- c()
 wStar_conv_e_list <- list()
 Rtarg_vec <- seq(0.001, 0.01, length.out = 50)
 for(i in 1:length(Rtarg_vec)){
-this_Rtarg <- Rtarg_vec[i]
-targ_vec <- c(this_Rtarg, C_targ)
-#targ_vec <- c(this_Rtarg)
-#-----------------------------------------------
-cormat <- cor(mat_pctDiff_train)
-#cormat <- round(mat_Loads %*% t(mat_Loads), 7)
-mat_nab <- cbind(nab_mu_ret_in, nab_C)
-#mat_nab <- cbind(nab_mu_ret_in)
-list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_test)
-wStar_conv <- list_out[[1]]
-lambdas_conv <- list_out[[2]]
-ts_wStar_conv <- list_out[[3]]
-V_conv <- list_out[[4]]
-lV_conv <- list_out[[5]]
-V_conv_vec[i] <- V_conv
-lV_conv_vec[i] <- lV_conv
-wStar_conv_list[[i]] <- wStar_conv
-backtest_muRet_conv_vec[i] <- mean(ts_wStar_conv)
-backtest_sdRet_conv_vec[i] <- sd(ts_wStar_conv)
-wStar_conv_e <- exp(wStar_conv) / sum(exp(wStar_conv))
-ts_wStar_conv_e <- mat_pctDiff_test %*% wStar_conv_e
-wStar_conv_e_list[[i]] <- wStar_conv_e
-backtest_muRet_conv_e_vec[i] <- mean(ts_wStar_conv_e)
-backtest_sdRet_conv_e_vec[i] <- sd(ts_wStar_conv_e)
-#-----------------------------------------------
-cormat <- cor(mat_pctDiff_train_sig)
-mat_nab <- cbind(nab_mu_ret_sigs, nab_C_sigs)
-#mat_nab <- cbind(nab_mu_ret_sigs)
-list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_test_sig)
-wStar_sigs <- list_out[[1]]
-lambdas_sigs <- list_out[[2]]
-ts_wStar_sigs <- list_out[[3]]
-V_sigs <- list_out[[4]]
-lV_sigs <- list_out[[5]]
-V_sigs_vec[i] <- V_sigs
-lV_sigs_vec[i] <- lV_sigs
-wStar_sigs_list[[i]] <- wStar_sigs
-backtest_muRet_sigs_vec[i] <- mean(ts_wStar_sigs)
-backtest_sdRet_sigs_vec[i] <- sd(ts_wStar_sigs)
-wStar_sigs_e <- exp(wStar_sigs) / sum(exp(wStar_sigs))
-ts_wStar_sigs_e <- mat_pctDiff_test_sig %*% wStar_sigs_e
-wStar_sigs_e_list[[i]] <- wStar_sigs_e
-backtest_muRet_sigs_e_vec[i] <- mean(ts_wStar_sigs_e)
-backtest_sdRet_sigs_e_vec[i] <- sd(ts_wStar_sigs_e)
-#-----------------------------------------------
-# print(lambdas_conv[2])
-# print(lambdas_sigs[2])
-# print(lV_conv)
-# print(lV_sigs)
+  this_Rtarg <- Rtarg_vec[i]
+  targ_vec <- c(this_Rtarg, C_targ)
+  #targ_vec <- c(this_Rtarg)
+  #-----------------------------------------------
+  cormat <- cor(mat_pctDiff_train)
+  #cormat <- round(mat_Loads %*% t(mat_Loads), 7)
+  mat_nab <- cbind(nab_mu_ret_in, nab_C)
+  #mat_nab <- cbind(nab_mu_ret_in)
+  list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_test)
+  wStar_conv <- list_out[[1]]
+  lambdas_conv <- list_out[[2]]
+  ts_wStar_conv <- list_out[[3]]
+  V_conv <- list_out[[4]]
+  lV_conv <- list_out[[5]]
+  V_conv_vec[i] <- V_conv
+  lV_conv_vec[i] <- lV_conv
+  wStar_conv_list[[i]] <- wStar_conv
+  backtest_muRet_conv_vec[i] <- mean(ts_wStar_conv)
+  backtest_sdRet_conv_vec[i] <- sd(ts_wStar_conv)
+  wStar_conv_e <- exp(wStar_conv) / sum(exp(wStar_conv))
+  ts_wStar_conv_e <- mat_pctDiff_test %*% wStar_conv_e
+  wStar_conv_e_list[[i]] <- wStar_conv_e
+  backtest_muRet_conv_e_vec[i] <- mean(ts_wStar_conv_e)
+  backtest_sdRet_conv_e_vec[i] <- sd(ts_wStar_conv_e)
+  #-----------------------------------------------
+  cormat <- cor(mat_pctDiff_train_sig)
+  mat_nab <- cbind(nab_mu_ret_sigs, nab_C_sigs)
+  #mat_nab <- cbind(nab_mu_ret_sigs)
+  list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_test_sig)
+  wStar_sigs <- list_out[[1]]
+  lambdas_sigs <- list_out[[2]]
+  ts_wStar_sigs <- list_out[[3]]
+  V_sigs <- list_out[[4]]
+  lV_sigs <- list_out[[5]]
+  V_sigs_vec[i] <- V_sigs
+  lV_sigs_vec[i] <- lV_sigs
+  wStar_sigs_list[[i]] <- wStar_sigs
+  backtest_muRet_sigs_vec[i] <- mean(ts_wStar_sigs)
+  backtest_sdRet_sigs_vec[i] <- sd(ts_wStar_sigs)
+  wStar_sigs_e <- exp(wStar_sigs) / sum(exp(wStar_sigs))
+  ts_wStar_sigs_e <- mat_pctDiff_test_sig %*% wStar_sigs_e
+  wStar_sigs_e_list[[i]] <- wStar_sigs_e
+  backtest_muRet_sigs_e_vec[i] <- mean(ts_wStar_sigs_e)
+  backtest_sdRet_sigs_e_vec[i] <- sd(ts_wStar_sigs_e)
+  #-----------------------------------------------
+  # print(lambdas_conv[2])
+  # print(lambdas_sigs[2])
+  # print(lV_conv)
+  # print(lV_sigs)
 }
 
 df_plot <- data.frame(Return = Rtarg_vec, Conventional = sqrt(V_conv_vec), Experiment = sqrt(V_sigs_vec))
@@ -863,16 +1190,17 @@ gg
 
 
 
+## Example 2: Mod-MV analysis to determine optimal investments across strategic objectives in the development context
 
 
 
-Little or no care is taken, however, to address the tradeoffs that exist between investments in each of these thematic areas. It is well known, for example, that agriculture is often detrimental to the environment. This implies a tradeoff between the food security and environmental objectives. Economic growth, in its turn, is inversely related to both agricultural and environmental objectives. In many parts of the world, there is also a longstanding tradeoff between economic growth and economic equality. Investments in one thematic area can thus offset returns to investments in other thematic areas.
+<!-- Little or no care is taken, however, to address the tradeoffs that exist between investments in each of these thematic areas. It is well known, for example, that agriculture is often detrimental to the environment. This implies a tradeoff between the food security and environmental objectives. Economic growth, in its turn, is inversely related to both agricultural and environmental objectives. In many parts of the world, there is also a longstanding tradeoff between economic growth and economic equality. Investments in one thematic area can thus offset returns to investments in other thematic areas. -->
 
-Moreover, conventional
+<!-- Moreover, conventional -->
 
-### I.ii Proposed solution: a PCA approach
+<!-- ### I.ii Proposed solution: a PCA approach -->
 
-In this concept note, I propose a rigorous, precise method for identifying and quantifying tradeoffs and synergies between strategic objectives (SOs). The method is based on principle components analysis (PCA) of a large dataset of development indicators spanning the usual thematic areas. (For a good overview of PCA, see Abdi & Williams (2010).) A variant of this approach has been applied in the analysis of financial market time series (Gopikrishnan et al., 2001). Here I enhance such precedents by also leveraging a rigorous signal selecting technique developed in the study of physical systems (Dehesa et al., 1983).
+<!-- In this concept note, I propose a rigorous, precise method for identifying and quantifying tradeoffs and synergies between strategic objectives (SOs). The method is based on principle components analysis (PCA) of a large dataset of development indicators spanning the usual thematic areas. (For a good overview of PCA, see Abdi & Williams (2010).) A variant of this approach has been applied in the analysis of financial market time series (Gopikrishnan et al., 2001). Here I enhance such precedents by also leveraging a rigorous signal selecting technique developed in the study of physical systems (Dehesa et al., 1983). -->
 
 
 ```{r, echo=FALSE}
@@ -1090,14 +1418,14 @@ indicator_vec <- c(healthPop_indicators, food_sec_indicators, educ_indicators,
                    economic_growth_indicators, economic_equality_indicators,
                    environmental_indicators, peaceHRights_indicators,
                    infrastructure_indicators)
-list_tsTypes <- list(healthPop_indicators, food_sec_indicators, educ_indicators,
-                     economic_growth_indicators, economic_equality_indicators,
-                     environmental_indicators, peaceHRights_indicators,
-                     infrastructure_indicators)
-tsType_names <- c("Health/Population", "Food Security", "Education",
-                  "Economic Growth", "Economic Equality",
-                  "Environmental Sustainability", "Peace and Human Rights", "Infrastructure")
-names(list_tsTypes) <- tsType_names
+list_groups <- list(healthPop_indicators, food_sec_indicators, educ_indicators,
+                    economic_growth_indicators, economic_equality_indicators,
+                    environmental_indicators, peaceHRights_indicators,
+                    infrastructure_indicators)
+group_names <- c("Health/Population", "Food Security", "Education",
+                 "Economic Growth", "Economic Equality",
+                 "Environmental Sustainability", "Peace and Human Rights", "Infrastructure")
+names(list_groups) <- group_names
 #-------------------------------------------------------------
 #"Least developed countries: UN classification"
 #"Sub-Saharan Africa (excluding high income)"
@@ -1245,8 +1573,8 @@ mat_pctDiff_train <- mat_PCA_in[ind_train, ]
 #ts_avg_test <- ts_avg_in[ind_test]
 #date_vec_test <- date_vec[ind_test]
 list_sigs <- Signals_from_noise(mat_pctDiff_train, varimax_rot = T,
-                                list_tsTypes = list_tsTypes,
-                                tsType_names = tsType_names,
+                                list_groups = list_groups,
+                                group_names = group_names,
                                 pca_var_plot = F,
                                 pca_ind_plot = F,
                                 eigenvalue_density_plot = T,
@@ -1297,14 +1625,14 @@ ones_vec <- rep(1, nrow(mat_eigvecs))
 mat_sig_eigvecs_aug <- cbind(mat_sig_eigvecs, ones_vec)
 
 #------------------------------------------------------------
-# df_plot1 <- data.frame(Year = as.integer(names(ts_avg)), ts_avg)
-# df_plot2 <- data.frame(Year = as.integer(names(ts_avg)), mat_signal_ts)
+# df_plot1 <- data.frame(Year = as.integer(names(inData_avg)), inData_avg)
+# df_plot2 <- data.frame(Year = as.integer(names(inData_avg)), mat_signal_ts)
 # signal_id <- paste("Signal", c(1:n_signals))
 # colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
 # gathercols <- signal_id
 # df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
 # gg <- ggplot()
-# gg <- gg + geom_line(data = df_plot1, aes(x = Year, y = ts_avg), color = "orange", lwd = 1.2)
+# gg <- gg + geom_line(data = df_plot1, aes(x = Year, y = inData_avg), color = "orange", lwd = 1.2)
 # gg <- gg + geom_line(data = df_plot2, aes(x = Year, y = Value))
 # gg <- gg + facet_wrap(~ Signal, nrow = 1)
 # gg <- gg + theme(axis.title.y = element_blank())
@@ -1368,55 +1696,55 @@ backtest_sdRet_conv_e_vec <- c()
 wStar_conv_e_list <- list()
 Rtarg_vec <- seq(0.001, 0.01, length.out = 50)
 for(i in 1:length(Rtarg_vec)){
-this_Rtarg <- Rtarg_vec[i]
-targ_vec <- c(this_Rtarg, C_targ)
-#targ_vec <- c(this_Rtarg)
-#-----------------------------------------------
-cormat <- round(cor(mat_pctDiff_train), 7)
-#cormat <- round(mat_Loads %*% t(mat_Loads), 7)
-mat_nab <- cbind(nab_mu_ret_in, nab_C)
-#mat_nab <- cbind(nab_mu_ret_in)
-list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL)
-wStar_conv <- list_out[[1]]
-lambdas_conv <- list_out[[2]]
-#ts_wStar_conv <- list_out[[3]]
-V_conv <- list_out[[4]]
-lV_conv <- list_out[[5]]
-V_conv_vec[i] <- V_conv
-lV_conv_vec[i] <- lV_conv
-wStar_conv_list[[i]] <- wStar_conv
-#backtest_muRet_conv_vec[i] <- mean(ts_wStar_conv)
-#backtest_sdRet_conv_vec[i] <- sd(ts_wStar_conv)
-wStar_conv_e <- exp(wStar_conv) / sum(exp(wStar_conv))
-#ts_wStar_conv_e <- mat_pctDiff_test %*% wStar_conv_e
-wStar_conv_e_list[[i]] <- wStar_conv_e
-#backtest_muRet_conv_e_vec[i] <- mean(ts_wStar_conv_e)
-#backtest_sdRet_conv_e_vec[i] <- sd(ts_wStar_conv_e)
-#-----------------------------------------------
-cormat <- cor(mat_pctDiff_train_sig)
-mat_nab <- cbind(nab_mu_ret_sigs, nab_C_sigs)
-#mat_nab <- cbind(nab_mu_ret_sigs)
-list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL)
-wStar_sigs <- list_out[[1]]
-lambdas_sigs <- list_out[[2]]
-#ts_wStar_sigs <- list_out[[3]]
-V_sigs <- list_out[[4]]
-lV_sigs <- list_out[[5]]
-V_sigs_vec[i] <- V_sigs
-lV_sigs_vec[i] <- lV_sigs
-wStar_sigs_list[[i]] <- wStar_sigs
-# backtest_muRet_sigs_vec[i] <- mean(ts_wStar_sigs)
-# backtest_sdRet_sigs_vec[i] <- sd(ts_wStar_sigs)
-wStar_sigs_e <- exp(wStar_sigs) / sum(exp(wStar_sigs))
-# ts_wStar_sigs_e <- mat_pctDiff_test_sig %*% wStar_sigs_e
-wStar_sigs_e_list[[i]] <- wStar_sigs_e
-# backtest_muRet_sigs_e_vec[i] <- mean(ts_wStar_sigs_e)
-# backtest_sdRet_sigs_e_vec[i] <- sd(ts_wStar_sigs_e)
-#-----------------------------------------------
-# print(lambdas_conv[2])
-# print(lambdas_sigs[2])
-# print(lV_conv)
-# print(lV_sigs)
+  this_Rtarg <- Rtarg_vec[i]
+  targ_vec <- c(this_Rtarg, C_targ)
+  #targ_vec <- c(this_Rtarg)
+  #-----------------------------------------------
+  cormat <- round(cor(mat_pctDiff_train), 7)
+  #cormat <- round(mat_Loads %*% t(mat_Loads), 7)
+  mat_nab <- cbind(nab_mu_ret_in, nab_C)
+  #mat_nab <- cbind(nab_mu_ret_in)
+  list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL)
+  wStar_conv <- list_out[[1]]
+  lambdas_conv <- list_out[[2]]
+  #ts_wStar_conv <- list_out[[3]]
+  V_conv <- list_out[[4]]
+  lV_conv <- list_out[[5]]
+  V_conv_vec[i] <- V_conv
+  lV_conv_vec[i] <- lV_conv
+  wStar_conv_list[[i]] <- wStar_conv
+  #backtest_muRet_conv_vec[i] <- mean(ts_wStar_conv)
+  #backtest_sdRet_conv_vec[i] <- sd(ts_wStar_conv)
+  wStar_conv_e <- exp(wStar_conv) / sum(exp(wStar_conv))
+  #ts_wStar_conv_e <- mat_pctDiff_test %*% wStar_conv_e
+  wStar_conv_e_list[[i]] <- wStar_conv_e
+  #backtest_muRet_conv_e_vec[i] <- mean(ts_wStar_conv_e)
+  #backtest_sdRet_conv_e_vec[i] <- sd(ts_wStar_conv_e)
+  #-----------------------------------------------
+  cormat <- cor(mat_pctDiff_train_sig)
+  mat_nab <- cbind(nab_mu_ret_sigs, nab_C_sigs)
+  #mat_nab <- cbind(nab_mu_ret_sigs)
+  list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL)
+  wStar_sigs <- list_out[[1]]
+  lambdas_sigs <- list_out[[2]]
+  #ts_wStar_sigs <- list_out[[3]]
+  V_sigs <- list_out[[4]]
+  lV_sigs <- list_out[[5]]
+  V_sigs_vec[i] <- V_sigs
+  lV_sigs_vec[i] <- lV_sigs
+  wStar_sigs_list[[i]] <- wStar_sigs
+  # backtest_muRet_sigs_vec[i] <- mean(ts_wStar_sigs)
+  # backtest_sdRet_sigs_vec[i] <- sd(ts_wStar_sigs)
+  wStar_sigs_e <- exp(wStar_sigs) / sum(exp(wStar_sigs))
+  # ts_wStar_sigs_e <- mat_pctDiff_test_sig %*% wStar_sigs_e
+  wStar_sigs_e_list[[i]] <- wStar_sigs_e
+  # backtest_muRet_sigs_e_vec[i] <- mean(ts_wStar_sigs_e)
+  # backtest_sdRet_sigs_e_vec[i] <- sd(ts_wStar_sigs_e)
+  #-----------------------------------------------
+  # print(lambdas_conv[2])
+  # print(lambdas_sigs[2])
+  # print(lV_conv)
+  # print(lV_sigs)
 }
 
 df_plot <- data.frame(Return = Rtarg_vec, Conventional = sqrt(V_conv_vec), Experiment = sqrt(V_sigs_vec))
@@ -1490,24 +1818,43 @@ gg
 
 ```
 
+## Discussion and conculsions
+
+* When tackling complex, seemingly intangible, subjects such as "sustainability", or "resilience", or, in the case of this paper, "tradeoffs between strategic objectives", progress is often made by attempting to formalize---or otherwise bring down to earth---a longstanding, high level (and, at times, politically driven), conceptual narrative of the issue in terms of measurable inputs and outputs. Regardless of the degree of success in bringing the problem down to earth, the quantitative grappling with it forces us to examine it in greater granularity than is possible in the high level narrative. New problems, and/or connections to old problems, are invariably discovered along the way, unnoticed until now due to fixation on certain aspects of the problem that are emphasized in the conceptual narrative. [It is worth mentioning that this process is not subject to political pressures, and does not allow us to substitute real progress on the problem with conferences and rhetoric.]
+
+* In the quantitative grappling presented here, it was discovered that, before the question of tradeoffs can even be asked, one must first address the question of dimensions. There is not just one set of tradeoffs, but a set for each dimension found in the data. The task of identifying and extracting dimensions is, then, a whole can of worms unto itself. The number of dimensions that can meaningfully be analyzed is a function both of the real structure that may or may not exist in the data, and of the amount of available data. Amazingly, there is a rigorous method of dimension extraction that takes all of this into account.
+
+* Once dimensions are extracted, they must then be characterized in concrete terms. What aspect of reality is described by each dimension? This is achieved by applying a varimax rotation to the loadings matrix. If clear thematic trends fail to emerge after varimax rotation, this is motivation for a deep reassessment of underlying preconceptions and/or the quality of the data.
+
+* Once dimensions have been characterized, the question of tradeoffs can be addressed.
+
+* Having identified tradeoffs, the natural next question from a donor's perspective is: how to optimize investment across these tradeoffs? ...which then turns out to be intimately bound up with the issue of risk...portfolio optimization. An unsuspected opportunity.
+
+
+
+
+
+
+## scraps:
+
 
 ```{r, echo=F}
 # wStar_normd <- wStar_sig1 / max(abs(wStar_sig1))
 # #w_star_normd <- wStar_trad / max(abs(wStar_trad))
-# col_order <- colnames(mat_PCA_in)
-# df_plot <- data.frame(ts_id = col_order, mat_Loads_rot, wStar_normd)
+# varNames_ordered <- colnames(mat_PCA_in)
+# df_plot <- data.frame(ts_id = varNames_ordered, mat_Loads_rot, wStar_normd)
 # signal_id <- paste("Signal", c(1:n_sigs))
 # colnames(df_plot)[2:(n_sigs + 1)] <- signal_id
 # colnames(df_plot)[ncol(df_plot)] <- "Portfolio weights"
 # gathercols <- colnames(df_plot)[-1]
 # df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
 # #--
-# n_ts <- ncol(mat_PCA_in)
-# group_vec <- rep(NA, n_ts)
-# for(i in 1:length(list_tsTypes)){
-#   this_tsType_vec <- list_tsTypes[[i]]
-#   this_tsType_name <- tsType_names[i]
-#   group_vec[which(col_order %in% this_tsType_vec)] <- this_tsType_name
+# n_obs <- ncol(mat_PCA_in)
+# group_vec <- rep(NA, n_obs)
+# for(i in 1:length(list_groups)){
+#   this_group_vec <- list_groups[[i]]
+#   this_group_name <- group_names[i]
+#   group_vec[which(varNames_ordered %in% this_group_vec)] <- this_group_name
 # 
 # }
 # 
