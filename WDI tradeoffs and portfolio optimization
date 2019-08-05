@@ -155,6 +155,7 @@ WDI data . This is the data that the UN (SDG Tracker) uses to track progress tow
 #setwd("D:/OneDrive - CGIAR/Documents")
 #options(warn = -1); options(scipen = 999)
 #-------------------------------------------------------------
+#devtools::install_github("thomasp85/patchwork")
 library(plyr)
 library(tidyverse)
 library(ggplot2)
@@ -164,6 +165,7 @@ library(factoextra)
 library(Hmisc)
 library(corrplot)
 library(tidyquant)
+library(patchwork)
 #=======================================================================
 #=======================================================================
 # Define functions
@@ -482,7 +484,7 @@ list_groups <- list(spy_sector_detail, minerals_detail, agriculture_detail, ener
                     currency_detail, emerg_mkt_detail, crypto_detail, Tbond_detail)
 group_names <- c("US Sectors", "Minerals", "Agriculture", "Energy", "Major Currency Pairs",
                  "Emerging Markets", "Cryptocurrencies/Blockchain", "T-Bonds")
-#--
+  #-------------------------------------------
 #per_ema <- 13
 #fromdate = Sys.Date() - 360
 fromdate = "2018-06-20"
@@ -722,7 +724,7 @@ interpret_loadings(mat_loads_rot_sig_train,
 
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 
-# Get test data
+# Get backtest data
 list_out <- signals_from_noise(mat_PCA_in,
                                eigenvalue_density_plot = F,
                                signals_plot = F,
@@ -730,7 +732,7 @@ list_out <- signals_from_noise(mat_PCA_in,
                                pca_ind_plot = F,
                                list_groups = list_groups,
                                group_names = group_names,
-                               quietly = F)
+                               quietly = T)
 mat_loads_sig_test <- list_out[[1]]
 mat_loads_rot_sig_test <- list_out[[2]]
 mat_pctDiff_sig_test <- list_out[[5]][ind_test, ]
@@ -743,7 +745,7 @@ mat_pctDiff_sig_test <- list_out[[5]][ind_test, ]
 
 
 
-```{r, fig.width=10, fig.height=4, fig.align='center', echo = FALSE }
+```{r, fig.width=8, fig.height=6, fig.align='center', echo = FALSE }
 
 # investment <- 10^4
 # investment * (1 + (mat_ts_dy[nrow(mat_ts_dy), 1] - mat_ts_dy[1, 1]) / mat_ts_dy[1, 1])
@@ -796,6 +798,133 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
   return(list_out)
 }
 #=======================================================================
+get_optimal_frontier <- function(cormat, mat_nab,
+                                 Rtarg_limits = c(0.001, 0.3),
+                                 n_points_on_frontier = 50,
+                                 mat_pctDiff_backtest,
+                                 utility_interpretation = F,
+                                 frontier_budget_plot = T,
+                                 budget_weights_plot = T,
+                                 list_groups = NULL,
+                                 group_names = NULL
+){
+  #-------------------------------------------
+  Rtarg_vec <- seq(Rtarg_limits[1], Rtarg_limits[2], length.out = n_points_on_frontier)
+  list_wStar <- list()
+  lC_vec <- c()
+  V_vec <- c()
+  lV_vec <- c()
+  backtest_pctRet_vec <- c()
+  backtest_pctRet_sd2_vec <- c()
+  performance_vec <- c()
+  #-------------------------------------------
+  for(i in 1:length(Rtarg_vec)){
+    this_Rtarg <- Rtarg_vec[i]
+    targ_vec <- c(this_Rtarg, C_targ)
+    list_out <- optimize_portfolio(cormat, mat_nab, targ_vec,
+                                   mat_pctDiff_backtest,
+                                   utility_interpretation)
+    list_wStar[[i]] <- list_out[[1]]
+    lambdas <- list_out[[2]]
+    lC_vec[i] <- lambdas[2]
+    V_vec[i] <- list_out[[3]]
+    lV_vec[i] <- list_out[[4]]
+    backtest_pctRet_vec[i] <- list_out[[5]]
+    backtest_pctRet_sd2_vec[i] <- list_out[[6]]
+    performance_vec[i] <- list_out[[7]]
+    
+  }
+  #-------------------------------------------
+  if(is.null(mat_pctDiff_backtest)){
+    df_frontier <- data.frame(R_targ = Rtarg_vec,
+                              V_targ = V_vec,
+                              lV = lV_vec, lC = lC_vec)
+    colnames(df_frontier) <- c("Return target",
+                               "Risk (variance)",
+                               "Risk shadow price",
+                               "Budget shadow price")
+  }else{
+    df_frontier <- data.frame(R_targ = Rtarg_vec,
+                              R_backtest = backtest_pctRet_vec,
+                              V_targ = V_vec,
+                              V_backtest = backtest_pctRet_sd2_vec,
+                              Performance = performance_vec,
+                              lV = lV_vec, lC = lC_vec)
+    colnames(df_frontier) <- c("Return target", "Return backtest",
+                               "Risk (variance)", "Risk backtest",
+                               "Performance", "Risk shadow price",
+                               "Budget shadow price")
+  }
+  #-------------------------------------------
+  df_w <- data.frame(df_frontier$`Risk (variance)`, t(do.call(cbind, list_wStar)))
+  varNames_ordered <- row.names(mat_nab)
+  colnames(df_w) <- c("Risk (variance)", varNames_ordered)
+  #-------------------------------------------
+  # Frontier plot
+  if(frontier_budget_plot){
+    if(!is.null(mat_pctDiff_backtest)){
+      df_plot <- df_frontier[, c("Risk (variance)", "Return target", "Return backtest")]
+      df_plot <- df_plot %>% gather(Type, `Return`, `Return target`:`Return backtest`)
+      gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return`, group = Type, color = Type))
+      gg <- gg + geom_point()
+      gg <- gg + labs(title = "Optimal Portfolio Frontier")
+      gg <- gg + theme(legend.title = element_blank(),
+                       axis.title.x = element_blank(),
+                       axis.text.x = element_blank())
+      gg_frontier <- gg
+
+    }else{
+      df_plot <- df_frontier[, c("Risk (variance)", "Return target")]
+      gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return target`))
+      gg <- gg + labs(title = "Optimal Portfolio Frontier")
+      gg <- gg + theme(axis.title.x = element_blank(),
+                       axist.text.x = element_blank())
+      gg <- gg + geom_point()
+      gg_frontier <- gg
+      
+    }
+  #-------------------------------------------
+  # Budget weights plot
+  gathercols <- colnames(df_w)[-1]
+  df_plot <- df_w
+  df_plot$point_id <- 1:n_points_on_frontier
+  df_match_V <- df_plot[, c("point_id", "Risk (variance)")]
+  df_plot <- df_plot %>% gather_("Item", "Budget weights", gathercols)
+  if(!is.null(list_groups)){
+    n_var <- nrow(mat_nab)
+    group_vec <- rep(NA, n_var)
+    for(i in 1:length(list_groups)){
+      this_group_vec <- list_groups[[i]]
+      this_group_name <- group_names[i]
+      group_vec[which(varNames_ordered %in% this_group_vec)] <- this_group_name
+    }
+    df_match_group <- data.frame(Item = varNames_ordered, Type = group_vec)
+    df_plot <- merge(df_plot, df_match_group, by = "Item")
+    df_plot <- df_plot %>% group_by(point_id, Type) %>% summarise(`Budget weights` = sum(`Budget weights`))
+    df_plot <- merge(df_plot, df_match_V, by = "point_id")
+    colnames(df_plot)[2] <- "Item"
+  }
+    df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(df_plot$`Budget weights`, decreasing = T)]), ordered = T)
+  #df_plot <- arrange(df_plot, Item, `Risk (variance)`)
+  gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Budget weights`, fill = Item))
+  gg <- gg + geom_area(position = "stack")
+  gg <- gg + theme(legend.title = element_blank(),
+                   axis.title.x = element_blank())
+  if(length(unique(df_plot$Item)) > 15){gg <- gg + theme(legend.position = "none")}
+  gg_weights <- gg
+  #-------------------------------------------
+  # gg_together <- ggpubr::ggarrange(gg_frontier, gg_weights,
+  #                                      align = "v",
+  #                                      ncol = 1, nrow = 2)
+  gg_together <- gg_frontier + gg_weights + plot_layout(ncol = 1)
+  print(gg_together)
+
+  }
+
+  list_out <- list(df_frontier, df_w)
+  return(list_out)
+}
+#=======================================================================
 # # Get eigenportfolios
 # mat_wEigen <- apply(mat_eigvecs_sig_train, 2, function(x) x / sum(x))
 # # mat_loads_rot_sig_train_normd <- apply(mat_loads_rot_sig_train, 2, function(x) x / sum(x))
@@ -812,101 +941,97 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
 # mat_pctDiff_train_mo <- mat_pctDiff_mo[ind_train_mo, ]
 #=======================================================================
 # Conventional risk-reward frontier
-n_signals <- ncol(mat_loads_sig_train)
 n_vars <- nrow(mat_loads_sig_train)
 C_targ <- 1
-#nab_C <- rep(1, n_vars)
+nab_C <- rep(1, n_vars)
+#------------------------------------
+# Correlation matrix
+#cormat <- cor(mat_pctDiff_train)
+#covmat <- round(mat_loads_rot_sig_train %*% t(mat_loads_rot_sig_train), 7)
+covmat <- round(mat_loads_sig_train %*% t(mat_loads_sig_train), 7)
+sd_vec <- sqrt(diag(covmat))
+cormat <- diag(1 / sd_vec) %*% covmat %*% diag(1 / sd_vec)
+#------------------------------------
+# Expected returns vector
+ind_t_ret <- (nrow(mat_pctDiff_train) - length(ind_test)):nrow(mat_pctDiff_train)
+nab_mu_ret_train <- apply(mat_pctDiff_train[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
+#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train)
+#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train_mo)
+#------------------------------------
+mat_pctDiff_backtest <- mat_pctDiff_test
+#------------------------------------
+mat_nab <- cbind(nab_mu_ret_train, nab_C)
+#------------------------------------
+list_out <- get_optimal_frontier(cormat, mat_nab,
+                                 Rtarg_limits = c(0.01, 0.25),
+                                 n_points_on_frontier = 50,
+                                 mat_pctDiff_backtest,
+                                 utility_interpretation = F,
+                                 frontier_budget_plot = T,
+                                 budget_weights_plot = T,
+                                 list_groups = list_groups,
+                                 group_names = group_names)
+
+#df_w_look <- list_out[[2]]
+#------------------------------------
+
+
+
+
+
+```
+
+
+
+```{r, echo=F}
+
+#=======================================================================
+# Signals correlation matrix risk-reward frontier
+n_signals <- ncol(mat_loads_sig_train)
 nab_C <- rep(1, n_signals)
 #------------------------------------
 # Correlation matrix
 cormat <- cor(mat_pctDiff_sig_train)
-#cormat <- cor(mat_pctDiff_train)
-#cormat <- round(mat_loads_rot_sig_train %*% t(mat_loads_sig_train), 7)
 #------------------------------------
 # Expected returns vector
-nab_mu_ret_train <- apply(mat_pctDiff_sig_train, 2, function(x) prod(1 + x)) - 1
-#nab_mu_ret_train <- apply(mat_pctDiff_train, 2, function(x) prod(1 + x)) - 1
-#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train)
-#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train_mo)
-#nab_mu_ret_train <- mat_eigvecs_sig_train %*% rep(1, n_signals) #eigvals_sig_train
-#------------------------------------
+nab_mu_ret_train <- apply(mat_pctDiff_sig_train[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
+#nab_mu_ret_train <- mat_eigvecs_sig_train %*% rep(1, n_signals) #------------------------------------
 mat_pctDiff_backtest <- mat_pctDiff_sig_test
-#mat_pctDiff_backtest <- mat_pctDiff_test
 #------------------------------------
 mat_nab <- cbind(nab_mu_ret_train, nab_C)
-Rtarg_vec <- seq(0.001, 0.30, length.out = 20)
-list_wStar <- list()
-lC_vec <- c()
-V_vec <- c()
-lV_vec <- c()
-backtest_pctRet_vec <- c()
-backtest_pctRet_sd2_vec <- c()
-performance_vec <- c()
-for(i in 1:length(Rtarg_vec)){
-  this_Rtarg <- Rtarg_vec[i]
-  targ_vec <- c(this_Rtarg, C_targ)
-  list_out <- optimize_portfolio(cormat, mat_nab, targ_vec,
+row.names(mat_nab) <- signal_names
+#------------------------------------
+list_out <- get_optimal_frontier(cormat, mat_nab,
+                                 Rtarg_limits = c(0.01, 0.25),
+                                 n_points_on_frontier = 50,
                                  mat_pctDiff_backtest,
-                                 utility_interpretation = F)
-  list_wStar[[i]] <- list_out[[1]]
-  lambdas <- list_out[[2]]
-  lC_vec[i] <- lambdas[2]
-  V_vec[i] <- list_out[[3]]
-  lV_vec[i] <- list_out[[4]]
-  backtest_pctRet_vec[i] <- list_out[[5]]
-  backtest_pctRet_sd2_vec[i] <- list_out[[6]]
-  performance_vec[i] <- list_out[[7]]
+                                 utility_interpretation = T,
+                                 frontier_budget_plot = T,
+                                 budget_weights_plot = T,
+                                 list_groups = NULL,
+                                 group_names = NULL)
 
-}
+#df_w_look <- list_out[[2]]
+#------------------------------------
 
-
-
-df_frontier <- data.frame(R_targ = Rtarg_vec,
-                          R_backtest = backtest_pctRet_vec,
-                          V_targ = V_vec,
-                          V_backtest = backtest_pctRet_sd2_vec,
-                          performance = performance_vec,
-                          lV = lV_vec, lC = lC_vec)
-
-# df_eigenportfolio <- subset(df_eigenportfolio, V_eigen < max(df_frontier$V_targ))
-# gg <- gg + geom_point(data = df_eigenportfolio, mapping = aes(x = V_eigen, y = R_eigen), color = "blue")
-
-gg <- ggplot(df_frontier, aes(x = V_targ, y = R_targ))
-gg <- gg + geom_point()
-gg
-gg <- ggplot(df_frontier, aes(x = V_backtest, y = R_backtest))
-gg <- gg + geom_point()
-gg
-gg <- ggplot(df_frontier, aes(x = V_targ, y = performance))
-gg <- gg + geom_point()
-gg
-
-
-
-
-# Graph budget weights
-#data.frame(Item = colnames(mat_pctDiff_train), do.call(cbind, list_wStar))
-#df_w <- data.frame(Item = signal_names, do.call(cbind, list_wStar))
-df_w <- data.frame(df_frontier$V_targ, t(do.call(cbind, list_wStar)))
-colnames(df_w) <- c("Portfolio risk (variance)", signal_names)
-#colnames(df_w) <- c("Portfolio risk (variance)", colnames(mat_pctDiff_train))
-gathercols <- colnames(df_w)[-1]
-df_w <- df_w %>% gather_("Item", "Budget weights", gathercols)
-df_w$Item <- factor(df_w$Item, levels = unique(df_w$Item[order(df_w$`Budget weights`)]), ordered = T)
-df_w <- arrange(df_w, Item, `Portfolio risk (variance)`)
-# plot_this$Region <- factor(plot_this$Region,
-#                              levels = unique(plot_this$Region[order(plot_this$mu, plot_this$Region, decreasing = T)]),
-#                              ordered = T)
-
-
-gg <- ggplot(df_w, aes(x = `Portfolio risk (variance)`, y = `Budget weights`, fill = Item)) 
-gg <- gg + geom_area(position = "stack")
-#gg <- gg + geom_vline(xintercept = df$Risk[ind_opt], color = "green", lwd = 2)
-#gg <- gg + theme(legend.position = "none")
-gg
 
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
