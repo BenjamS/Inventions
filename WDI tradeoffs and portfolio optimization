@@ -157,13 +157,13 @@ WDI data . This is the data that the UN (SDG Tracker) uses to track progress tow
 #-------------------------------------------------------------
 #devtools::install_github("thomasp85/patchwork")
 library(plyr)
-library(tidyverse)
-library(ggplot2)
+# library(tidyverse)
+# library(ggplot2)
 library(zoo)
 library(FactoMineR)
 library(factoextra)
-library(Hmisc)
-library(corrplot)
+# library(Hmisc)
+# library(corrplot)
 library(tidyquant)
 library(patchwork)
 #=======================================================================
@@ -335,7 +335,7 @@ signals_from_noise <- function(mat_PCA_in,
   # View(mc$classification)
   # factoextra::fviz_cluster(mc, frame.type = "norm", geom = "text")
   #---------------------------------------------------------
-  list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig)
+  list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig, eigvals, mat_eigvecs)
   return(list_out)
   
 }
@@ -560,8 +560,8 @@ sd_ret_mo <- apply(mat_pctDiff_mo, 2, sd)
 mat_ts_in <- mat_ts_dy
 ts_avg_in <- ts_avg_dy
 mat_pctDiff_in <- mat_pctDiff_dy
-nab_mu_ret_in <- mu_ret_dy
-sd_ret_in <- sd_ret_dy
+# nab_mu_ret_in <- mu_ret_dy
+# sd_ret_in <- sd_ret_dy
 #----------------------------------------------
 mat_PCA_in <- mat_pctDiff_in
 date_vec <- row.names(mat_PCA_in)
@@ -676,7 +676,7 @@ list_out <- signals_from_noise(mat_pctDiff_train,
                                list_groups = list_groups,
                                group_names = group_names,
                                quietly = F)
-# list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig)
+# list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig, eigvals, mat_eigvecs)
 mat_loads_sig_train <- list_out[[1]]
 mat_loads_rot_sig_train <- list_out[[2]]
 # mat_loads_train <- list_out[[3]]
@@ -684,6 +684,8 @@ mat_loads_rot_sig_train <- list_out[[2]]
 mat_pctDiff_sig_train <- list_out[[5]]
 eigvals_sig_train <- list_out[[6]]
 mat_eigvecs_sig_train <- list_out[[7]]
+eigvals_train <- list_out[[8]]
+mat_eigvecs_train <- list_out[[9]]
 ```
 
 
@@ -747,15 +749,11 @@ mat_pctDiff_sig_test <- list_out[[5]][ind_test, ]
 
 
 ```{r, fig.width=8, fig.height=6, fig.align='center', echo = FALSE }
-
-# investment <- 10^4
-# investment * (1 + (mat_ts_dy[nrow(mat_ts_dy), 1] - mat_ts_dy[1, 1]) / mat_ts_dy[1, 1])
-# investment * prod(1 + mat_pctDiff_dy[, 1])
 #=======================================================================
 # Define portfolio optimization function
 optimize_portfolio <- function(cormat, mat_nab, targ_vec,
                                mat_pctDiff_backtest = NULL,
-                               utility_interpretation = T){
+                               utility_interpretation = F){
   cormat_inv <- solve(cormat)
   M <- t(mat_nab) %*% cormat_inv %*% mat_nab
   M_inv <- solve(M)
@@ -775,6 +773,9 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
   if(utility_interpretation){
     Exp_wStar <- exp(wStar)
     wStar <- Exp_wStar / sum(Exp_wStar)
+    Rtarg <- t(mat_nab[, 1]) %*% wStar
+  }else{
+    Rtarg <- targ_vec[1]
   }
   #----------------------------------------------------
   # Backtest
@@ -795,7 +796,7 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
     performance <- NULL
   }
   #----------------------------------------------------
-  list_out <- list(wStar, lambdas, V, l_V, backtest_pctRet, backtest_pctRet_sd2, performance, portfolio_pctDiff_t)
+  list_out <- list(wStar, lambdas, V, l_V, backtest_pctRet, backtest_pctRet_sd2, performance, portfolio_pctDiff_t, Rtarg)
   return(list_out)
 }
 #=======================================================================
@@ -818,6 +819,7 @@ get_optimal_frontier <- function(cormat, mat_nab,
   backtest_pctRet_vec <- c()
   backtest_pctRet_sd2_vec <- c()
   performance_vec <- c()
+  Rtarg_out_vec <- c()
   #-------------------------------------------
   for(i in 1:length(Rtarg_vec)){
     this_Rtarg <- Rtarg_vec[i]
@@ -833,7 +835,8 @@ get_optimal_frontier <- function(cormat, mat_nab,
     backtest_pctRet_vec[i] <- list_out[[5]]
     backtest_pctRet_sd2_vec[i] <- list_out[[6]]
     performance_vec[i] <- list_out[[7]]
-    
+    Rtarg_vec[i] <- list_out[[9]]
+
   }
   #-------------------------------------------
   if(is.null(mat_pctDiff_backtest)){
@@ -905,7 +908,10 @@ get_optimal_frontier <- function(cormat, mat_nab,
     df_plot <- merge(df_plot, df_match_V, by = "point_id")
     colnames(df_plot)[2] <- "Item"
   }
-    df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(df_plot$`Budget weights`, decreasing = T)]), ordered = T)
+  df_plot <- df_plot %>% group_by(Item) %>% mutate(mu = mean(`Budget weights`)) %>% as.data.frame(df_plot)
+  df_plot$Item <- factor(df_plot$Item,
+                         levels = unique(df_plot$Item[order(df_plot$mu, df_plot$Item, decreasing = T)]),
+                         ordered = T)
   #df_plot <- arrange(df_plot, Item, `Risk (variance)`)
   gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Budget weights`, fill = Item))
   gg <- gg + geom_area(position = "stack")
@@ -948,7 +954,7 @@ nab_C <- rep(1, n_vars)
 #------------------------------------
 # Correlation matrix
 cormat <- cor(mat_pctDiff_train)
-#covmat <- round(mat_loads_rot_sig_train %*% t(mat_loads_rot_sig_train), 7)
+#cormat <- round(mat_loads_rot_sig_train %*% t(mat_loads_rot_sig_train), 7)
 #cormat <- round(mat_loads_sig_train %*% t(mat_loads_sig_train), 7)
 # mse <- mean((cor(mat_pctDiff_train) - cormat)^2)
 # mse
@@ -973,14 +979,367 @@ list_out <- get_optimal_frontier(cormat, mat_nab,
                                  list_groups = list_groups,
                                  group_names = group_names)
 
-#df_w_look <- list_out[[2]]
+#df_wfrontier <- list_out[[1]]
 #------------------------------------
 
+
+```
+
+
+
+
+
+
+
+```{r, echo=F}
+
+n_signals <- ncol(mat_eigvecs_sig_train)
+mat_eigvecs_sig_train_aug <- cbind(mat_eigvecs_sig_train, nab_C)
+Q <- t(mat_eigvecs_sig_train_aug) %*% mat_eigvecs_train
+# M <- round(Q %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs_aug, 6)
+M <- round(Q %*% diag(1 / eigvals_train) %*% t(Q), 7)
+M
+M_inv <- round(solve(M), 5)
+M_inv
+
+targ_vec <-  c(0.2 * rep(1, n_signals), 1)
+#targ_vec <- c(0.06, 0.06, 0.02, 0.02, 1)
+x <- -2 * M_inv %*% targ_vec
+l_V <- 1 / x[1]
+lambdas <- l_V * x
+lambdas
+l_C <- lambdas[length(lambdas)]
+
+wStar <- -1 / (2 * l_V) * mat_eigvecs_train %*% diag(1 / eigvals_train) %*% t(mat_eigvecs_train) %*% mat_eigvecs_sig_train_aug %*% lambdas
+pctDiff_wStar <- mat_pctDiff_test %*% wStar
+
+backtest_ret <- prod(1 + pctDiff_wStar) - 1
+#sd(pctDiff_wStar)
+sum(wStar)
+
+t(wStar) %*% cormat %*% wStar
 
 
 
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
+
+df_w <- list_out[[2]]
+# this_wVec <- as.numeric(df_w[35, -1])
+# sum(this_wVec[which(this_wVec < 0)])
+# sum(this_wVec[which(this_wVec > 0)])
+n_points <- nrow(df_w)
+gathercols <- colnames(df_w)[-1]
+df_w$Port_id <- 1:nrow(df_w)
+df_w <- df_w %>% gather_("Item", "Budget weight", gathercols)
+df_w <- df_w %>% group_by(Item) %>% mutate(x = ifelse(sum(`Budget weight` < 0) > (n_points / 3), 1, 0))
+invert_these <- unique(df_w$Item[which(df_w$x == 1)])
+ind_invert_these <- which(gathercols %in% invert_these)
+#-------------------------------------------------------------
+# mat_ts_dy_wInv <- mat_ts_dy
+# mat_ts_dy_wInv[, ind_invert_these] <- 1 / mat_ts_dy_wInv[, ind_invert_these]
+# mat_pctDiff_dy_wInv <- diff(mat_ts_dy_wInv) / mat_ts_dy_wInv[-nrow(mat_ts_dy_wInv), ]
+# #mat_pctDiff_dy <- diff(log(mat_ts_dy))
+# row.names(mat_pctDiff_dy_wInv) <- as.character(date_vec)
+# mat_pctDiff_in_wInv <- mat_pctDiff_dy_wInv
+# mat_PCA_in_wInv <- mat_pctDiff_in_wInv
+# colnames(mat_PCA_in_wInv) <- colnames(mat_PCA_in)
+# 
+# mat_pctDiff_train_wInv <- mat_PCA_in_wInv[ind_train, ]
+# mat_pctDiff_test_wInv <- mat_PCA_in_wInv[ind_test, ]
+# #ts_avg_test_wInv <- ts_avg_in_wInv[ind_test]
+# #date_vec_test <- date_vec[ind_test]
+#-------------------------------------------------------------
+#mat_pctDiff_train[, c("Cotton")] / mat_pctDiff_train_wInv[, c("Cotton")]
+#-------------------------------------------------------------
+mat_pctDiff_train_wInv[ind_invert_these, ] <- -mat_pctDiff_train[ind_invert_these, ]
+#-------------------------------------------------------------
+list_out <- signals_from_noise(mat_pctDiff_train_wInv,
+                               eigenvalue_density_plot = T,
+                               signals_plot = T,
+                               pca_var_plot = F,
+                               pca_ind_plot = F,
+                               list_groups = list_groups,
+                               group_names = group_names,
+                               quietly = F)
+# list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig)
+mat_loads_sig_train_wInv <- list_out[[1]]
+mat_loads_rot_sig_train_wInv <- list_out[[2]]
+# mat_loads_train <- list_out[[3]]
+# mat_laods_rot_train <- list_out[[4]]
+mat_pctDiff_sig_train_wInv <- list_out[[5]]
+eigvals_sig_train_wInv <- list_out[[6]]
+mat_eigvecs_sig_train_wInv <- list_out[[7]]
+#-------------------------------------------------------------
+# signal_names <- c("US / Emerg. Markets,\nEnergy, Blockchain", "Precious metals", "FOREX", "US Bonds", "Agriculture", "Industrial metals")
+interpret_loadings(mat_loads_rot_sig_train_wInv,
+                   list_groups = list_groups,
+                   group_names = group_names,
+                   signal_names = signal_names)
+
+#-------------------------------------------------------------
+
+```
+
+
+
+```{r, echo=FALSE}
+#-------------------------------------------------------------
+
+# Get backtest data
+list_out <- signals_from_noise(mat_PCA_in_wInv,
+                               eigenvalue_density_plot = F,
+                               signals_plot = F,
+                               pca_var_plot = F,
+                               pca_ind_plot = F,
+                               list_groups = list_groups,
+                               group_names = group_names,
+                               quietly = T)
+mat_loads_sig_test_wInv <- list_out[[1]]
+mat_loads_rot_sig_test_wInv <- list_out[[2]]
+mat_pctDiff_sig_test_wInv <- list_out[[5]][ind_test, ]
+#-------------------------------------------------------------
+#=======================================================================
+# Conventional risk-reward frontier, now with inverses of neg wgts
+n_vars <- nrow(mat_loads_sig_train_wInv)
+C_targ <- 1
+nab_C <- rep(1, n_vars)
+#------------------------------------
+# Correlation matrix
+cormat <- cor(mat_pctDiff_train)
+#cormat <- round(mat_loads_rot_sig_train %*% t(mat_loads_rot_sig_train), 7)
+#cormat <- round(mat_loads_sig_train %*% t(mat_loads_sig_train), 7)
+# mse <- mean((cor(mat_pctDiff_train) - cormat)^2)
+# mse
+#------------------------------------
+# Expected returns vector
+ind_t_ret <- (nrow(mat_pctDiff_train_wInv) - length(ind_test)):nrow(mat_pctDiff_train_wInv)
+nab_mu_ret_train_wInv <- apply(mat_pctDiff_train_wInv[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
+#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train)
+#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train_mo)
+#------------------------------------
+mat_pctDiff_backtest_wInv <- mat_pctDiff_test_wInv
+#------------------------------------
+mat_nab <- cbind(nab_mu_ret_train, nab_C)
+#------------------------------------
+list_out <- get_optimal_frontier(cormat, mat_nab,
+                                 Rtarg_limits = c(0.01, .35),
+                                 n_points_on_frontier = 50,
+                                 mat_pctDiff_backtest_wInv,
+                                 utility_interpretation = F,
+                                 frontier_budget_plot = T,
+                                 budget_weights_plot = T,
+                                 list_groups = list_groups,
+                                 group_names = group_names)
+
+#df_wfrontier <- list_out[[1]]
+#------------------------------------
+
+
+```
+
+
+
+
+```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
+
+df_w <- list_out[[2]]
+gathercols <- colnames(df_w)[-1]
+df_w$Port_id <- 1:nrow(df_w)
+df_w <- df_w %>% gather_("Item", "Budget weight", gathercols)
+df_w <- df_w %>% group_by(Item) %>% mutate(x = ifelse(sum(`Budget weight` < 0), 1, 0))
+invert_these <- unique(df_w$Item[which(df_w$x == 1)])
+ind_invert_these <- which(gathercols %in% invert_these)
+#-------------------------------------------------------------
+mat_ts_dy_wInv <- mat_ts_dy
+mat_ts_dy_wInv[, ind_invert_these] <- 1 / mat_ts_dy_wInv[, ind_invert_these]
+mat_pctDiff_dy_wInv <- diff(mat_ts_dy_wInv) / mat_ts_dy_wInv[-nrow(mat_ts_dy_wInv), ]
+#mat_pctDiff_dy <- diff(log(mat_ts_dy))
+row.names(mat_pctDiff_dy_wInv) <- as.character(date_vec)
+mat_pctDiff_in_wInv <- mat_pctDiff_dy_wInv
+mat_PCA_in_wInv <- mat_pctDiff_in_wInv
+colnames(mat_PCA_in_wInv) <- colnames(mat_PCA_in)
+
+mat_pctDiff_train_wInv <- mat_PCA_in_wInv[ind_train, ]
+mat_pctDiff_test_wInv <- mat_PCA_in_wInv[ind_test, ]
+#ts_avg_test_wInv <- ts_avg_in_wInv[ind_test]
+#date_vec_test <- date_vec[ind_test]
+#-------------------------------------------------------------
+list_out <- signals_from_noise(mat_pctDiff_train_wInv,
+                               eigenvalue_density_plot = T,
+                               signals_plot = T,
+                               pca_var_plot = F,
+                               pca_ind_plot = F,
+                               list_groups = list_groups,
+                               group_names = group_names,
+                               quietly = F)
+# list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig)
+mat_loads_sig_train_wInv <- list_out[[1]]
+mat_loads_rot_sig_train_wInv <- list_out[[2]]
+# mat_loads_train <- list_out[[3]]
+# mat_laods_rot_train <- list_out[[4]]
+mat_pctDiff_sig_train_wInv <- list_out[[5]]
+eigvals_sig_train_wInv <- list_out[[6]]
+mat_eigvecs_sig_train_wInv <- list_out[[7]]
+#-------------------------------------------------------------
+# signal_names <- c("US / Emerg. Markets,\nEnergy, Blockchain", "Precious metals", "FOREX", "US Bonds", "Agriculture", "Industrial metals")
+interpret_loadings(mat_loads_rot_sig_train_wInv,
+                   list_groups = list_groups,
+                   group_names = group_names,
+                   signal_names = signal_names)
+
+#-------------------------------------------------------------
+
+```
+
+
+
+
+
+
+
+
+```{r, echo=FALSE}
+#-------------------------------------------------------------
+
+# Get backtest data
+list_out <- signals_from_noise(mat_PCA_in_wInv,
+                               eigenvalue_density_plot = F,
+                               signals_plot = F,
+                               pca_var_plot = F,
+                               pca_ind_plot = F,
+                               list_groups = list_groups,
+                               group_names = group_names,
+                               quietly = T)
+mat_loads_sig_test_wInv <- list_out[[1]]
+mat_loads_rot_sig_test_wInv <- list_out[[2]]
+mat_pctDiff_sig_test_wInv <- list_out[[5]][ind_test, ]
+#-------------------------------------------------------------
+#=======================================================================
+# Conventional risk-reward frontier, now with inverses of neg wgts
+n_vars <- nrow(mat_loads_sig_train_wInv)
+C_targ <- 1
+nab_C <- rep(1, n_vars)
+#------------------------------------
+# Correlation matrix
+cormat <- cor(mat_pctDiff_train_wInv)
+#cormat <- round(mat_loads_rot_sig_train %*% t(mat_loads_rot_sig_train), 7)
+#cormat <- round(mat_loads_sig_train %*% t(mat_loads_sig_train), 7)
+# mse <- mean((cor(mat_pctDiff_train) - cormat)^2)
+# mse
+#------------------------------------
+# Expected returns vector
+ind_t_ret <- (nrow(mat_pctDiff_train_wInv) - length(ind_test)):nrow(mat_pctDiff_train_wInv)
+nab_mu_ret_train_wInv <- apply(mat_pctDiff_train_wInv[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
+#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train)
+#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train_mo)
+#------------------------------------
+mat_pctDiff_backtest_wInv <- mat_pctDiff_test_wInv
+#------------------------------------
+mat_nab <- cbind(nab_mu_ret_train_wInv, nab_C)
+#------------------------------------
+list_out <- get_optimal_frontier(cormat, mat_nab,
+                                 Rtarg_limits = c(0.01, .35),
+                                 n_points_on_frontier = 50,
+                                 mat_pctDiff_backtest_wInv,
+                                 utility_interpretation = F,
+                                 frontier_budget_plot = T,
+                                 budget_weights_plot = T,
+                                 list_groups = list_groups,
+                                 group_names = group_names)
+
+#df_wfrontier <- list_out[[1]]
+#------------------------------------
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ```{r, echo=F}
@@ -2035,28 +2394,5 @@ Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
 
 
 # 
-# Q <- t(mat_sig_eigvecs_aug) %*% mat_eigvecs
-# # M <- round(Q %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs_aug, 6)
-# M <- round(Q %*% diag(1 / eigvals) %*% t(Q), 7)
-# M
-# M_inv <- round(solve(M), 5)
-# M_inv
-# 
-# targ_vec <-  c(1.1 * rep(1, n_sigs), 1)
-# #targ_vec <- c(0.06, 0.06, 0.02, 0.02, 1)
-# x <- -2 * M_inv %*% targ_vec
-# l_V <- 1 / x[1]
-# lambdas <- l_V * x
-# lambdas
-# l_C <- lambdas[length(lambdas)]
-# 
-# wStar_2 <- -1 / (2 * l_V) * mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs_aug %*% lambdas
-# ts_wStar_2 <- mat_pctDiff_in %*% wStar_2
-# sum(wStar_2)
-# ts_wStar_sig2 <- mat_pctDiff_in %*% wStar_2
-# 
-# # w_star_check <- -1 / (2 * l_V) * (mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs %*% lambdas[1:n_sigs] + l_C * mat_eigvecs %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% ones_vec)
-# # w_star - w_star_check
-# # sum(w_star_check)
 
 ```
