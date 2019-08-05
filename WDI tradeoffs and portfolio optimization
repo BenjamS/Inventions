@@ -721,6 +721,8 @@ interpret_loadings(mat_loads_rot_sig_train,
 
 #### 4.1.3 Portfolio optimization
 
+The train data is 2/3 the whole data. The expected returns are calculated over a period equal in length to that of the test data.
+
 
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 
@@ -742,7 +744,6 @@ mat_pctDiff_sig_test <- list_out[[5]][ind_test, ]
 
 
 ```
-
 
 
 ```{r, fig.width=8, fig.height=6, fig.align='center', echo = FALSE }
@@ -946,11 +947,11 @@ C_targ <- 1
 nab_C <- rep(1, n_vars)
 #------------------------------------
 # Correlation matrix
-#cormat <- cor(mat_pctDiff_train)
+cormat <- cor(mat_pctDiff_train)
 #covmat <- round(mat_loads_rot_sig_train %*% t(mat_loads_rot_sig_train), 7)
-covmat <- round(mat_loads_sig_train %*% t(mat_loads_sig_train), 7)
-sd_vec <- sqrt(diag(covmat))
-cormat <- diag(1 / sd_vec) %*% covmat %*% diag(1 / sd_vec)
+#cormat <- round(mat_loads_sig_train %*% t(mat_loads_sig_train), 7)
+# mse <- mean((cor(mat_pctDiff_train) - cormat)^2)
+# mse
 #------------------------------------
 # Expected returns vector
 ind_t_ret <- (nrow(mat_pctDiff_train) - length(ind_test)):nrow(mat_pctDiff_train)
@@ -982,7 +983,6 @@ list_out <- get_optimal_frontier(cormat, mat_nab,
 ```
 
 
-
 ```{r, echo=F}
 
 #=======================================================================
@@ -991,7 +991,7 @@ n_signals <- ncol(mat_loads_sig_train)
 nab_C <- rep(1, n_signals)
 #------------------------------------
 # Correlation matrix
-cormat <- cor(mat_pctDiff_sig_train)
+cormat <- round(cor(mat_pctDiff_sig_train), 7)
 #------------------------------------
 # Expected returns vector
 nab_mu_ret_train <- apply(mat_pctDiff_sig_train[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
@@ -1005,7 +1005,7 @@ list_out <- get_optimal_frontier(cormat, mat_nab,
                                  Rtarg_limits = c(0.01, 0.25),
                                  n_points_on_frontier = 50,
                                  mat_pctDiff_backtest,
-                                 utility_interpretation = T,
+                                 utility_interpretation = F,
                                  frontier_budget_plot = T,
                                  budget_weights_plot = T,
                                  list_groups = NULL,
@@ -1020,9 +1020,9 @@ list_out <- get_optimal_frontier(cormat, mat_nab,
 
 
 
+#### 4.1.4 Dealing with negative budget weights
 
-
-
+A negative sign on a budget weight indicates that one should invest in the inverse of the corresponding portfolio item. In the financial context, this is possible through short selling. However there is no short selling analogue in the motivating context of this paper. Even in the financial context, many investors prefer to avoid short selling, prompting banks to offer products that track the inverse of specific stocks, commodities, or of whole sectors. The VelocityShares 3x Inverse Gold Exchange Traded Note (ticker symbol: DLGD), for example, tracks the inverse of gold. Investors can avoid taking a short position on gold by investing in this product.
 
 
 
