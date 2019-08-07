@@ -765,6 +765,7 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
   # Optimal budget weights
   wStar <- -1 / (2 * l_V) * cormat_inv %*% mat_nab %*% lambdas
   # sum(wStar)
+  Rtarg <- targ_vec[1]
   # Portfolio variance
   V <- t(wStar) %*% cormat %*% wStar
   #----------------------------------------------------
@@ -772,31 +773,34 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
   # (Makes all budget weights positive)
   if(utility_interpretation){
     Exp_wStar <- exp(wStar)
-    wStar <- Exp_wStar / sum(Exp_wStar)
-    Rtarg <- t(mat_nab[, 1]) %*% wStar
-  }else{
-    Rtarg <- targ_vec[1]
-  }
+    K <- sum(Exp_wStar)
+    wStar <- Exp_wStar / K
+    #Rtarg <- t(mat_nab[, 1]) %*% wStar
+    # Portfolio variance
+    #V <- t(wStar) %*% cormat %*% wStar
+  } 
   #----------------------------------------------------
   # Backtest
   if(!is.null(mat_pctDiff_backtest)){
     # Straight returns
     portfolio_pctDiff_t <- mat_pctDiff_backtest %*% wStar
     backtest_pctRet <- prod(1 + portfolio_pctDiff_t) - 1
-    backtest_pctRet_sd2 <- sd(portfolio_pctDiff_t)^2
+    backtest_V <- t(wStar) %*% cor(mat_pctDiff_backtest) %*% wStar
     # Performance (returns compared to a benchmark portfolio (the 1/n portfolio for eg.))
     n_items <- ncol(cormat)
-    portfolio_benchmark_pctDiff_t <- mat_pctDiff_backtest %*% rep(1 / n_items, n_items)
+    wBench <- rep(1 / n_items, n_items)
+    portfolio_benchmark_pctDiff_t <- mat_pctDiff_backtest %*% wBench
     backtest_pctRet_benchmark <- prod(1 + portfolio_benchmark_pctDiff_t) - 1
+    backtest_V_benchmark <- t(wBench) %*% cor(mat_pctDiff_backtest) %*% wBench
     performance <- backtest_pctRet - backtest_pctRet_benchmark
   }else{
     portfolio_pctDiff_t <- NULL
     backtest_pctRet <- NULL
-    backtest_pctRet_sd2 <- NULL
+    backtest_pctRet_V <- NULL
     performance <- NULL
   }
   #----------------------------------------------------
-  list_out <- list(wStar, lambdas, V, l_V, backtest_pctRet, backtest_pctRet_sd2, performance, portfolio_pctDiff_t, Rtarg)
+  list_out <- list(wStar, lambdas, V, l_V, backtest_pctRet, backtest_V, backtest_pctRet_benchmark, backtest_V_benchmark, portfolio_pctDiff_t, Rtarg)
   return(list_out)
 }
 #=======================================================================
@@ -817,8 +821,9 @@ get_optimal_frontier <- function(cormat, mat_nab,
   V_vec <- c()
   lV_vec <- c()
   backtest_pctRet_vec <- c()
-  backtest_pctRet_sd2_vec <- c()
-  performance_vec <- c()
+  backtest_V_vec <- c()
+  backtest_pctRet_benchmark_vec <- c()
+  backtest_V_benchmark_vec <- c()
   Rtarg_out_vec <- c()
   #-------------------------------------------
   for(i in 1:length(Rtarg_vec)){
@@ -827,48 +832,66 @@ get_optimal_frontier <- function(cormat, mat_nab,
     list_out <- optimize_portfolio(cormat, mat_nab, targ_vec,
                                    mat_pctDiff_backtest,
                                    utility_interpretation)
+#      list_out <- list(wStar, lambdas, V, l_V, backtest_pctRet, backtest_V, backtest_pctRet_benchmark, backtest_V_benchmark, portfolio_pctDiff_t, Rtarg)
+
     list_wStar[[i]] <- list_out[[1]]
     lambdas <- list_out[[2]]
     lC_vec[i] <- lambdas[2]
     V_vec[i] <- list_out[[3]]
     lV_vec[i] <- list_out[[4]]
     backtest_pctRet_vec[i] <- list_out[[5]]
-    backtest_pctRet_sd2_vec[i] <- list_out[[6]]
-    performance_vec[i] <- list_out[[7]]
-    Rtarg_vec[i] <- list_out[[9]]
+    backtest_V_vec[i] <- list_out[[6]]
+    backtest_pctRet_benchmark_vec[i] <- list_out[[7]]
+    backtest_V_benchmark_vec[i] <- list_out[[8]]
+    Rtarg_out_vec[i] <- list_out[[10]]
 
   }
   #-------------------------------------------
   if(is.null(mat_pctDiff_backtest)){
-    df_frontier <- data.frame(R_targ = Rtarg_vec,
+    df_frontier <- data.frame(R_targ = Rtarg_out_vec,
                               V_targ = V_vec,
                               lV = lV_vec, lC = lC_vec)
     colnames(df_frontier) <- c("Return target",
                                "Risk (variance)",
                                "Risk shadow price",
                                "Budget shadow price")
+      df_w <- data.frame(df_frontier$`Risk (variance)`, t(do.call(cbind, list_wStar)))
+
   }else{
-    df_frontier <- data.frame(R_targ = Rtarg_vec,
+    df_frontier <- data.frame(R_targ = Rtarg_out_vec,
                               R_backtest = backtest_pctRet_vec,
+                              R_backtest_benchmark = backtest_pctRet_benchmark_vec,
                               V_targ = V_vec,
-                              V_backtest = backtest_pctRet_sd2_vec,
-                              Performance = performance_vec,
+                              V_backtest = backtest_V_vec,
+                              V_backtest_benchmark = backtest_V_benchmark_vec,
                               lV = lV_vec, lC = lC_vec)
     colnames(df_frontier) <- c("Return target", "Return backtest",
+                               "Return backtest 1/n portfolio",
                                "Risk (variance)", "Risk backtest",
-                               "Performance", "Risk shadow price",
+                               "Risk backtest 1/n portfolio",
+                               "Risk shadow price",
                                "Budget shadow price")
+      df_w <- data.frame(df_frontier$`Risk backtest`, t(do.call(cbind, list_wStar)))
+
   }
   #-------------------------------------------
-  df_w <- data.frame(df_frontier$`Risk (variance)`, t(do.call(cbind, list_wStar)))
   varNames_ordered <- row.names(mat_nab)
   colnames(df_w) <- c("Risk (variance)", varNames_ordered)
   #-------------------------------------------
   # Frontier plot
   if(frontier_budget_plot){
     if(!is.null(mat_pctDiff_backtest)){
-      df_plot <- df_frontier[, c("Risk (variance)", "Return target", "Return backtest")]
-      df_plot <- df_plot %>% gather(Type, `Return`, `Return target`:`Return backtest`)
+      df_plot1 <- df_frontier[, c("Risk (variance)", "Return target")]
+      df_plot2 <- df_frontier[, c("Risk backtest", "Return backtest")]
+#      df_plot3 <- df_frontier[, c("Risk backtest 1/n portfolio", "Return backtest 1/n portfolio")]
+      df_plot1$Type <- "Target"
+      df_plot2$Type <- "Optimized Portfolio Backtest"
+ #     df_plot3$Type <- "1/n Portfolio Backtest"
+      colnames(df_plot1)[2] <- "Return"
+      colnames(df_plot2)[1:2] <- c("Risk (variance)", "Return")
+  #    colnames(df_plot3)[1:2] <- c("Risk (variance)", "Return")
+      df_plot <- do.call(rbind, list(df_plot1, df_plot2))
+      # df_plot1 <- df_plot1 %>% gather(Type, `Return`, `Return target`:`Return backtest`)
       gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return`, group = Type, color = Type))
       gg <- gg + geom_point()
       gg <- gg + labs(title = "Optimal Portfolio Frontier")
@@ -979,7 +1002,7 @@ list_out <- get_optimal_frontier(cormat, mat_nab,
                                  list_groups = list_groups,
                                  group_names = group_names)
 
-#df_wfrontier <- list_out[[1]]
+df_frontier <- list_out[[1]]
 #------------------------------------
 
 
@@ -993,350 +1016,36 @@ list_out <- get_optimal_frontier(cormat, mat_nab,
 
 ```{r, echo=F}
 
-n_signals <- ncol(mat_eigvecs_sig_train)
-mat_eigvecs_sig_train_aug <- cbind(mat_eigvecs_sig_train, nab_C)
-Q <- t(mat_eigvecs_sig_train_aug) %*% mat_eigvecs_train
-# M <- round(Q %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs_aug, 6)
-M <- round(Q %*% diag(1 / eigvals_train) %*% t(Q), 7)
-M
-M_inv <- round(solve(M), 5)
-M_inv
-
-targ_vec <-  c(0.2 * rep(1, n_signals), 1)
-#targ_vec <- c(0.06, 0.06, 0.02, 0.02, 1)
-x <- -2 * M_inv %*% targ_vec
-l_V <- 1 / x[1]
-lambdas <- l_V * x
-lambdas
-l_C <- lambdas[length(lambdas)]
-
-wStar <- -1 / (2 * l_V) * mat_eigvecs_train %*% diag(1 / eigvals_train) %*% t(mat_eigvecs_train) %*% mat_eigvecs_sig_train_aug %*% lambdas
-pctDiff_wStar <- mat_pctDiff_test %*% wStar
-
-backtest_ret <- prod(1 + pctDiff_wStar) - 1
-#sd(pctDiff_wStar)
-sum(wStar)
-
-t(wStar) %*% cormat %*% wStar
-
-
-
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
-
-df_w <- list_out[[2]]
-# this_wVec <- as.numeric(df_w[35, -1])
-# sum(this_wVec[which(this_wVec < 0)])
-# sum(this_wVec[which(this_wVec > 0)])
-n_points <- nrow(df_w)
-gathercols <- colnames(df_w)[-1]
-df_w$Port_id <- 1:nrow(df_w)
-df_w <- df_w %>% gather_("Item", "Budget weight", gathercols)
-df_w <- df_w %>% group_by(Item) %>% mutate(x = ifelse(sum(`Budget weight` < 0) > (n_points / 3), 1, 0))
-invert_these <- unique(df_w$Item[which(df_w$x == 1)])
-ind_invert_these <- which(gathercols %in% invert_these)
-#-------------------------------------------------------------
-# mat_ts_dy_wInv <- mat_ts_dy
-# mat_ts_dy_wInv[, ind_invert_these] <- 1 / mat_ts_dy_wInv[, ind_invert_these]
-# mat_pctDiff_dy_wInv <- diff(mat_ts_dy_wInv) / mat_ts_dy_wInv[-nrow(mat_ts_dy_wInv), ]
-# #mat_pctDiff_dy <- diff(log(mat_ts_dy))
-# row.names(mat_pctDiff_dy_wInv) <- as.character(date_vec)
-# mat_pctDiff_in_wInv <- mat_pctDiff_dy_wInv
-# mat_PCA_in_wInv <- mat_pctDiff_in_wInv
-# colnames(mat_PCA_in_wInv) <- colnames(mat_PCA_in)
+# n_signals <- ncol(mat_eigvecs_sig_train)
+# mat_eigvecs_sig_train_aug <- cbind(mat_eigvecs_sig_train, nab_C)
+# Q <- t(mat_eigvecs_sig_train_aug) %*% mat_eigvecs_train
+# # M <- round(Q %*% diag(1 / eigvals) %*% t(mat_eigvecs) %*% mat_sig_eigvecs_aug, 6)
+# M <- round(Q %*% diag(1 / eigvals_train) %*% t(Q), 7)
+# M
+# M_inv <- round(solve(M), 5)
+# M_inv
 # 
-# mat_pctDiff_train_wInv <- mat_PCA_in_wInv[ind_train, ]
-# mat_pctDiff_test_wInv <- mat_PCA_in_wInv[ind_test, ]
-# #ts_avg_test_wInv <- ts_avg_in_wInv[ind_test]
-# #date_vec_test <- date_vec[ind_test]
-#-------------------------------------------------------------
-#mat_pctDiff_train[, c("Cotton")] / mat_pctDiff_train_wInv[, c("Cotton")]
-#-------------------------------------------------------------
-mat_pctDiff_train_wInv[ind_invert_these, ] <- -mat_pctDiff_train[ind_invert_these, ]
-#-------------------------------------------------------------
-list_out <- signals_from_noise(mat_pctDiff_train_wInv,
-                               eigenvalue_density_plot = T,
-                               signals_plot = T,
-                               pca_var_plot = F,
-                               pca_ind_plot = F,
-                               list_groups = list_groups,
-                               group_names = group_names,
-                               quietly = F)
-# list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig)
-mat_loads_sig_train_wInv <- list_out[[1]]
-mat_loads_rot_sig_train_wInv <- list_out[[2]]
-# mat_loads_train <- list_out[[3]]
-# mat_laods_rot_train <- list_out[[4]]
-mat_pctDiff_sig_train_wInv <- list_out[[5]]
-eigvals_sig_train_wInv <- list_out[[6]]
-mat_eigvecs_sig_train_wInv <- list_out[[7]]
-#-------------------------------------------------------------
-# signal_names <- c("US / Emerg. Markets,\nEnergy, Blockchain", "Precious metals", "FOREX", "US Bonds", "Agriculture", "Industrial metals")
-interpret_loadings(mat_loads_rot_sig_train_wInv,
-                   list_groups = list_groups,
-                   group_names = group_names,
-                   signal_names = signal_names)
-
-#-------------------------------------------------------------
-
-```
+# targ_vec <-  c(0.2 * rep(1, n_signals), 1)
+# #targ_vec <- c(0.06, 0.06, 0.02, 0.02, 1)
+# x <- -2 * M_inv %*% targ_vec
+# l_V <- 1 / x[1]
+# lambdas <- l_V * x
+# lambdas
+# l_C <- lambdas[length(lambdas)]
+# 
+# wStar <- -1 / (2 * l_V) * mat_eigvecs_train %*% diag(1 / eigvals_train) %*% t(mat_eigvecs_train) %*% mat_eigvecs_sig_train_aug %*% lambdas
+# pctDiff_wStar <- mat_pctDiff_test %*% wStar
+# 
+# backtest_ret <- prod(1 + pctDiff_wStar) - 1
+# #sd(pctDiff_wStar)
+# sum(wStar)
+# 
+# t(wStar) %*% cormat %*% wStar
 
 
-
-```{r, echo=FALSE}
-#-------------------------------------------------------------
-
-# Get backtest data
-list_out <- signals_from_noise(mat_PCA_in_wInv,
-                               eigenvalue_density_plot = F,
-                               signals_plot = F,
-                               pca_var_plot = F,
-                               pca_ind_plot = F,
-                               list_groups = list_groups,
-                               group_names = group_names,
-                               quietly = T)
-mat_loads_sig_test_wInv <- list_out[[1]]
-mat_loads_rot_sig_test_wInv <- list_out[[2]]
-mat_pctDiff_sig_test_wInv <- list_out[[5]][ind_test, ]
-#-------------------------------------------------------------
-#=======================================================================
-# Conventional risk-reward frontier, now with inverses of neg wgts
-n_vars <- nrow(mat_loads_sig_train_wInv)
-C_targ <- 1
-nab_C <- rep(1, n_vars)
-#------------------------------------
-# Correlation matrix
-cormat <- cor(mat_pctDiff_train)
-#cormat <- round(mat_loads_rot_sig_train %*% t(mat_loads_rot_sig_train), 7)
-#cormat <- round(mat_loads_sig_train %*% t(mat_loads_sig_train), 7)
-# mse <- mean((cor(mat_pctDiff_train) - cormat)^2)
-# mse
-#------------------------------------
-# Expected returns vector
-ind_t_ret <- (nrow(mat_pctDiff_train_wInv) - length(ind_test)):nrow(mat_pctDiff_train_wInv)
-nab_mu_ret_train_wInv <- apply(mat_pctDiff_train_wInv[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
-#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train)
-#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train_mo)
-#------------------------------------
-mat_pctDiff_backtest_wInv <- mat_pctDiff_test_wInv
-#------------------------------------
-mat_nab <- cbind(nab_mu_ret_train, nab_C)
-#------------------------------------
-list_out <- get_optimal_frontier(cormat, mat_nab,
-                                 Rtarg_limits = c(0.01, .35),
-                                 n_points_on_frontier = 50,
-                                 mat_pctDiff_backtest_wInv,
-                                 utility_interpretation = F,
-                                 frontier_budget_plot = T,
-                                 budget_weights_plot = T,
-                                 list_groups = list_groups,
-                                 group_names = group_names)
-
-#df_wfrontier <- list_out[[1]]
-#------------------------------------
 
 
 ```
-
-
-
-
-```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
-
-df_w <- list_out[[2]]
-gathercols <- colnames(df_w)[-1]
-df_w$Port_id <- 1:nrow(df_w)
-df_w <- df_w %>% gather_("Item", "Budget weight", gathercols)
-df_w <- df_w %>% group_by(Item) %>% mutate(x = ifelse(sum(`Budget weight` < 0), 1, 0))
-invert_these <- unique(df_w$Item[which(df_w$x == 1)])
-ind_invert_these <- which(gathercols %in% invert_these)
-#-------------------------------------------------------------
-mat_ts_dy_wInv <- mat_ts_dy
-mat_ts_dy_wInv[, ind_invert_these] <- 1 / mat_ts_dy_wInv[, ind_invert_these]
-mat_pctDiff_dy_wInv <- diff(mat_ts_dy_wInv) / mat_ts_dy_wInv[-nrow(mat_ts_dy_wInv), ]
-#mat_pctDiff_dy <- diff(log(mat_ts_dy))
-row.names(mat_pctDiff_dy_wInv) <- as.character(date_vec)
-mat_pctDiff_in_wInv <- mat_pctDiff_dy_wInv
-mat_PCA_in_wInv <- mat_pctDiff_in_wInv
-colnames(mat_PCA_in_wInv) <- colnames(mat_PCA_in)
-
-mat_pctDiff_train_wInv <- mat_PCA_in_wInv[ind_train, ]
-mat_pctDiff_test_wInv <- mat_PCA_in_wInv[ind_test, ]
-#ts_avg_test_wInv <- ts_avg_in_wInv[ind_test]
-#date_vec_test <- date_vec[ind_test]
-#-------------------------------------------------------------
-list_out <- signals_from_noise(mat_pctDiff_train_wInv,
-                               eigenvalue_density_plot = T,
-                               signals_plot = T,
-                               pca_var_plot = F,
-                               pca_ind_plot = F,
-                               list_groups = list_groups,
-                               group_names = group_names,
-                               quietly = F)
-# list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig)
-mat_loads_sig_train_wInv <- list_out[[1]]
-mat_loads_rot_sig_train_wInv <- list_out[[2]]
-# mat_loads_train <- list_out[[3]]
-# mat_laods_rot_train <- list_out[[4]]
-mat_pctDiff_sig_train_wInv <- list_out[[5]]
-eigvals_sig_train_wInv <- list_out[[6]]
-mat_eigvecs_sig_train_wInv <- list_out[[7]]
-#-------------------------------------------------------------
-# signal_names <- c("US / Emerg. Markets,\nEnergy, Blockchain", "Precious metals", "FOREX", "US Bonds", "Agriculture", "Industrial metals")
-interpret_loadings(mat_loads_rot_sig_train_wInv,
-                   list_groups = list_groups,
-                   group_names = group_names,
-                   signal_names = signal_names)
-
-#-------------------------------------------------------------
-
-```
-
-
-
-
-
-
-
-
-```{r, echo=FALSE}
-#-------------------------------------------------------------
-
-# Get backtest data
-list_out <- signals_from_noise(mat_PCA_in_wInv,
-                               eigenvalue_density_plot = F,
-                               signals_plot = F,
-                               pca_var_plot = F,
-                               pca_ind_plot = F,
-                               list_groups = list_groups,
-                               group_names = group_names,
-                               quietly = T)
-mat_loads_sig_test_wInv <- list_out[[1]]
-mat_loads_rot_sig_test_wInv <- list_out[[2]]
-mat_pctDiff_sig_test_wInv <- list_out[[5]][ind_test, ]
-#-------------------------------------------------------------
-#=======================================================================
-# Conventional risk-reward frontier, now with inverses of neg wgts
-n_vars <- nrow(mat_loads_sig_train_wInv)
-C_targ <- 1
-nab_C <- rep(1, n_vars)
-#------------------------------------
-# Correlation matrix
-cormat <- cor(mat_pctDiff_train_wInv)
-#cormat <- round(mat_loads_rot_sig_train %*% t(mat_loads_rot_sig_train), 7)
-#cormat <- round(mat_loads_sig_train %*% t(mat_loads_sig_train), 7)
-# mse <- mean((cor(mat_pctDiff_train) - cormat)^2)
-# mse
-#------------------------------------
-# Expected returns vector
-ind_t_ret <- (nrow(mat_pctDiff_train_wInv) - length(ind_test)):nrow(mat_pctDiff_train_wInv)
-nab_mu_ret_train_wInv <- apply(mat_pctDiff_train_wInv[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
-#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train)
-#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train_mo)
-#------------------------------------
-mat_pctDiff_backtest_wInv <- mat_pctDiff_test_wInv
-#------------------------------------
-mat_nab <- cbind(nab_mu_ret_train_wInv, nab_C)
-#------------------------------------
-list_out <- get_optimal_frontier(cormat, mat_nab,
-                                 Rtarg_limits = c(0.01, .35),
-                                 n_points_on_frontier = 50,
-                                 mat_pctDiff_backtest_wInv,
-                                 utility_interpretation = F,
-                                 frontier_budget_plot = T,
-                                 budget_weights_plot = T,
-                                 list_groups = list_groups,
-                                 group_names = group_names)
-
-#df_wfrontier <- list_out[[1]]
-#------------------------------------
-
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1381,117 +1090,7 @@ list_out <- get_optimal_frontier(cormat, mat_nab,
 
 #### 4.1.4 Dealing with negative budget weights
 
-A negative sign on a budget weight indicates that one should invest in the inverse of the corresponding portfolio item. In the financial context, this is possible through short selling. However there is no short selling analogue in the motivating context of this paper. Even in the financial context, many investors prefer to avoid short selling, prompting banks to offer products that track the inverse of specific stocks, commodities, or of whole sectors. The VelocityShares 3x Inverse Gold Exchange Traded Note (ticker symbol: DLGD), for example, tracks the inverse of gold. Investors can avoid taking a short position on gold by investing in this product.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r, fig.width=13, fig.height=11, fig.align='center', echo=FALSE}
-mse <- mean((cor(mat_pctDiff_train) - mat_loads_sig_train %*% t(mat_loads_sig_train))^2)
-mse
-# sse <- sum((cor(mat_PCA_in) - mat_loads_sig_train %*% t(mat_loads_sig_train))^2)
-# sse
-#-----------------------------------------------
-# Conventional optimization
-n_signals <- ncol(mat_loads_sig_train)
-n_vars <- nrow(mat_loads_sig_train)
-ret_targ <- 0.002
-C_targ <- 1
-targ_vec <- c(ret_targ, C_targ)
-nab_C <- rep(1, n_vars)
-cormat <- cor(mat_pctDiff_train)
-#cormat <- round(mat_loads_sig %*% t(mat_loads_sig), 7)
-nab_mu_ret_train <- colMeans(mat_pctDiff_train)
-#nab_mu_ret_train <- mat_eigvecs_sig_train %*% eigvals_sig_train #rep(1, n_signals)
-mat_nab <- cbind(nab_mu_ret_train, nab_C)
-#mat_nab <- nab_mu_ret_in
-list_out <- optimize_portfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_test)
-wStar_conv <- list_out[[1]]
-lambdas_conv <- list_out[[2]]
-ts_wStar_conv <- list_out[[3]]
-lV_conv <- list_out[[5]]
-wStar_conv_e <- exp(wStar_conv) / sum(exp(wStar_conv))
-ts_wStar_conv_e <- mat_pctDiff_test %*% wStar_conv_e
-sd_conv_e <- NA#sqrt(t(wStar_conv_e) %*% cormat %*% wStar_conv_e)
-#-----------------------------------------------
-# Optimization only over signals
-#mat_pctDiff_sig_train <- mat_pctDiff_train %*% mat_loads_sig_train
-mat_pctDiff_sig_train <- mat_pctDiff_train %*% mat_loads_rot_sig_train
-nab_mu_ret_sigs_train <- colMeans(mat_pctDiff_sig_train)
-nab_C_sigs <- rep(1, n_signals)
-cormat <- cor(mat_pctDiff_sig_train)
-mat_nab <- cbind(nab_mu_ret_sigs_train, nab_C_sigs)
-list_out <- optimize_portfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = mat_pctDiff_sig_test)
-wStar_sigs <- list_out[[1]]
-lambdas_sigs <- list_out[[2]]
-ts_wStar_sigs <- list_out[[3]]
-wStar_sigs_e <- exp(wStar_sigs) / sum(exp(wStar_sigs))
-ts_wStar_sigs_e <- mat_pctDiff_sig_test %*% wStar_sigs_e
-sd_sigs_e <- NA#sqrt(t(wStar_sigs_e) %*% cormat %*% wStar_sigs_e)
-#-----------------------------------------------
-# Backtesting
-#-----------------------------------------------
-mat_comp_ts <- cbind(ts_avg_test, ts_wStar_conv_e, ts_wStar_sigs_e, mat_eigenportfolio_test)
-colnames(mat_comp_ts) <- c("Average", "Opt conv", "Opt sigs", paste("Eigenportfolio", 1:n_signals))
-
-mat_comp_ts_perform <- apply(mat_comp_ts, 2, function(x) x - mat_comp_ts[, 1])
-#df_plot <- data.frame(Date = date_vec_test, mat_comp_ts_perform)
-df_plot <- data.frame(Date = date_vec_test, mat_comp_ts)
-df_plot_base <- df_plot[, c("Date", "Average")]
-df_plot$Average <- NULL
-gathercols <- colnames(df_plot)[-1]
-#str_ylab <- "Performance (Pct. point diff. from average)"
-str_ylab <- "Return (frac)"
-df_plot <- df_plot %>% gather_("Type", str_ylab, gathercols)
-df_plot <- subset(df_plot, Type %in% c("Opt.sigs", "Opt.conv"))
-gg <- ggplot()
-gg <- gg + geom_line(data = df_plot_base, aes(x = Date, y = Average, group = 1), color = "orange", lwd = 2)
-gg <- gg + geom_line(data = df_plot, aes(x = Date, y = `Return (frac)`, group = 1))
-gg <- gg + facet_wrap(~Type, ncol = 1, scales = "free")
-gg <- gg + labs(y = str_ylab)
-gg
-#------------
-n_positive <- apply(mat_comp_ts, 2, function(x) length(which(x > 0)))
-mu_ret <- colMeans(mat_comp_ts)
-sum_ret <- colSums(mat_comp_ts)
-sd_ret <- apply(mat_comp_ts, 2, sd)
-cv_ret <- sd_ret / mu_ret
-sd_eigprtf_vec <- diag(sqrt(t(mat_loads_rot_sig_normd) %*% cor(mat_pctDiff_train) %*% mat_loads_rot_sig_normd))
-sd_ret_calc <- c(NA, sd_conv_e, sd_sigs_e, sd_eigprtf_vec)
-knitr::kable(data.frame(n_positive, sum_ret, mu_ret, cv_ret, sd_ret, sd_ret_calc))
-#------------
-# mu_ret_pos <- apply(mat_comp_ts, 2, function(x) mean(x[which(x > 0)]))
-# sd_ret_pos <- apply(mat_comp_ts, 2, function(x) sd(x[which(x > 0)]))
-# cv_ret_pos <- sd_ret_pos / mu_ret_pos
-# knitr::kable(data.frame(n_positive, mu_ret_pos, cv_ret_pos, sd_ret_pos))
-# #------------
-# mu_ret_neg <- apply(mat_comp_ts, 2, function(x) mean(x[which(x < 0)]))
-# sd_ret_neg <- apply(mat_comp_ts, 2, function(x) sd(x[which(x < 0)]))
-# cv_ret_neg <- sd_ret_neg / mu_ret_neg
-# knitr::kable(data.frame(n_positive, mu_ret_neg, cv_ret_neg, sd_ret_neg))
-#------------
-n_positive <- apply(mat_comp_ts_perform, 2, function(x) length(which(x > 0)))
-sd_perform <- apply(mat_comp_ts_perform, 2, function(x) sd(x[which(x > 0)]))
-mu_perform <- apply(mat_comp_ts_perform, 2, function(x) mean(x[which(x > 0)]))
-sd_perform <- apply(mat_comp_ts_perform, 2, sd)
-mu_perform <- colMeans(mat_comp_ts_perform)
-cv_perform <- sd_perform / mu_perform
-knitr::kable(data.frame(n_positive, mu_perform, cv_perform, sd_perform))
-
-
-```
+<!-- A negative sign on a budget weight indicates that one should invest in the inverse of the corresponding portfolio item. In the financial context, this is possible through short selling. However there is no short selling analogue in the motivating context of this paper. Even in the financial context, many investors prefer to avoid short selling, prompting banks to offer products that track the inverse of specific stocks, commodities, or of whole sectors. The VelocityShares 3x Inverse Gold Exchange Traded Note (ticker symbol: DLGD), for example, tracks the inverse of gold. Investors can avoid taking a short position on gold by investing in this product. -->
 
 
 
@@ -1501,17 +1100,9 @@ knitr::kable(data.frame(n_positive, mu_perform, cv_perform, sd_perform))
 
 
 
-<!-- Little or no care is taken, however, to address the tradeoffs that exist between investments in each of these thematic areas. It is well known, for example, that agriculture is often detrimental to the environment. This implies a tradeoff between the food security and environmental objectives. Economic growth, in its turn, is inversely related to both agricultural and environmental objectives. In many parts of the world, there is also a longstanding tradeoff between economic growth and economic equality. Investments in one thematic area can thus offset returns to investments in other thematic areas. -->
-
-<!-- Moreover, conventional -->
-
-<!-- ### I.ii Proposed solution: a PCA approach -->
-
-<!-- In this concept note, I propose a rigorous, precise method for identifying and quantifying tradeoffs and synergies between strategic objectives (SOs). The method is based on principle components analysis (PCA) of a large dataset of development indicators spanning the usual thematic areas. (For a good overview of PCA, see Abdi & Williams (2010).) A variant of this approach has been applied in the analysis of financial market time series (Gopikrishnan et al., 2001). Here I enhance such precedents by also leveraging a rigorous signal selecting technique developed in the study of physical systems (Dehesa et al., 1983). -->
-
 
 ```{r, echo=FALSE}
-setwd("D:/OneDrive - CGIAR/Documents")
+#setwd("D:/OneDrive - CGIAR/Documents")
 #-------------------------------------------------------------
 remove_countries <- c("São Tomé and Principe", "Micronesia, Fed. Sts.")
 WDI_country_classification <- read.csv("WDICountry.csv", stringsAsFactors = F)
@@ -1805,6 +1396,8 @@ df_plot$Type[which(df_plot$Indicator %in% peaceHRights_indicators)] <- "Equality
 # gg <- gg + theme(legend.position = "none")
 # gg
 #------------------------------------------------------------
+check_on_data <- F
+if(check_on_data){
 this_type <- "Health/Population"
 df_plot2 <- subset(df_plot, Type == this_type)
 gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
@@ -1869,6 +1462,9 @@ gg <- gg + geom_point(size = 2)
 gg <- gg + labs(title = this_type)
 gg_infrastr <- gg
 gg
+  
+}
+
 ```
 
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
@@ -2396,3 +1992,12 @@ Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
 # 
 
 ```
+
+
+<!-- Little or no care is taken, however, to address the tradeoffs that exist between investments in each of these thematic areas. It is well known, for example, that agriculture is often detrimental to the environment. This implies a tradeoff between the food security and environmental objectives. Economic growth, in its turn, is inversely related to both agricultural and environmental objectives. In many parts of the world, there is also a longstanding tradeoff between economic growth and economic equality. Investments in one thematic area can thus offset returns to investments in other thematic areas. -->
+
+<!-- Moreover, conventional -->
+
+<!-- ### I.ii Proposed solution: a PCA approach -->
+
+<!-- In this concept note, I propose a rigorous, precise method for identifying and quantifying tradeoffs and synergies between strategic objectives (SOs). The method is based on principle components analysis (PCA) of a large dataset of development indicators spanning the usual thematic areas. (For a good overview of PCA, see Abdi & Williams (2010).) A variant of this approach has been applied in the analysis of financial market time series (Gopikrishnan et al., 2001). Here I enhance such precedents by also leveraging a rigorous signal selecting technique developed in the study of physical systems (Dehesa et al., 1983). -->
