@@ -938,8 +938,7 @@ get_optimal_frontier <- function(cormat, mat_nab,
   #df_plot <- arrange(df_plot, Item, `Risk (variance)`)
   gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Budget weights`, fill = Item))
   gg <- gg + geom_area(position = "stack")
-  gg <- gg + theme(legend.title = element_blank(),
-                   axis.title.x = element_blank())
+  gg <- gg + theme(legend.title = element_blank())
   if(length(unique(df_plot$Item)) > 15){gg <- gg + theme(legend.position = "none")}
   gg_weights <- gg
   #-------------------------------------------
@@ -1015,6 +1014,17 @@ df_frontier <- list_out[[1]]
 
 
 ```{r, echo=F}
+
+
+# wLam <- -nab_mu_ret_train / lamW::lambertW0(-nab_mu_ret_train)
+# #wLam <- wLam / sum(wLam)
+# t(wLam) %*% cormat %*% wLam
+# 
+# portfolio_pctDiff_t_Lam <- mat_pctDiff_backtest %*% wLam
+# backtest_pctRet_Lam <- prod(1 + portfolio_pctDiff_t_Lam) - 1
+# backtest_V <- t(wLam) %*% cor(mat_pctDiff_backtest) %*% wLam
+# backtest_pctRet_Lam
+# backtest_V
 
 # n_signals <- ncol(mat_eigvecs_sig_train)
 # mat_eigvecs_sig_train_aug <- cbind(mat_eigvecs_sig_train, nab_C)
