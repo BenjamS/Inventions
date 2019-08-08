@@ -772,7 +772,7 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
   # Utility function interpretation of equations
   # (Makes all budget weights positive)
   if(utility_interpretation){
-    Exp_wStar <- exp(wStar)
+    Exp_wStar <- (-1 / wStar)
     K <- sum(Exp_wStar)
     wStar <- Exp_wStar / K
     #Rtarg <- t(mat_nab[, 1]) %*% wStar
@@ -995,7 +995,7 @@ list_out <- get_optimal_frontier(cormat, mat_nab,
                                  Rtarg_limits = c(0.01, 0.25),
                                  n_points_on_frontier = 50,
                                  mat_pctDiff_backtest,
-                                 utility_interpretation = F,
+                                 utility_interpretation = T,
                                  frontier_budget_plot = T,
                                  budget_weights_plot = T,
                                  list_groups = list_groups,
@@ -1014,6 +1014,74 @@ df_frontier <- list_out[[1]]
 
 
 ```{r, echo=F}
+
+#------------------------------------
+# nab_mu_ret_train <<- nab_mu_ret_train
+# cormat <<- cormat
+portfolio_heuristic_fn <- function(w_vec){
+  w_vec <- w_vec / sum(w_vec)
+  R <- as.numeric(t(nab_mu_ret_train) %*% w_vec)
+  V <- as.numeric(t(w_vec) %*% cormat %*% w_vec)
+  obj_fn <- R
+  return(obj_fn)
+}
+env <- environment(fun = portfolio_heuristic_fn)
+env[["nab_mu_ret_train"]] <- nab_mu_ret_train
+env[["cormat"]] <- cormat
+#------------------------------------
+out_malschains <- Rmalschains::malschains(function(w_vec) {-portfolio_heuristic_fn(w_vec)},
+                        lower = as.vector(rep(0, n_vars)),
+                        upper = as.vector(rep(1, n_vars)),
+                        verbosity = 0,
+                        env = env)
+w_vec <- out_malschains$sol
+w_vec <- w_vec / sum(w_vec)
+  R <- as.numeric(t(nab_mu_ret_train) %*% w_vec)
+  V <- as.numeric(t(w_vec) %*% cormat %*% w_vec)
+R
+V
+
+# nab_mu_ret_test <- apply(mat_pctDiff_backtest, 2, function(x) prod(1 + x)) - 1
+# R_btest <- t(w_vec) %*% nab_mu_ret_test
+R_btest <- prod(1 + mat_pctDiff_backtest %*% w_vec) - 1
+V_btest <- t(w_vec) %*% cor(mat_pctDiff_backtest) %*% w_vec
+R_btest
+V_btest
+
+
+out_GenSA <- GenSA::GenSA(par = NULL, function(w_vec, nab_mu_ret_train, cormat) {-portfolio_heuristic_fn(w_vec, nab_mu_ret_train, cormat)},
+             lower = as.vector(rep(0, n_vars)),
+             upper = (rep(0.9, n_vars)),
+             control=list(max.call = 1e5),
+             cormat, nab_mu_ret_train)
+
+w_vec <- out_GenSA$par
+w_vec <- w_vec / sum(w_vec)
+  R <- as.numeric(t(nab_mu_ret_train) %*% w_vec)
+  V <- as.numeric(t(w_vec) %*% cormat %*% w_vec)
+R
+V
+#------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # wLam <- -nab_mu_ret_train / lamW::lambertW0(-nab_mu_ret_train)
