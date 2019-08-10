@@ -484,7 +484,7 @@ list_groups <- list(spy_sector_detail, minerals_detail, agriculture_detail, ener
                     currency_detail, emerg_mkt_detail, crypto_detail, Tbond_detail)
 group_names <- c("US Sectors", "Minerals", "Agriculture", "Energy", "Major Currency Pairs",
                  "Emerging Markets", "Cryptocurrencies/Blockchain", "T-Bonds")
-  #-------------------------------------------
+#-------------------------------------------
 #per_ema <- 13
 #fromdate = Sys.Date() - 360
 fromdate = "2018-06-20"
@@ -748,7 +748,7 @@ mat_pctDiff_sig_test <- list_out[[5]][ind_test, ]
 ```
 
 
-```{r, fig.width=8, fig.height=6, fig.align='center', echo = FALSE }
+```{r, fig.width=8, fig.height=6, fig.align='center', echo = FALSE}
 #=======================================================================
 # Define portfolio optimization function
 optimize_portfolio <- function(cormat, mat_nab, targ_vec,
@@ -772,19 +772,20 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
   # Utility function interpretation of equations
   # (Makes all budget weights positive)
   if(utility_interpretation){
-    Exp_wStar <- (-1 / wStar)
+    leverage_factor <- sum(abs(wStar))
+    #wStar <- wStar / leverage_factor
+    Exp_wStar <- exp(-10 * wStar)
     K <- sum(Exp_wStar)
-    wStar <- Exp_wStar / K
-    #Rtarg <- t(mat_nab[, 1]) %*% wStar
-    # Portfolio variance
-    #V <- t(wStar) %*% cormat %*% wStar
+    #wStar <- -Exp_wStar / K * leverage_factor
+    wStar <- -Exp_wStar / K
   } 
   #----------------------------------------------------
   # Backtest
   if(!is.null(mat_pctDiff_backtest)){
     # Straight returns
-    portfolio_pctDiff_t <- mat_pctDiff_backtest %*% wStar
-    backtest_pctRet <- prod(1 + portfolio_pctDiff_t) - 1
+    # portfolio_pctDiff_t <- mat_pctDiff_backtest %*% wStar
+    # backtest_pctRet <- prod(1 + portfolio_pctDiff_t) - 1
+    backtest_pctRet <- (apply(mat_pctDiff_backtest, 2, function(x) prod(1 + x)) - 1) %*% wStar
     backtest_V <- t(wStar) %*% cor(mat_pctDiff_backtest) %*% wStar
     # Performance (returns compared to a benchmark portfolio (the 1/n portfolio for eg.))
     n_items <- ncol(cormat)
@@ -794,25 +795,138 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
     backtest_V_benchmark <- t(wBench) %*% cor(mat_pctDiff_backtest) %*% wBench
     performance <- backtest_pctRet - backtest_pctRet_benchmark
   }else{
-    portfolio_pctDiff_t <- NULL
+    #portfolio_pctDiff_t <- NULL
     backtest_pctRet <- NULL
-    backtest_pctRet_V <- NULL
+    backtest_V <- NULL
+    backtest_pctRet_benchmark <- NULL
+    backtest_V_benchmark <- NULL
     performance <- NULL
   }
   #----------------------------------------------------
-  list_out <- list(wStar, lambdas, V, l_V, backtest_pctRet, backtest_V, backtest_pctRet_benchmark, backtest_V_benchmark, portfolio_pctDiff_t, Rtarg)
+  list_out <- list(wStar, lambdas, V, l_V, backtest_pctRet, backtest_V, backtest_pctRet_benchmark, backtest_V_benchmark, Rtarg)
   return(list_out)
 }
+
+
+
+#=======================================================================
+plot_frontier <- function(df_frontier,
+                          fig_num = NULL,
+                          remove_xAxis = F,
+                          include_backtest_frontier = F){
+  #-------------------------------------------
+  n_points_on_frontier <- nrow(df_frontier)
+  #-------------------------------------------
+  str_title <- "Optimal Portfolio Frontier"
+  if(!is.null(fig_num)){
+    str_title <- paste(paste("Figure", fig_num), str_title)
+    }
+  
+  if(!include_backtest_frontier){
+    df_plot <- df_frontier[, c("Risk (variance)", "Return target")]
+    gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return target`))
+    gg <- gg + labs(title = str_title)
+    if(remove_xAxis){
+      gg <- gg + theme(axis.title.x = element_blank(),
+                       axis.text.x = element_blank())
+    }
+    gg <- gg + geom_point()
+    gg_frontier <- gg
+    print(gg_frontier)
+  }else{
+    df_plot1 <- df_frontier[, c("Risk (variance)", "Return target")]
+    df_plot2 <- df_frontier[, c("Risk backtest", "Return backtest")]
+    df_plot1$Type <- "Optimized Portfolio Target"
+    df_plot2$Type <- "Optimized Portfolio Backtest"
+    colnames(df_plot1)[2] <- "Return"
+    colnames(df_plot2)[1:2] <- c("Risk (variance)", "Return")
+    df_plot <- do.call(rbind, list(df_plot1, df_plot2))
+    gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return`, group = Type, color = Type))
+    gg <- gg + geom_point()
+    gg <- gg + labs(title = str_title)
+    gg <- gg + theme(legend.title = element_blank())
+    if(remove_xAxis){
+      gg <- gg + theme(axis.title.x = element_blank(),
+                       axis.text.x = element_blank())
+    }
+    gg_frontier_wBacktest <- gg
+    print(gg_frontier_wBacktest)
+  }
+  
+}
+
+
+#=======================================================================
+plot_frontier_and_budget <- function(df_frontier, df_w_plot,
+                                     n_points_on_frontier,
+                                     varNames_ordered,
+                                     fig_num = NULL,
+                                     list_groups = NULL,
+                                     group_names = NULL){
+  #-------------------------------------------
+  # Frontier plot
+  str_title <- "Optimal Portfolio Frontier"
+  if(!is.null(fig_num)){
+    str_title <- paste(paste("Figure", fig_num), str_title)
+    }
+    df_plot <- df_frontier[, c("Risk (variance)", "Return target")]
+    gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return target`))
+    gg <- gg + labs(title = str_title)
+    if(remove_xAxis){
+      gg <- gg + theme(axis.title.x = element_blank(),
+                       axis.text.x = element_blank())
+    }
+    gg <- gg + geom_point()
+    gg_frontier <- gg
+  #-------------------------------------------
+  # Budget weights plot
+  # Note df_w_in should have just the target risk column (i.e. don't also include the backtest risk column). At any rate, the budget risk column should be the same as the one used in the frontier plot.
+    df_plot <- df_w_plot
+    gathercols <- colnames(df_plot)
+    df_plot$portfolio_id <- 1:n_points_on_frontier
+    df_match_V <- df_plot[, c("portfolio_id", "Risk (variance)")]
+    df_plot <- df_plot %>% gather_("Item", "Budget weights", gathercols)
+    if(!is.null(list_groups)){
+      n_var <- nrow(mat_nab)
+      group_vec <- rep(NA, n_var)
+      for(i in 1:length(list_groups)){
+        this_group_vec <- list_groups[[i]]
+        this_group_name <- group_names[i]
+        group_vec[which(varNames_ordered %in% this_group_vec)] <- this_group_name
+      }
+      df_match_group <- data.frame(Item = varNames_ordered, Type = group_vec)
+      df_plot <- merge(df_plot, df_match_group, by = "Item")
+      df_plot <- df_plot %>% group_by(portfolio_id, Type) %>% summarise(`Budget weights` = sum(`Budget weights`))
+      df_plot <- merge(df_plot, df_match_V, by = "portfolio_id")
+      colnames(df_plot)[2] <- "Item"
+    }
+    df_plot <- df_plot %>% group_by(Item) %>% mutate(mu = mean(`Budget weights`)) %>% as.data.frame(df_plot)
+    df_plot$Item <- factor(df_plot$Item,
+                           levels = unique(df_plot$Item[order(df_plot$mu, df_plot$Item, decreasing = T)]),
+                           ordered = T)
+    #df_plot <- arrange(df_plot, Item, `Risk (variance)`)
+    gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Budget weights`, fill = Item))
+    gg <- gg + geom_area(position = "stack")
+    gg <- gg + theme(legend.title = element_blank())
+    if(length(unique(df_plot$Item)) > 15){gg <- gg + theme(legend.position = "none")}
+    gg_weights <- gg
+    #-------------------------------------------
+    gg_together <- gg_frontier + gg_weights + plot_layout(ncol = 1)
+    print(gg_together)
+  
+}
+
+
 #=======================================================================
 get_optimal_frontier <- function(cormat, mat_nab,
                                  Rtarg_limits = c(0.001, 0.3),
                                  n_points_on_frontier = 50,
                                  mat_pctDiff_backtest,
                                  utility_interpretation = F,
-                                 frontier_budget_plot = T,
-                                 budget_weights_plot = T,
+                                 frontier_and_budget_plot = F,
                                  list_groups = NULL,
-                                 group_names = NULL
+                                 group_names = NULL,
+                                 fig_num = NULL
 ){
   #-------------------------------------------
   Rtarg_vec <- seq(Rtarg_limits[1], Rtarg_limits[2], length.out = n_points_on_frontier)
@@ -832,8 +946,8 @@ get_optimal_frontier <- function(cormat, mat_nab,
     list_out <- optimize_portfolio(cormat, mat_nab, targ_vec,
                                    mat_pctDiff_backtest,
                                    utility_interpretation)
-#      list_out <- list(wStar, lambdas, V, l_V, backtest_pctRet, backtest_V, backtest_pctRet_benchmark, backtest_V_benchmark, portfolio_pctDiff_t, Rtarg)
-
+    #      list_out <- list(wStar, lambdas, V, l_V, backtest_pctRet, backtest_V, backtest_pctRet_benchmark, backtest_V_benchmark, portfolio_pctDiff_t, Rtarg)
+    
     list_wStar[[i]] <- list_out[[1]]
     lambdas <- list_out[[2]]
     lC_vec[i] <- lambdas[2]
@@ -843,9 +957,11 @@ get_optimal_frontier <- function(cormat, mat_nab,
     backtest_V_vec[i] <- list_out[[6]]
     backtest_pctRet_benchmark_vec[i] <- list_out[[7]]
     backtest_V_benchmark_vec[i] <- list_out[[8]]
-    Rtarg_out_vec[i] <- list_out[[10]]
-
+    Rtarg_out_vec[i] <- list_out[[9]]
+    
   }
+  #-------------------------------------------
+  varNames_ordered <- row.names(mat_nab)
   #-------------------------------------------
   if(is.null(mat_pctDiff_backtest)){
     df_frontier <- data.frame(R_targ = Rtarg_out_vec,
@@ -855,8 +971,9 @@ get_optimal_frontier <- function(cormat, mat_nab,
                                "Risk (variance)",
                                "Risk shadow price",
                                "Budget shadow price")
-      df_w <- data.frame(df_frontier$`Risk (variance)`, t(do.call(cbind, list_wStar)))
-
+    df_w <- data.frame(df_frontier$`Risk (variance)`, t(do.call(cbind, list_wStar)))
+    colnames(df_w) <- c("Risk (variance)", varNames_ordered)
+    
   }else{
     df_frontier <- data.frame(R_targ = Rtarg_out_vec,
                               R_backtest = backtest_pctRet_vec,
@@ -871,103 +988,26 @@ get_optimal_frontier <- function(cormat, mat_nab,
                                "Risk backtest 1/n portfolio",
                                "Risk shadow price",
                                "Budget shadow price")
-      df_w <- data.frame(df_frontier$`Risk backtest`, t(do.call(cbind, list_wStar)))
-
+    df_w <- data.frame(df_frontier$`Risk (variance)`,
+                       df_frontier$`Risk backtest`,
+                       t(do.call(cbind, list_wStar)))
+    colnames(df_w) <- c("Risk (variance)", "Risk (variance) backtest", varNames_ordered)
+    
   }
-  #-------------------------------------------
-  varNames_ordered <- row.names(mat_nab)
-  colnames(df_w) <- c("Risk (variance)", varNames_ordered)
-  #-------------------------------------------
-  # Frontier plot
-  if(frontier_budget_plot){
-    if(!is.null(mat_pctDiff_backtest)){
-      df_plot1 <- df_frontier[, c("Risk (variance)", "Return target")]
-      df_plot2 <- df_frontier[, c("Risk backtest", "Return backtest")]
-#      df_plot3 <- df_frontier[, c("Risk backtest 1/n portfolio", "Return backtest 1/n portfolio")]
-      df_plot1$Type <- "Target"
-      df_plot2$Type <- "Optimized Portfolio Backtest"
- #     df_plot3$Type <- "1/n Portfolio Backtest"
-      colnames(df_plot1)[2] <- "Return"
-      colnames(df_plot2)[1:2] <- c("Risk (variance)", "Return")
-  #    colnames(df_plot3)[1:2] <- c("Risk (variance)", "Return")
-      df_plot <- do.call(rbind, list(df_plot1, df_plot2))
-      # df_plot1 <- df_plot1 %>% gather(Type, `Return`, `Return target`:`Return backtest`)
-      gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return`, group = Type, color = Type))
-      gg <- gg + geom_point()
-      gg <- gg + labs(title = "Optimal Portfolio Frontier")
-      gg <- gg + theme(legend.title = element_blank(),
-                       axis.title.x = element_blank(),
-                       axis.text.x = element_blank())
-      gg_frontier <- gg
-
-    }else{
-      df_plot <- df_frontier[, c("Risk (variance)", "Return target")]
-      gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return target`))
-      gg <- gg + labs(title = "Optimal Portfolio Frontier")
-      gg <- gg + theme(axis.title.x = element_blank(),
-                       axist.text.x = element_blank())
-      gg <- gg + geom_point()
-      gg_frontier <- gg
-      
-    }
-  #-------------------------------------------
-  # Budget weights plot
-  gathercols <- colnames(df_w)[-1]
-  df_plot <- df_w
-  df_plot$point_id <- 1:n_points_on_frontier
-  df_match_V <- df_plot[, c("point_id", "Risk (variance)")]
-  df_plot <- df_plot %>% gather_("Item", "Budget weights", gathercols)
-  if(!is.null(list_groups)){
-    n_var <- nrow(mat_nab)
-    group_vec <- rep(NA, n_var)
-    for(i in 1:length(list_groups)){
-      this_group_vec <- list_groups[[i]]
-      this_group_name <- group_names[i]
-      group_vec[which(varNames_ordered %in% this_group_vec)] <- this_group_name
-    }
-    df_match_group <- data.frame(Item = varNames_ordered, Type = group_vec)
-    df_plot <- merge(df_plot, df_match_group, by = "Item")
-    df_plot <- df_plot %>% group_by(point_id, Type) %>% summarise(`Budget weights` = sum(`Budget weights`))
-    df_plot <- merge(df_plot, df_match_V, by = "point_id")
-    colnames(df_plot)[2] <- "Item"
+  #--------------------------------------
+  if(frontier_and_budget_plot){
+      if(!is.null(mat_pctDiff_backtest)){df_w_plot <- df_w[-2]}else{df_w_plot <- df_w}
+  plot_frontier_and_budget(df_frontier, df_w_plot,
+                           n_points_on_frontier = n_points_on_frontier,
+                           varNames_ordered = varNames_ordered,
+                           fig_num = fig_num,
+                           list_groups = NULL,
+                           group_names = NULL)
   }
-  df_plot <- df_plot %>% group_by(Item) %>% mutate(mu = mean(`Budget weights`)) %>% as.data.frame(df_plot)
-  df_plot$Item <- factor(df_plot$Item,
-                         levels = unique(df_plot$Item[order(df_plot$mu, df_plot$Item, decreasing = T)]),
-                         ordered = T)
-  #df_plot <- arrange(df_plot, Item, `Risk (variance)`)
-  gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Budget weights`, fill = Item))
-  gg <- gg + geom_area(position = "stack")
-  gg <- gg + theme(legend.title = element_blank())
-  if(length(unique(df_plot$Item)) > 15){gg <- gg + theme(legend.position = "none")}
-  gg_weights <- gg
-  #-------------------------------------------
-  # gg_together <- ggpubr::ggarrange(gg_frontier, gg_weights,
-  #                                      align = "v",
-  #                                      ncol = 1, nrow = 2)
-  gg_together <- gg_frontier + gg_weights + plot_layout(ncol = 1)
-  print(gg_together)
-
-  }
-
+  #--------------------------------------
   list_out <- list(df_frontier, df_w)
   return(list_out)
 }
-#=======================================================================
-# # Get eigenportfolios
-# mat_wEigen <- apply(mat_eigvecs_sig_train, 2, function(x) x / sum(x))
-# # mat_loads_rot_sig_train_normd <- apply(mat_loads_rot_sig_train, 2, function(x) x / sum(x))
-# # mat_wEigen <- apply(mat_loads_rot_sig_train_normd, 2, function(x) x / sum(x))
-# V_eigen <- apply(mat_wEigen, 2, function(x) t(x) %*% cormat %*% x)
-# mat_pctDiff_eigenportfolio <- mat_pctDiff_train %*% mat_wEigen
-# R_eigen <- apply(mat_pctDiff_eigenportfolio, 2, function(x) prod(1 + x) - 1)
-# CV_eigen <- abs(sqrt(V_eigen) / R_eigen)
-# df_eigenportfolio <- data.frame(R_eigen, V_eigen, CV_eigen)
-#-----------------------------------------------------------------------
-# Get monthly train data in case you want to use mean monthly returns in optimization
-# mo_yr_endTrain <- format(as.Date(row.names(mat_pctDiff_dy)[nrow(mat_pctDiff_train)]), "%b %Y")
-# ind_train_mo <- 1:which(row.names(mat_pctDiff_mo) == mo_yr_endTrain)
-# mat_pctDiff_train_mo <- mat_pctDiff_mo[ind_train_mo, ]
 #=======================================================================
 # Conventional risk-reward frontier
 n_vars <- nrow(mat_loads_sig_train)
@@ -990,31 +1030,79 @@ nab_mu_ret_train <- apply(mat_pctDiff_train[ind_t_ret, ], 2, function(x) prod(1 
 mat_pctDiff_backtest <- mat_pctDiff_test
 #------------------------------------
 mat_nab <- cbind(nab_mu_ret_train, nab_C)
+n_points_on_frontier <- 50
 #------------------------------------
 list_out <- get_optimal_frontier(cormat, mat_nab,
                                  Rtarg_limits = c(0.01, 0.25),
-                                 n_points_on_frontier = 50,
-                                 mat_pctDiff_backtest,
-                                 utility_interpretation = T,
-                                 frontier_budget_plot = T,
-                                 budget_weights_plot = T,
+                                 n_points_on_frontier = n_points_on_frontier,
+                                 mat_pctDiff_backtest = mat_pctDiff_backtest,
+                                 utility_interpretation = F,
+                                 frontier_budget_plot = F,
                                  list_groups = list_groups,
-                                 group_names = group_names)
+                                 group_names = group_names,
+                                 fig_num = )
+
+
+
 
 df_frontier <- list_out[[1]]
+df_w <- list_out[[2]]
 #------------------------------------
 
 
 ```
 
+Minimum variance analysis is, in many ways, still a work in progress. A backtest of the optimal weights displayed in Figure ... indicates that the real return on investment in these optimal portfolios would have been much less, and the risk much higher, than the efficient fontier suggests.
+
+```{r, fig.width=8, fig.height=4, fig.align='center', echo = FALSE}
+
+  #-------------------------------------------
+  # Frontier plot with backtest
+  plot_frontier(df_frontier,
+                n_points_on_frontier,
+                fig_num = NULL,
+                include_backtest_frontier = T)
+  #-------------------------------------------
+
+
+```
+
+Recently, the notion of "eigenportfolios" has been explored..., in particular the leading eigenvector, which, as observed above, corresponds to the time series average. The eigenportfolios corresponding to the data are displayed in table ... They are all disastrous portfolios with respect to the efficient frontier.
+
+```{r, echo=F}
+
+# Get eigenportfolios
+mat_wEigen <- apply(mat_eigvecs_sig_train, 2, function(x) x / sum(x))
+# mat_loads_rot_sig_train_normd <- apply(mat_loads_rot_sig_train, 2, function(x) x / sum(x))
+# mat_wEigen <- apply(mat_loads_rot_sig_train_normd, 2, function(x) x / sum(x))
+V_eigen <- apply(mat_wEigen, 2, function(x) t(x) %*% cormat %*% x)
+mat_pctDiff_eigenportfolio <- mat_pctDiff_train %*% mat_wEigen
+R_eigen <- apply(mat_pctDiff_eigenportfolio, 2, function(x) prod(1 + x) - 1)
+CV_eigen <- abs(sqrt(V_eigen) / R_eigen)
+df_eigenportfolio <- data.frame(R_eigen, V_eigen, CV_eigen)
+#kableExtra::kable()
+#-----------------------------------------------------------------------
+# Get monthly train data in case you want to use mean monthly returns in optimization
+# mo_yr_endTrain <- format(as.Date(row.names(mat_pctDiff_dy)[nrow(mat_pctDiff_train)]), "%b %Y")
+# ind_train_mo <- 1:which(row.names(mat_pctDiff_mo) == mo_yr_endTrain)
+# mat_pctDiff_train_mo <- mat_pctDiff_mo[ind_train_mo, ]
 
 
 
+```
 
+#### 4.1.4 Dealing with negative budget weights
+
+One of the main problems limiting the usefulness of MV analysis is that the optimal weights usually include negative values. A negative sign on a budget weight indicates that one should invest in the inverse of the corresponding portfolio item. In the financial context, this is possible through short selling, or through investment in financial products that track the inverse of a given product. However, there remains a more serious problem: a portfolio with both negative and positive weights implies that the investor must spend beyond their budget---i.e., they must borrow---in order to take up the corresponding position on the efficient frontier. Some of the higher return positions on the frontier above require that the investor borrow amounts that are equal to 30%-50% of their budget.
+
+In order to enforce positive weights only when solving for optimal portfolios, the elegance of Merton's approach must be replaced with heuristic methods. An evolutionary algorithm is applied below...
 
 
 ```{r, echo=F}
 
+wLam <- exp(lamW::lambertW0(-nab_mu_ret_train))
+wLam <- wLam / sum(wLam)
+t(nab_mu_ret_train) %*% wLam
 #------------------------------------
 # nab_mu_ret_train <<- nab_mu_ret_train
 # cormat <<- cormat
@@ -1030,14 +1118,14 @@ env[["nab_mu_ret_train"]] <- nab_mu_ret_train
 env[["cormat"]] <- cormat
 #------------------------------------
 out_malschains <- Rmalschains::malschains(function(w_vec) {-portfolio_heuristic_fn(w_vec)},
-                        lower = as.vector(rep(0, n_vars)),
-                        upper = as.vector(rep(1, n_vars)),
-                        verbosity = 0,
-                        env = env)
+                                          lower = as.vector(rep(0, n_vars)),
+                                          upper = as.vector(rep(1, n_vars)),
+                                          verbosity = 0,
+                                          env = env)
 w_vec <- out_malschains$sol
 w_vec <- w_vec / sum(w_vec)
-  R <- as.numeric(t(nab_mu_ret_train) %*% w_vec)
-  V <- as.numeric(t(w_vec) %*% cormat %*% w_vec)
+R <- as.numeric(t(nab_mu_ret_train) %*% w_vec)
+V <- as.numeric(t(w_vec) %*% cormat %*% w_vec)
 R
 V
 
@@ -1050,49 +1138,19 @@ V_btest
 
 
 out_GenSA <- GenSA::GenSA(par = NULL, function(w_vec, nab_mu_ret_train, cormat) {-portfolio_heuristic_fn(w_vec, nab_mu_ret_train, cormat)},
-             lower = as.vector(rep(0, n_vars)),
-             upper = (rep(0.9, n_vars)),
-             control=list(max.call = 1e5),
-             cormat, nab_mu_ret_train)
+                          lower = as.vector(rep(0, n_vars)),
+                          upper = (rep(0.9, n_vars)),
+                          control=list(max.call = 1e5),
+                          cormat, nab_mu_ret_train)
 
 w_vec <- out_GenSA$par
 w_vec <- w_vec / sum(w_vec)
-  R <- as.numeric(t(nab_mu_ret_train) %*% w_vec)
-  V <- as.numeric(t(w_vec) %*% cormat %*% w_vec)
+R <- as.numeric(t(nab_mu_ret_train) %*% w_vec)
+V <- as.numeric(t(w_vec) %*% cormat %*% w_vec)
 R
 V
 #------------------------------------
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# wLam <- -nab_mu_ret_train / lamW::lambertW0(-nab_mu_ret_train)
-# #wLam <- wLam / sum(wLam)
-# t(wLam) %*% cormat %*% wLam
-# 
-# portfolio_pctDiff_t_Lam <- mat_pctDiff_backtest %*% wLam
-# backtest_pctRet_Lam <- prod(1 + portfolio_pctDiff_t_Lam) - 1
-# backtest_V <- t(wLam) %*% cor(mat_pctDiff_backtest) %*% wLam
-# backtest_pctRet_Lam
-# backtest_V
 
 # n_signals <- ncol(mat_eigvecs_sig_train)
 # mat_eigvecs_sig_train_aug <- cbind(mat_eigvecs_sig_train, nab_C)
@@ -1166,9 +1224,6 @@ list_out <- get_optimal_frontier(cormat, mat_nab,
 
 
 
-#### 4.1.4 Dealing with negative budget weights
-
-<!-- A negative sign on a budget weight indicates that one should invest in the inverse of the corresponding portfolio item. In the financial context, this is possible through short selling. However there is no short selling analogue in the motivating context of this paper. Even in the financial context, many investors prefer to avoid short selling, prompting banks to offer products that track the inverse of specific stocks, commodities, or of whole sectors. The VelocityShares 3x Inverse Gold Exchange Traded Note (ticker symbol: DLGD), for example, tracks the inverse of gold. Investors can avoid taking a short position on gold by investing in this product. -->
 
 
 
@@ -1476,70 +1531,70 @@ df_plot$Type[which(df_plot$Indicator %in% peaceHRights_indicators)] <- "Equality
 #------------------------------------------------------------
 check_on_data <- F
 if(check_on_data){
-this_type <- "Health/Population"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg_health <- gg
-gg
-this_type <- "Education"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg_educ <- gg
-gg
-this_type <- "Economic Growth"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg_econ <- gg
-gg
-# this_type <- "Economic Equality"
-# df_plot2 <- subset(df_plot, Type == this_type)
-# gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-# gg <- gg + geom_line(lwd = 1.1)
-# gg <- gg + geom_point(size = 2)
-# gg <- gg + labs(title = this_type)
-# gg_employ <- gg
-# gg
-this_type <- "Environmental Sustainability"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg_environ <- gg
-gg
-this_type <- "Food Security"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg_pop <- gg
-gg
-this_type <- "Infrastructure"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg_infrastr <- gg
-gg
-this_type <- "Equality, Peace, Human Rights"
-df_plot2 <- subset(df_plot, Type == this_type)
-gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
-gg <- gg + geom_line(lwd = 1.1)
-gg <- gg + geom_point(size = 2)
-gg <- gg + labs(title = this_type)
-gg_infrastr <- gg
-gg
+  this_type <- "Health/Population"
+  df_plot2 <- subset(df_plot, Type == this_type)
+  gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+  gg <- gg + geom_line(lwd = 1.1)
+  gg <- gg + geom_point(size = 2)
+  gg <- gg + labs(title = this_type)
+  gg_health <- gg
+  gg
+  this_type <- "Education"
+  df_plot2 <- subset(df_plot, Type == this_type)
+  gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+  gg <- gg + geom_line(lwd = 1.1)
+  gg <- gg + geom_point(size = 2)
+  gg <- gg + labs(title = this_type)
+  gg_educ <- gg
+  gg
+  this_type <- "Economic Growth"
+  df_plot2 <- subset(df_plot, Type == this_type)
+  gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+  gg <- gg + geom_line(lwd = 1.1)
+  gg <- gg + geom_point(size = 2)
+  gg <- gg + labs(title = this_type)
+  gg_econ <- gg
+  gg
+  # this_type <- "Economic Equality"
+  # df_plot2 <- subset(df_plot, Type == this_type)
+  # gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+  # gg <- gg + geom_line(lwd = 1.1)
+  # gg <- gg + geom_point(size = 2)
+  # gg <- gg + labs(title = this_type)
+  # gg_employ <- gg
+  # gg
+  this_type <- "Environmental Sustainability"
+  df_plot2 <- subset(df_plot, Type == this_type)
+  gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+  gg <- gg + geom_line(lwd = 1.1)
+  gg <- gg + geom_point(size = 2)
+  gg <- gg + labs(title = this_type)
+  gg_environ <- gg
+  gg
+  this_type <- "Food Security"
+  df_plot2 <- subset(df_plot, Type == this_type)
+  gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+  gg <- gg + geom_line(lwd = 1.1)
+  gg <- gg + geom_point(size = 2)
+  gg <- gg + labs(title = this_type)
+  gg_pop <- gg
+  gg
+  this_type <- "Infrastructure"
+  df_plot2 <- subset(df_plot, Type == this_type)
+  gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+  gg <- gg + geom_line(lwd = 1.1)
+  gg <- gg + geom_point(size = 2)
+  gg <- gg + labs(title = this_type)
+  gg_infrastr <- gg
+  gg
+  this_type <- "Equality, Peace, Human Rights"
+  df_plot2 <- subset(df_plot, Type == this_type)
+  gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
+  gg <- gg + geom_line(lwd = 1.1)
+  gg <- gg + geom_point(size = 2)
+  gg <- gg + labs(title = this_type)
+  gg_infrastr <- gg
+  gg
   
 }
 
