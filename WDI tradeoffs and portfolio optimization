@@ -427,20 +427,20 @@ interpret_loadings <- function(mat_loads_rot_sig,
   
 }
 #=======================================================================
-optimize_portfolio <- function(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL){
-  cormat_inv <- solve(cormat)
-  M <- t(mat_nab) %*% cormat_inv %*% mat_nab
-  M_inv <- solve(M)
-  x <- -2 * M_inv %*% targ_vec
-  l_V <- 1 / x[1]
-  lambdas <- l_V * x
-  wStar <- -1 / (2 * l_V) * cormat_inv %*% mat_nab %*% lambdas
-  sum(wStar)
-  if(!is.null(mat_pctDiff_test)){ts_wStar <- mat_pctDiff_test %*% wStar}else{ts_wStar <- NULL}
-  V <- t(wStar) %*% cormat %*% wStar
-  list_out <- list(wStar, lambdas, ts_wStar, V, l_V)
-  return(list_out)
-}
+# optimize_portfolio <- function(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL){
+#   cormat_inv <- solve(cormat)
+#   M <- t(mat_nab) %*% cormat_inv %*% mat_nab
+#   M_inv <- solve(M)
+#   x <- -2 * M_inv %*% targ_vec
+#   l_V <- 1 / x[1]
+#   lambdas <- l_V * x
+#   wStar <- -1 / (2 * l_V) * cormat_inv %*% mat_nab %*% lambdas
+#   sum(wStar)
+#   if(!is.null(mat_pctDiff_test)){ts_wStar <- mat_pctDiff_test %*% wStar}else{ts_wStar <- NULL}
+#   V <- t(wStar) %*% cormat %*% wStar
+#   list_out <- list(wStar, lambdas, ts_wStar, V, l_V)
+#   return(list_out)
+# }
 #=======================================================================
 # End function definition
 #=======================================================================
@@ -882,7 +882,7 @@ plot_frontier_and_budget <- function(df_frontier, df_w_plot,
   # Budget weights plot
   # Note df_w_in should have just the target risk column (i.e. don't also include the backtest risk column). At any rate, the budget risk column should be the same as the one used in the frontier plot.
     df_plot <- df_w_plot
-    gathercols <- colnames(df_plot)
+    gathercols <- colnames(df_plot)[-1]
     df_plot$portfolio_id <- 1:n_points_on_frontier
     df_match_V <- df_plot[, c("portfolio_id", "Risk (variance)")]
     df_plot <- df_plot %>% gather_("Item", "Budget weights", gathercols)
@@ -1093,9 +1093,9 @@ df_eigenportfolio <- data.frame(R_eigen, V_eigen, CV_eigen)
 
 #### 4.1.4 Dealing with negative budget weights
 
-One of the main problems limiting the usefulness of MV analysis is that the optimal weights usually include negative values. A negative sign on a budget weight indicates that one should invest in the inverse of the corresponding portfolio item. In the financial context, this is possible through short selling, or through investment in financial products that track the inverse of a given product. However, there remains a more serious problem: a portfolio with both negative and positive weights implies that the investor must spend beyond their budget---i.e., they must borrow---in order to take up the corresponding position on the efficient frontier. Some of the higher return positions on the frontier above require that the investor borrow amounts that are equal to 30%-50% of their budget.
+One of the main problems limiting the useffulness of MV analysis is that the optimal weights usually include negative values. A negative sign on a budget weight indicates that one should invest in the inverse of the corresponding portfolio item. In the financial context, this is possible through short selling, or through investment in financial products that track the inverse of a given product. However, there remains a more serious problem: a portfolio with both negative and positive weights implies that the investor must spend beyond their budget---i.e., they must borrow---in order to take up the corresponding position on the efficient frontier. In the example above, some of the higher return positions on the frontier require that the investor borrow amounts that are equal to 30%-50% of their budget. (...This is part of the motivation for eigenportfolios, there is a theorem guaranteeing that the components of the leading eigenvector will always be positive if the correlation matrix has no negative elements.)
 
-In order to enforce positive weights only when solving for optimal portfolios, the elegance of Merton's approach must be replaced with heuristic methods. An evolutionary algorithm is applied below...
+It is possible to enforce positive weights when solving for optimal portfolios using heuristic methods. However, these methods offer no guarantee that the solution found is a global optimum. An evolutionary algorithm is applied below...
 
 
 ```{r, echo=F}
@@ -1184,7 +1184,7 @@ V
 ```
 
 
-
+Another way, not yet explored in the literature, is to interpret the optimal weights as utility weights rather than budget weights, optimize utility weights rather than budget weights. Utility is defined in terms of a first order relation such that increments in the quantity of a given portfolio item are valued in proportion to the amount of the item already accumulated.... Defined up to an affine transformation.
 
 
 ```{r, echo=F}
