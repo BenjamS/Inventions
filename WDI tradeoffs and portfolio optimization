@@ -488,7 +488,8 @@ group_names <- c("US Sectors", "Minerals", "Agriculture", "Energy", "Major Curre
 #per_ema <- 13
 #fromdate = Sys.Date() - 360
 fromdate = "2018-06-20"
-tbl_ohlcv <- tq_get(ts_symb_vec, get = "stock.prices", from = fromdate)
+todate = "2019-08-09"
+tbl_ohlcv <- tq_get(ts_symb_vec, get = "stock.prices", from = fromdate, to = todate)
 df_ohlcv <- as.data.frame(tbl_ohlcv)
 #--
 # Crypto ts can have duplicate date entries sometimes (BTC-USD)
@@ -560,7 +561,7 @@ sd_ret_mo <- apply(mat_pctDiff_mo, 2, sd)
 mat_ts_in <- mat_ts_dy
 ts_avg_in <- ts_avg_dy
 mat_pctDiff_in <- mat_pctDiff_dy
-# nab_mu_ret_in <- mu_ret_dy
+# nab_pctRet_in <- mu_ret_dy
 # sd_ret_in <- sd_ret_dy
 #----------------------------------------------
 mat_PCA_in <- mat_pctDiff_in
@@ -752,7 +753,6 @@ mat_pctDiff_sig_test <- list_out[[5]][ind_test, ]
 #=======================================================================
 # Define portfolio optimization function
 optimize_portfolio <- function(cormat, mat_nab, targ_vec,
-                               mat_pctDiff_backtest = NULL,
                                utility_interpretation = F){
   cormat_inv <- solve(cormat)
   M <- t(mat_nab) %*% cormat_inv %*% mat_nab
@@ -763,6 +763,7 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
   if(l_V > 0){l_V <- -l_V}
   # Budget shadow price (l_C = lambdas[2], l_R normalized to = 1)
   lambdas <- l_V * x
+  l_C <- lambdas[2]
   # Optimal budget weights
   wStar <- -1 / (2 * l_V) * cormat_inv %*% mat_nab %*% lambdas
   # sum(wStar)
@@ -770,118 +771,85 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
   V <- t(wStar) %*% cormat %*% wStar
   # Rtarg <- targ_vec[1]
   Rtarg <- t(wStar) %*% mat_nab[, 1]
-  #l_C <- lambdas[2]
   #Rtarg1 <- -(l_V * V + l_C)
   #----------------------------------------------------
   # Utility function interpretation of equations
   # (Makes all budget weights positive)
   if(utility_interpretation){
-    leverage_factor <- sum(abs(wStar))
-    #wStar <- wStar / leverage_factor
-    #Exp_wStar <- exp(-10 * wStar)
     Exp_wStar <- exp(wStar)
     K <- sum(Exp_wStar)
-    #wStar <- -Exp_wStar / K * leverage_factor
     wStar <- Exp_wStar / K
-    #Rtarg <- prod(wStar^mat_nab[, 1])
     Rtarg <- t(wStar) %*% mat_nab[, 1]
     V <- t(wStar) %*% cormat %*% wStar
   } 
-  #----------------------------------------------------
-  # Backtest
-  if(!is.null(mat_pctDiff_backtest)){
-    # Straight returns
-    # portfolio_pctDiff_t <- mat_pctDiff_backtest %*% wStar
-    # backtest_pctRet <- prod(1 + portfolio_pctDiff_t) - 1
-    backtest_pctRet <- (apply(mat_pctDiff_backtest, 2, function(x) prod(1 + x)) - 1) %*% wStar
-    backtest_V <- t(wStar) %*% cor(mat_pctDiff_backtest) %*% wStar
-    # Performance (returns compared to a benchmark portfolio (the 1/n portfolio for eg.))
-    n_items <- ncol(cormat)
-    wBench <- rep(1 / n_items, n_items)
-    portfolio_benchmark_pctDiff_t <- mat_pctDiff_backtest %*% wBench
-    backtest_pctRet_benchmark <- prod(1 + portfolio_benchmark_pctDiff_t) - 1
-    backtest_V_benchmark <- t(wBench) %*% cor(mat_pctDiff_backtest) %*% wBench
-    performance <- backtest_pctRet - backtest_pctRet_benchmark
-  }else{
-    #portfolio_pctDiff_t <- NULL
-    backtest_pctRet <- NULL
-    backtest_V <- NULL
-    backtest_pctRet_benchmark <- NULL
-    backtest_V_benchmark <- NULL
-    performance <- NULL
-  }
-  #----------------------------------------------------
-  list_out <- list(wStar, lambdas, V, l_V, backtest_pctRet, backtest_V, backtest_pctRet_benchmark, backtest_V_benchmark, Rtarg)
+    list_out <- list(wStar, Rtarg, V, l_V, l_C)
   return(list_out)
+
 }
 #=======================================================================
-plot_frontier <- function(df_frontier,
-                          str_title = NULL,
-                          fig_num = NULL,
-                          remove_xAxis = F,
-                          include_backtest_frontier = F){
+backtest_portfolio <- function(wStar, nab_pctRet_test, cormat_test,
+                               include_benchmark = F){
+  #----------------------------------------------------
+    # Backtest
+    R_test <- t(wStar) %*% nab_pctRet_test
+    V_test <- t(wStar) %*% cormat_test %*% wStar
+    if(include_benchmark){
+    # Benchmark portfolio
+    n_items <- ncol(cormat)
+    wBmark <- rep(1 / n_items, n_items)
+    R_test_bMark <- t(wBmark) %*% nab_pctRet_test
+    V_test_bMark <- t(wBmark) %*% cormat_test %*% wBmark
+    }else{
+    R_test_bMark <- NULL
+    V_test_bMark <- NULL
+    }
+  #----------------------------------------------------
+  outvec <- c(R_test, V_test, R_test_bMark, V_test_bMark)
+  return(outvec)
+  
+}
+#=======================================================================
+plot_frontier_wBacktest <- function(df_frontier,
+                                    df_backtest,
+                          fig_title = NULL){
   #-------------------------------------------
   n_points_on_frontier <- nrow(df_frontier)
+  color_vec <- c("#56B4E9", "black")
   #-------------------------------------------
-  if(is.null(str_title)){str_title <- "Optimal Portfolio Frontier"}
-  if(!is.null(fig_num)){
-    fig_num <- paste0(fig_num, ":")
-    str_title <- paste(paste("Figure", fig_num), str_title)
-    }
-  
-  if(!include_backtest_frontier){
-    df_plot <- df_frontier[, c("Risk (variance)", "Return target")]
-    gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return target`))
-    gg <- gg + labs(title = str_title)
-    gg <- gg + theme(plot.title = element_text(size = 10))
-    if(remove_xAxis){
-      gg <- gg + theme(axis.title.x = element_blank(),
-                       axis.text.x = element_blank())
-    }
-    gg <- gg + geom_point()
-    gg_frontier <- gg
-    print(gg_frontier)
-  }else{
+  if(is.null(fig_title)){fig_title <- "Optimal Portfolio Frontier"}
     df_plot1 <- df_frontier[, c("Risk (variance)", "Return target")]
-    df_plot2 <- df_frontier[, c("Risk backtest", "Return backtest")]
-    df_plot1$Type <- "Optimized Portfolio Target"
-    df_plot2$Type <- "Optimized Portfolio Backtest"
+    df_plot2 <- df_backtest[, c("Risk backtest", "Return backtest")]
+    df_plot1$Type <- "Optimal solution"
+    df_plot2$Type <- "Backtest of solution"
     colnames(df_plot1)[2] <- "Return"
     colnames(df_plot2)[1:2] <- c("Risk (variance)", "Return")
     df_plot <- do.call(rbind, list(df_plot1, df_plot2))
     gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return`, group = Type, color = Type))
     gg <- gg + geom_point()
-    gg <- gg + labs(title = str_title)
+    gg <- gg + scale_color_manual(values = color_vec)
+    gg <- gg + labs(title = fig_title)
     gg <- gg + theme(plot.title = element_text(size = 10))
     gg <- gg + theme(legend.title = element_blank())
-    if(remove_xAxis){
-      gg <- gg + theme(axis.title.x = element_blank(),
-                       axis.text.x = element_blank())
-    }
+    gg <- gg + coord_cartesian(xlim = c(0, max(df_frontier$`Risk (variance)`)))
     gg_frontier_wBacktest <- gg
     print(gg_frontier_wBacktest)
-  }
-  
+
 }
 
 
 #=======================================================================
-plot_frontier_and_budget <- function(df_frontier, df_w_plot,
+plot_frontier_and_budget <- function(df_frontier, df_wStar,
                                      n_points_on_frontier,
                                      varNames_ordered,
-                                     fig_num = NULL,
+                                     fig_title = NULL,
                                      list_groups = NULL,
                                      group_names = NULL){
   #-------------------------------------------
   # Frontier plot
-  str_title <- "Optimal Portfolio Frontier"
-  if(!is.null(fig_num)){
-    fig_num <- paste0(fig_num, ":")
-    str_title <- paste(paste("Figure", fig_num), str_title)
-  }
+  if(is.null(fig_title)){fig_title <- "Optimal Portfolio Frontier"}
   df_plot <- df_frontier[, c("Risk (variance)", "Return target")]
   gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return target`))
-  gg <- gg + labs(title = str_title)
+  gg <- gg + labs(title = fig_title)
   gg <- gg + theme(axis.title.x = element_blank(),
                      axis.text.x = element_blank(),
                    plot.title = element_text(size = 10))
@@ -890,7 +858,7 @@ plot_frontier_and_budget <- function(df_frontier, df_w_plot,
   #-------------------------------------------
   # Budget weights plot
   # Note df_w_in should have just the target risk column (i.e. don't also include the backtest risk column). At any rate, the budget risk column should be the same as the one used in the frontier plot.
-  df_plot <- df_w_plot
+  df_plot <- df_wStar
   gathercols <- colnames(df_plot)[-1]
   df_plot$portfolio_id <- 1:n_points_on_frontier
   df_match_V <- df_plot[, c("portfolio_id", "Risk (variance)")]
@@ -929,91 +897,70 @@ plot_frontier_and_budget <- function(df_frontier, df_w_plot,
 get_optimal_frontier <- function(cormat, mat_nab,
                                  Rtarg_limits = c(0.001, 0.3),
                                  n_points_on_frontier = 50,
-                                 mat_pctDiff_backtest = NULL,
                                  utility_interpretation = F,
+                                 backtest_info = NULL,
                                  frontier_and_budget_plot = T,
                                  list_groups = NULL,
                                  group_names = NULL,
-                                 fig_num = NULL
+                                 fig_title = NULL
 ){
   #-------------------------------------------
   Rtarg_vec <- seq(Rtarg_limits[1], Rtarg_limits[2], length.out = n_points_on_frontier)
   list_wStar <- list()
-  lC_vec <- c()
+  R_vec <- c()
   V_vec <- c()
   lV_vec <- c()
-  backtest_pctRet_vec <- c()
-  backtest_V_vec <- c()
-  backtest_pctRet_benchmark_vec <- c()
-  backtest_V_benchmark_vec <- c()
-  Rtarg_out_vec <- c()
+  lC_vec <- c()
   #-------------------------------------------
   for(i in 1:length(Rtarg_vec)){
     this_Rtarg <- Rtarg_vec[i]
     targ_vec <- c(this_Rtarg, C_targ)
     list_out <- optimize_portfolio(cormat, mat_nab, targ_vec,
-                                   mat_pctDiff_backtest,
                                    utility_interpretation)
-    #      list_out <- list(wStar, lambdas, V, l_V, backtest_pctRet, backtest_V, backtest_pctRet_benchmark, backtest_V_benchmark, portfolio_pctDiff_t, Rtarg)
-    
     list_wStar[[i]] <- list_out[[1]]
-    lambdas <- list_out[[2]]
-    lC_vec[i] <- lambdas[2]
+    R_vec[i] <- list_out[[2]]
     V_vec[i] <- list_out[[3]]
     lV_vec[i] <- list_out[[4]]
-    backtest_pctRet_vec[i] <- list_out[[5]]
-    backtest_V_vec[i] <- list_out[[6]]
-    backtest_pctRet_benchmark_vec[i] <- list_out[[7]]
-    backtest_V_benchmark_vec[i] <- list_out[[8]]
-    Rtarg_out_vec[i] <- list_out[[9]]
-    
+    lC_vec[i] <- list_out[[5]]
   }
   #-------------------------------------------
-  varNames_ordered <- row.names(mat_nab)
-  #-------------------------------------------
-  if(is.null(mat_pctDiff_backtest)){
-    df_frontier <- data.frame(R_targ = Rtarg_out_vec,
-                              V_targ = V_vec,
-                              lV = lV_vec, lC = lC_vec)
+    df_frontier <- data.frame(R_vec, V_vec, lV_vec, lC_vec)
     colnames(df_frontier) <- c("Return target",
                                "Risk (variance)",
                                "Risk shadow price",
                                "Budget shadow price")
-    df_w <- data.frame(df_frontier$`Risk (variance)`, t(do.call(cbind, list_wStar)))
-    colnames(df_w) <- c("Risk (variance)", varNames_ordered)
-    
+    df_wStar <- data.frame(V_vec, t(do.call(cbind, list_wStar)))
+    varNames_ordered <- row.names(mat_nab)
+    colnames(df_wStar) <- c("Risk (variance)", varNames_ordered)
+  #-------------------------------------------
+  # Backtest
+  if(!is.null(backtest_info)){
+    nab_pctRet_test <- backtest_info[[1]]
+    cormat_test <- backtest_info[[2]]
+    list_outTest <- list()
+    for(i in 1:n_points_on_frontier){
+      wStar <- list_wStar[[i]]
+      outvec <- backtest_portfolio(wStar, nab_pctRet_test, cormat_test,
+                               include_benchmark = F)
+    list_outTest[[i]] <- outvec
+
+    }
+    df_backtest <- as.data.frame(do.call(rbind, list_outTest))
+    colnames(df_backtest) <- c("Return backtest", "Risk backtest")
   }else{
-    df_frontier <- data.frame(R_targ = Rtarg_out_vec,
-                              R_backtest = backtest_pctRet_vec,
-                              R_backtest_benchmark = backtest_pctRet_benchmark_vec,
-                              V_targ = V_vec,
-                              V_backtest = backtest_V_vec,
-                              V_backtest_benchmark = backtest_V_benchmark_vec,
-                              lV = lV_vec, lC = lC_vec)
-    colnames(df_frontier) <- c("Return target", "Return backtest",
-                               "Return backtest 1/n portfolio",
-                               "Risk (variance)", "Risk backtest",
-                               "Risk backtest 1/n portfolio",
-                               "Risk shadow price",
-                               "Budget shadow price")
-    df_w <- data.frame(df_frontier$`Risk (variance)`,
-                       df_frontier$`Risk backtest`,
-                       t(do.call(cbind, list_wStar)))
-    colnames(df_w) <- c("Risk (variance)", "Risk (variance) backtest", varNames_ordered)
-    
+    df_backtest <- NULL
   }
   #--------------------------------------
   if(frontier_and_budget_plot){
-    if(!is.null(mat_pctDiff_backtest)){df_w_plot <- df_w[-2]}else{df_w_plot <- df_w}
-    plot_frontier_and_budget(df_frontier, df_w_plot,
+    plot_frontier_and_budget(df_frontier, df_wStar,
                              n_points_on_frontier = n_points_on_frontier,
                              varNames_ordered = varNames_ordered,
-                             fig_num = fig_num,
+                             fig_title = fig_title,
                              list_groups = list_groups,
                              group_names = group_names)
   }
   #--------------------------------------
-  list_out <- list(df_frontier, df_w)
+  list_out <- list(df_wStar, df_frontier, df_backtest)
   return(list_out)
 }
 #=======================================================================
@@ -1024,6 +971,7 @@ nab_C <- rep(1, n_vars)
 #------------------------------------
 # Correlation matrix
 cormat <- cor(mat_pctDiff_train)
+cormat_test <- cor(mat_pctDiff_test)
 #cormat <- round(mat_loads_rot_sig_train %*% t(mat_loads_rot_sig_train), 7)
 #cormat <- round(mat_loads_sig_train %*% t(mat_loads_sig_train), 7)
 # mse <- mean((cor(mat_pctDiff_train) - cormat)^2)
@@ -1031,28 +979,24 @@ cormat <- cor(mat_pctDiff_train)
 #------------------------------------
 # Expected returns vector
 ind_t_ret <- (nrow(mat_pctDiff_train) - length(ind_test)):nrow(mat_pctDiff_train)
-nab_mu_ret_train <- apply(mat_pctDiff_train[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
-#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train)
-#nab_mu_ret_train <- 1 + colMeans(mat_pctDiff_train_mo)
+nab_pctRet_train <- apply(mat_pctDiff_train[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
+nab_pctRet_test <- apply(mat_pctDiff_test, 2, function(x) prod(1 + x)) - 1
 #------------------------------------
-mat_pctDiff_backtest <- mat_pctDiff_test
-#------------------------------------
-mat_nab <- cbind(nab_mu_ret_train, nab_C)
+mat_nab <- cbind(nab_pctRet_train, nab_C)
 n_points_on_frontier <- 50
 #------------------------------------
 list_out <- get_optimal_frontier(cormat, mat_nab,
-                                 Rtarg_limits = c(0.01, 0.25),
+                                 Rtarg_limits = c(0.01, 0.3),
                                  n_points_on_frontier = n_points_on_frontier,
-                                 mat_pctDiff_backtest = mat_pctDiff_backtest,
                                  utility_interpretation = F,
+                                 backtest_info = list(nab_pctRet_test, cormat_test),
                                  frontier_and_budget_plot = T,
                                  list_groups = list_groups,
                                  group_names = group_names,
-                                 fig_num = 1)
+                                 fig_title = "Figure 1: Optimal portfolio frontier")
 
-
-df_frontier <- list_out[[1]]
-df_w <- list_out[[2]]
+df_frontier <- list_out[[2]]
+df_backtest <- list_out[[3]]
 #------------------------------------
 
 
@@ -1064,11 +1008,9 @@ Minimum variance analysis is, in many ways, still a work in progress. A backtest
 
   #-------------------------------------------
   # Frontier plot with backtest
-  plot_frontier(df_frontier,
-                str_title = "Optimal Portfolio Solution vs. Backtest",
-                fig_num = 2,
-                remove_xAxis = F,
-                include_backtest_frontier = T)
+plot_frontier_wBacktest(df_frontier,
+                        df_backtest,
+                        fig_title = "Figure 2: Optimal portfolio solution vs. backtest")
   #-------------------------------------------
 
 
@@ -1083,16 +1025,15 @@ mat_wEigen <- apply(mat_eigvecs_sig_train, 2, function(x) x / sum(x))
 # mat_loads_rot_sig_train_normd <- apply(mat_loads_rot_sig_train, 2, function(x) x / sum(x))
 # mat_wEigen <- apply(mat_loads_rot_sig_train_normd, 2, function(x) x / sum(x))
 V_eigen <- apply(mat_wEigen, 2, function(x) t(x) %*% cormat %*% x)
-R_eigen <- apply(mat_wEigen, 2, function(x) t(x) %*% nab_mu_ret_train)
-cormat_test <- cor(mat_pctDiff_backtest)
-nab_mu_ret_test <- apply(mat_pctDiff_test, 2, function(x) prod(1 + x)) - 1
+R_eigen <- apply(mat_wEigen, 2, function(x) t(x) %*% nab_pctRet_train)
 V_eigen_test <- apply(mat_wEigen, 2, function(x) t(x) %*% cormat_test %*% x)
-R_eigen_test <- apply(mat_wEigen, 2, function(x) t(x) %*% nab_mu_ret_test)
+R_eigen_test <- apply(mat_wEigen, 2, function(x) t(x) %*% nab_pctRet_test)
 
 #mat_pctDiff_eigenportfolio <- mat_pctDiff_train %*% mat_wEigen
 #R_eigen <- apply(mat_pctDiff_eigenportfolio, 2, function(x) prod(1 + x)) - 1
 #CV_eigen <- abs(sqrt(V_eigen) / R_eigen)
-n_signals <- ncol(mat_pctDiff_eigenportfolio)
+n_signals <- ncol(mat_pctDiff_sig_train)
+signal_names[1] <- "US / Emerg. Markets, Energy, Blockchain"
 df_eigenportfolio <- data.frame(Eigen_portfolio = as.character(c(1:n_signals)),
                                       Characteristic = signal_names,
                                       R_eigen, V_eigen,
@@ -1110,7 +1051,7 @@ knitr::kable(df_eigenportfolio)
 
 #### 4.1.4 Dealing with negative budget weights
 
-One of the main problems limiting the useffulness of MV analysis is that the optimal weights usually include negative values. A negative sign on a budget weight indicates that one should invest in the inverse of the corresponding portfolio item. In the financial context, this is possible through short selling, or through investment in financial products that track the inverse of a given product. However, there remains a more serious problem: a portfolio with both negative and positive weights implies that the investor must spend beyond their budget---i.e., they must borrow---in order to take up the corresponding position on the efficient frontier. In the example above, some of the higher return positions on the frontier require that the investor borrow amounts that are equal to 30%-50% of their budget. (...This is part of the motivation for eigenportfolios, there is a theorem guaranteeing that the components of the leading eigenvector will always be positive if the correlation matrix has no negative elements.)
+One of the main problems limiting the usefulness of MV analysis is that the optimal weights usually include negative values. A negative sign on a budget weight indicates that one should invest in the inverse of the corresponding portfolio item. In the financial context, this is possible through short selling, or through investment in financial products that track the inverse of a given product. However, there remains a more serious problem: a portfolio with both negative and positive weights implies that the investor must spend beyond their budget---i.e., they must borrow---in order to take up the corresponding position on the efficient frontier. In the example above, some of the higher return positions on the frontier require that the investor borrow amounts that are equal to 30%-50% of their budget. (...This is part of the motivation for eigenportfolios, there is a theorem guaranteeing that the components of the leading eigenvector will always be positive if the correlation matrix has no negative elements.)
 
 It is possible to enforce positive weights when solving for optimal portfolios using heuristic methods. However, these methods offer no guarantee that the solution found is a global optimum. An evolutionary algorithm is applied below...
 
@@ -1118,36 +1059,36 @@ It is possible to enforce positive weights when solving for optimal portfolios u
 ```{r, echo=F}
 
 
-# wLam <- exp(lamW::lambertW0(-nab_mu_ret_train))
+# wLam <- exp(lamW::lambertW0(-nab_pctRet_train))
 # wLam <- wLam / sum(wLam)
-# t(nab_mu_ret_train) %*% wLam
-#------------------------------------
-# Heuristic solution
-portfolio_heuristic_fn <- function(w_vec){
-  w_vec <- w_vec / sum(w_vec)
-  R <- as.numeric(t(nab_mu_ret) %*% w_vec)
-  V <- as.numeric(t(w_vec) %*% cormat %*% w_vec)
-  obj_fn <- R
-  return(obj_fn)
-}
-env <- environment(fun = portfolio_heuristic_fn)
-env[["nab_mu_ret"]] <- nab_mu_ret_train
-env[["cormat"]] <- cormat
-env[["nab_mu_ret"]] <- nab_mu_ret_test
-env[["cormat"]] <- cormat_test
-#------------------------------------
-out_malschains <- Rmalschains::malschains(function(w_vec) {-portfolio_heuristic_fn(w_vec)},
-                                          lower = as.vector(rep(0, n_vars)),
-                                          upper = as.vector(rep(1, n_vars)),
-                                          verbosity = 0,
-                                          env = env)
-w_vec <- out_malschains$sol
-w_vec <- w_vec / sum(w_vec)
-R <- as.numeric(t(nab_mu_ret_train) %*% w_vec)
-V <- as.numeric(t(w_vec) %*% cormat %*% w_vec)
-R
-V
-#------------------------------------
+# t(nab_pctRet_train) %*% wLam
+# #------------------------------------
+# # Heuristic solution
+# portfolio_heuristic_fn <- function(w_vec){
+#   w_vec <- w_vec / sum(w_vec)
+#   R <- as.numeric(t(nab_pctRet) %*% w_vec)
+#   V <- as.numeric(t(w_vec) %*% cormat %*% w_vec)
+#   obj_fn <- R
+#   return(obj_fn)
+# }
+# env <- environment(fun = portfolio_heuristic_fn)
+# env[["nab_pctRet"]] <- nab_pctRet_train
+# env[["cormat"]] <- cormat
+# env[["nab_pctRet"]] <- nab_pctRet_test
+# env[["cormat"]] <- cormat_test
+# #------------------------------------
+# out_malschains <- Rmalschains::malschains(function(w_vec) {-portfolio_heuristic_fn(w_vec)},
+#                                           lower = as.vector(rep(0, n_vars)),
+#                                           upper = as.vector(rep(1, n_vars)),
+#                                           verbosity = 0,
+#                                           env = env)
+# w_vec <- out_malschains$sol
+# w_vec <- w_vec / sum(w_vec)
+# R <- as.numeric(t(nab_pctRet_train) %*% w_vec)
+# V <- as.numeric(t(w_vec) %*% cormat %*% w_vec)
+# R
+# V
+# #------------------------------------
 
 
 # n_signals <- ncol(mat_eigvecs_sig_train)
@@ -1182,7 +1123,7 @@ V
 ```
 
 
-Another way, not yet explored in the literature, is to interpret the optimal weights as utility weights rather than budget weights, optimize utility weights rather than budget weights. Utility is defined in terms of a first order relation such that increments in the quantity of a given portfolio item are valued in proportion to the amount of the item already accumulated.... Defined up to an affine transformation.
+Another way, not yet explored in the literature, is to interpret the optimal weights as utility weights rather than budget weights. Recall that utility is defined in terms of the   Utility is defined in terms of a first order relation such that increments in the quantity of a given portfolio item are valued in proportion to the amount of the item already accumulated.... Defined up to an affine transformation.
 
 
 ```{r, fig.width=8, fig.height=6, fig.align='center', echo = FALSE}
@@ -1190,15 +1131,15 @@ Another way, not yet explored in the literature, is to interpret the optimal wei
 list_out <- get_optimal_frontier(cormat, mat_nab,
                                  Rtarg_limits = c(0.01, 7),
                                  n_points_on_frontier = n_points_on_frontier,
-                                 mat_pctDiff_backtest = mat_pctDiff_backtest,
                                  utility_interpretation = T,
+                                 backtest_info = list(nab_pctRet_test, cormat_test),
                                  frontier_and_budget_plot = T,
                                  list_groups = list_groups,
                                  group_names = group_names,
-                                 fig_num = 3)
+                                 fig_title = "Figure 3: Optimal portfolio frontier, utility weights")
 
-
-df_frontier <- list_out[[1]]
+df_frontier <- list_out[[2]]
+df_backtest <- list_out[[3]]
 
 
 ```
@@ -1207,45 +1148,18 @@ df_frontier <- list_out[[1]]
 
 ```{r, fig.width=8, fig.height=4, fig.align='center', echo = FALSE}
 
+
+
   #-------------------------------------------
   # Frontier plot with backtest
-  plot_frontier(df_frontier,
-                str_title = "Optimal portfolio solution vs. backtest, utility interpretation",
-                fig_num = 4,
-                remove_xAxis = F,
-                include_backtest_frontier = T)
+plot_frontier_wBacktest(df_frontier,
+                        df_backtest,
+                        fig_title = "Figure 4: Optimal portfolio solution vs. backtest, utility interpretation")
   #-------------------------------------------
+
 
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1259,25 +1173,28 @@ n_signals <- ncol(mat_loads_sig_train)
 nab_C <- rep(1, n_signals)
 #------------------------------------
 # Correlation matrix
-cormat <- round(cor(mat_pctDiff_sig_train), 7)
+cormat <- cor(mat_pctDiff_sig_train)
+cormat_test <- cor(mat_pctDiff_sig_test)
 #------------------------------------
 # Expected returns vector
-nab_mu_ret_train <- apply(mat_pctDiff_sig_train[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
-#nab_mu_ret_train <- mat_eigvecs_sig_train %*% rep(1, n_signals) #------------------------------------
-mat_pctDiff_backtest <- mat_pctDiff_sig_test
+nab_pctRet_train <- apply(mat_pctDiff_sig_train[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
+nab_pctRet_test <- apply(mat_pctDiff_sig_test, 2, function(x) prod(1 + x)) - 1
 #------------------------------------
-mat_nab <- cbind(nab_mu_ret_train, nab_C)
+mat_nab <- cbind(nab_pctRet_train, nab_C)
 row.names(mat_nab) <- signal_names
 #------------------------------------
 list_out <- get_optimal_frontier(cormat, mat_nab,
-                                 Rtarg_limits = c(0.01, 0.6),
+                                 Rtarg_limits = c(0.01, 3),
                                  n_points_on_frontier = n_points_on_frontier,
-                                 mat_pctDiff_backtest = mat_pctDiff_backtest,
                                  utility_interpretation = T,
+                                 backtest_info = list(nab_pctRet_test, cormat_test),
                                  frontier_and_budget_plot = T,
                                  list_groups = NULL,
                                  group_names = NULL,
-                                 fig_num = 3)
+                                 fig_title = "Figure 5: Optimal portfolio frontier, utility weights, signals")
+
+df_frontier <- list_out[[2]]
+df_backtest <- list_out[[3]]
 
 
 df_frontier <- list_out[[1]]
@@ -1292,11 +1209,9 @@ df_frontier <- list_out[[1]]
 
   #-------------------------------------------
   # Frontier plot with backtest
-  plot_frontier(df_frontier,
-                str_title = "Optimal Portfolio Solution vs. Backtest",
-                fig_num = 4,
-                remove_xAxis = F,
-                include_backtest_frontier = T)
+plot_frontier_wBacktest(df_frontier,
+                        df_backtest,
+                        fig_title = "Figure 6: Optimal portfolio solution vs. backtest, utility interpretation, signals")
   #-------------------------------------------
 
 ```
@@ -1730,11 +1645,11 @@ mat_pctDiff_train_sig <- mat_pctDiff_train %*% mat_Loads_rot
 #mat_pctDiff_test_sig <- mat_pctDiff_test %*% mat_Loads_rot
 #mat_eigenportfolio_test <- mat_pctDiff_test %*% mat_Loads_rot_normd
 #mat_pctDiff_sig_in <- mat_pctDiff_in %*% mat_Loads_rot
-nab_mu_ret_sigs <- colMeans(mat_pctDiff_train_sig)
+nab_pctRet_sigs <- colMeans(mat_pctDiff_train_sig)
 sd_ret_sigs <- apply(mat_pctDiff_train_sig, 2, sd)
-cv_ret_sigs <- sd_ret_sigs / nab_mu_ret_sigs
+cv_ret_sigs <- sd_ret_sigs / nab_pctRet_sigs
 sum_ret_sigs <- colSums(mat_pctDiff_train_sig)
-nab_mu_ret_sigs
+nab_pctRet_sigs
 cv_ret_sigs
 sum_ret_sigs
 #t(mat_Loads) %*% mat_Loads
@@ -1776,9 +1691,9 @@ nab_C <- rep(1, nrow(mat_sig_eigvecs))
 nab_C_sigs <- rep(1, n_sigs)
 #-----------------------------------------------
 cormat <- round(cor(mat_pctDiff_train), 7)
-nab_mu_ret_in <- nab_mu_ret
-mat_nab <- cbind(nab_mu_ret_in, nab_C)
-#mat_nab <- nab_mu_ret_in
+nab_pctRet_in <- nab_pctRet
+mat_nab <- cbind(nab_pctRet_in, nab_C)
+#mat_nab <- nab_pctRet_in
 list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL)
 wStar_conv <- list_out[[1]]
 lambdas_conv <- list_out[[2]]
@@ -1789,8 +1704,8 @@ wStar_conv_e <- exp(wStar_conv) / sum(exp(wStar_conv))
 # sd_conv_e <- NA#sqrt(t(wStar_conv_e) %*% cormat %*% wStar_conv_e)
 #-----------------------------------------------
 cormat <- cor(mat_pctDiff_train_sig)
-mat_nab <- cbind(nab_mu_ret_sigs, nab_C_sigs)
-#mat_nab <- cbind(nab_mu_ret_sigs)
+mat_nab <- cbind(nab_pctRet_sigs, nab_C_sigs)
+#mat_nab <- cbind(nab_pctRet_sigs)
 list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL)
 wStar_sigs <- list_out[[1]]
 lambdas_sigs <- list_out[[2]]
@@ -1829,8 +1744,8 @@ for(i in 1:length(Rtarg_vec)){
   #-----------------------------------------------
   cormat <- round(cor(mat_pctDiff_train), 7)
   #cormat <- round(mat_Loads %*% t(mat_Loads), 7)
-  mat_nab <- cbind(nab_mu_ret_in, nab_C)
-  #mat_nab <- cbind(nab_mu_ret_in)
+  mat_nab <- cbind(nab_pctRet_in, nab_C)
+  #mat_nab <- cbind(nab_pctRet_in)
   list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL)
   wStar_conv <- list_out[[1]]
   lambdas_conv <- list_out[[2]]
@@ -1849,8 +1764,8 @@ for(i in 1:length(Rtarg_vec)){
   #backtest_sdRet_conv_e_vec[i] <- sd(ts_wStar_conv_e)
   #-----------------------------------------------
   cormat <- cor(mat_pctDiff_train_sig)
-  mat_nab <- cbind(nab_mu_ret_sigs, nab_C_sigs)
-  #mat_nab <- cbind(nab_mu_ret_sigs)
+  mat_nab <- cbind(nab_pctRet_sigs, nab_C_sigs)
+  #mat_nab <- cbind(nab_pctRet_sigs)
   list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL)
   wStar_sigs <- list_out[[1]]
   lambdas_sigs <- list_out[[2]]
