@@ -969,7 +969,11 @@ n_vars <- nrow(mat_loads_sig_train)
 C_targ <- 1
 nab_C <- rep(1, n_vars)
 #------------------------------------
+# Get pct return vec and correlation matrix only over a period equal in length to that of the test period.
+ind_equal_test <- (nrow(mat_pctDiff_train) - length(ind_test)):nrow(mat_pctDiff_train)
+#------------------------------------
 # Correlation matrix
+#cormat <- cor(mat_pctDiff_train[ind_equal_test, ])
 cormat <- cor(mat_pctDiff_train)
 cormat_test <- cor(mat_pctDiff_test)
 #cormat <- round(mat_loads_rot_sig_train %*% t(mat_loads_rot_sig_train), 7)
@@ -978,8 +982,8 @@ cormat_test <- cor(mat_pctDiff_test)
 # mse
 #------------------------------------
 # Expected returns vector
-ind_t_ret <- (nrow(mat_pctDiff_train) - length(ind_test)):nrow(mat_pctDiff_train)
-nab_pctRet_train <- apply(mat_pctDiff_train[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
+#nab_pctRet_train <- apply(mat_pctDiff_train[ind_equal_test, ], 2, function(x) prod(1 + x)) - 1
+nab_pctRet_train <- apply(mat_pctDiff_train, 2, function(x) prod(1 + x)) - 1
 nab_pctRet_test <- apply(mat_pctDiff_test, 2, function(x) prod(1 + x)) - 1
 #------------------------------------
 mat_nab <- cbind(nab_pctRet_train, nab_C)
@@ -1177,7 +1181,8 @@ cormat <- cor(mat_pctDiff_sig_train)
 cormat_test <- cor(mat_pctDiff_sig_test)
 #------------------------------------
 # Expected returns vector
-nab_pctRet_train <- apply(mat_pctDiff_sig_train[ind_t_ret, ], 2, function(x) prod(1 + x)) - 1
+#nab_pctRet_train <- apply(mat_pctDiff_sig_train[ind_equal_test, ], 2, function(x) prod(1 + x)) - 1
+nab_pctRet_train <- apply(mat_pctDiff_sig_train, 2, function(x) prod(1 + x)) - 1
 nab_pctRet_test <- apply(mat_pctDiff_sig_test, 2, function(x) prod(1 + x)) - 1
 #------------------------------------
 mat_nab <- cbind(nab_pctRet_train, nab_C)
@@ -1197,7 +1202,6 @@ df_frontier <- list_out[[2]]
 df_backtest <- list_out[[3]]
 
 
-df_frontier <- list_out[[1]]
 #------------------------------------
 
 
@@ -1487,23 +1491,23 @@ table(out)
 #which(as.numeric(out) > 0)
 #colnames(df_WDI)[which(as.numeric(out) > 0)]
 #mat_zWDI <- scale(df_WDI)
-#mat_PCA_in <- diff(as.matrix(log(df_WDI)))
-mat_PCA_in <- diff(as.matrix(df_WDI)) / as.matrix(df_WDI[-nrow(df_WDI), ])
-row.names(mat_PCA_in) <- year_vec[-1]
+#mat_pctDiff <- diff(as.matrix(log(df_WDI)))
+mat_pctDiff <- diff(as.matrix(df_WDI)) / as.matrix(df_WDI[-nrow(df_WDI), ])
+row.names(mat_pctDiff) <- year_vec[-1]
 # library(tidyquant)
 # ema_per <- 2
-# mat_PCA_in <- apply(df_WDI, 2, function(x) x - EMA(x, ema_per))
-# row.names(mat_PCA_in) <- year_vec
-# mat_PCA_in <- mat_PCA_in[-c(1:(ema_per - 1)), ]
-# mat_PCA_in[is.nan(mat_PCA_in)] <- 0
-# mat_PCA_in[is.infinite(mat_PCA_in)] <- 0
+# mat_pctDiff <- apply(df_WDI, 2, function(x) x - EMA(x, ema_per))
+# row.names(mat_pctDiff) <- year_vec
+# mat_pctDiff <- mat_pctDiff[-c(1:(ema_per - 1)), ]
+# mat_pctDiff[is.nan(mat_pctDiff)] <- 0
+# mat_pctDiff[is.infinite(mat_pctDiff)] <- 0
 #-----------------------------------------------------------
-df_plot <- as.data.frame(mat_PCA_in)
+df_plot <- as.data.frame(mat_pctDiff)
 df_plot$Year <- year_vec[-1]
 df_plot <- df_plot %>% gather_("Indicator", "Value", colnames(df_WDI))
 df_plot$Type <- NA
 df_plot$Type[which(df_plot$Indicator %in% healthPop_indicators)] <- "Health/Population"
-df_plot$Type[which(df_plot$Indicator %in% economic_equality_indicators)] <- "Economic Equality"
+#df_plot$Type[which(df_plot$Indicator %in% economic_equality_indicators)] <- "Economic Equality"
 df_plot$Type[which(df_plot$Indicator %in% educ_indicators)] <- "Education"
 df_plot$Type[which(df_plot$Indicator %in% economic_growth_indicators)] <- "Economic Growth"
 df_plot$Type[which(df_plot$Indicator %in% environmental_indicators)] <- "Environmental Sustainability"
@@ -1590,7 +1594,7 @@ if(check_on_data){
 
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 #------------------------------------------------------------
-list_out <- signals_from_noise(mat_PCA_in,
+list_out <- signals_from_noise(mat_pctDiff,
                                eigenvalue_density_plot = T,
                                signals_plot = T,
                                pca_var_plot = F,
@@ -1602,20 +1606,6 @@ list_out <- signals_from_noise(mat_PCA_in,
 mat_loads_sig <- list_out[[1]]
 mat_loads_rot_sig <- list_out[[2]]
 
-
-# list_sigs <- Signals_from_noise(mat_PCA_in, varimax_rot = T,
-#                                 list_groups = list_groups,
-#                                 group_names = group_names,
-#                                 pca_var_plot = F,
-#                                 pca_ind_plot = F,
-#                                 eigenvalue_density_plot = T,
-#                                 sig_corr_plot = T,
-#                                 yearly = F)
-
-# colMeans(df_sigs[, -1])
-# sig_vec <- apply(df_sigs[, -1], 2, sd)
-# covmat <- diag(sig_vec) %*% cor(df_sigs[, -1]) %*% diag(sig_vec)
-# print(covmat)
 
 ```
 
@@ -1631,234 +1621,75 @@ interpret_loadings(mat_loads_rot_sig,
 
 ```
 
-```{r, fig.width=12, fig.height=4, fig.align='center', echo=FALSE}
+```{r, fig.width=8, fig.height=6, fig.align='center', echo = FALSE}
 
-
-mat_pctDiff_train_sig <- mat_pctDiff_train %*% mat_Loads_rot
-#mat_pctDiff_test_sig <- mat_pctDiff_test %*% mat_Loads_rot
-#mat_eigenportfolio_test <- mat_pctDiff_test %*% mat_Loads_rot_normd
-#mat_pctDiff_sig_in <- mat_pctDiff_in %*% mat_Loads_rot
-mat_Loads <- list_sigs[[4]]
-mat_Loads_rot <- list_sigs[[5]]
-mat_Loads_rot_normd <- apply(mat_Loads_rot, 2, function(x) x / sum(x))
-mat_pctDiff_train_sig <- mat_pctDiff_train %*% mat_Loads_rot
-#mat_pctDiff_test_sig <- mat_pctDiff_test %*% mat_Loads_rot
-#mat_eigenportfolio_test <- mat_pctDiff_test %*% mat_Loads_rot_normd
-#mat_pctDiff_sig_in <- mat_pctDiff_in %*% mat_Loads_rot
-nab_pctRet_sigs <- colMeans(mat_pctDiff_train_sig)
-sd_ret_sigs <- apply(mat_pctDiff_train_sig, 2, sd)
-cv_ret_sigs <- sd_ret_sigs / nab_pctRet_sigs
-sum_ret_sigs <- colSums(mat_pctDiff_train_sig)
-nab_pctRet_sigs
-cv_ret_sigs
-sum_ret_sigs
-#t(mat_Loads) %*% mat_Loads
-mse <- mean((cor(mat_pctDiff_train) - mat_Loads %*% t(mat_Loads))^2)
-sse <- sum((cor(mat_PCA_in) - mat_Loads %*% t(mat_Loads))^2)
-mse
-sse
-
-mat_sig_eigvecs <- list_sigs[[2]]
-n_sigs <- ncol(mat_sig_eigvecs)
-mat_eigvecs <- as.matrix(list_sigs[[3]])
-eigvals_sig <- eigvals <- list_sigs[[6]]
-eigvals <- list_sigs[[7]]
-ones_vec <- rep(1, nrow(mat_eigvecs))
-mat_sig_eigvecs_aug <- cbind(mat_sig_eigvecs, ones_vec)
-
-#------------------------------------------------------------
-# df_plot1 <- data.frame(Year = as.integer(names(inData_avg)), inData_avg)
-# df_plot2 <- data.frame(Year = as.integer(names(inData_avg)), mat_signal_ts)
-# signal_id <- paste("Signal", c(1:n_signals))
-# colnames(df_plot2)[2:(n_signals + 1)] <- signal_id
-# gathercols <- signal_id
-# df_plot2 <- df_plot2 %>% gather_("Signal", "Value", gathercols)
-# gg <- ggplot()
-# gg <- gg + geom_line(data = df_plot1, aes(x = Year, y = inData_avg), color = "orange", lwd = 1.2)
-# gg <- gg + geom_line(data = df_plot2, aes(x = Year, y = Value))
-# gg <- gg + facet_wrap(~ Signal, nrow = 1)
-# gg <- gg + theme(axis.title.y = element_blank())
-# gg
-
-```
-
-```{r, echo=FALSE}
-#-----------------------------------------------
-ret_targ <- 0.005
+#=======================================================================
+# Conventional risk-reward frontier
+n_vars <- nrow(mat_loads_rot_sig)
 C_targ <- 1
-targ_vec <- c(ret_targ, C_targ)
-nab_C <- rep(1, nrow(mat_sig_eigvecs))
-nab_C_sigs <- rep(1, n_sigs)
-#-----------------------------------------------
-cormat <- round(cor(mat_pctDiff_train), 7)
-nab_pctRet_in <- nab_pctRet
-mat_nab <- cbind(nab_pctRet_in, nab_C)
-#mat_nab <- nab_pctRet_in
-list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL)
-wStar_conv <- list_out[[1]]
-lambdas_conv <- list_out[[2]]
-#ts_wStar_conv <- list_out[[3]]
-lV_conv <- list_out[[5]]
-wStar_conv_e <- exp(wStar_conv) / sum(exp(wStar_conv))
-# ts_wStar_conv_e <- mat_pctDiff_test %*% wStar_conv_e
-# sd_conv_e <- NA#sqrt(t(wStar_conv_e) %*% cormat %*% wStar_conv_e)
-#-----------------------------------------------
-cormat <- cor(mat_pctDiff_train_sig)
-mat_nab <- cbind(nab_pctRet_sigs, nab_C_sigs)
-#mat_nab <- cbind(nab_pctRet_sigs)
-list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL)
-wStar_sigs <- list_out[[1]]
-lambdas_sigs <- list_out[[2]]
-ts_wStar_sigs <- list_out[[3]]
-wStar_sigs_e <- exp(wStar_sigs) / sum(exp(wStar_sigs))
-#ts_wStar_sigs_e <- mat_pctDiff_test_sig %*% wStar_sigs_e
-#sd_sigs_e <- NA#sqrt(t(wStar_sigs_e) %*% cormat %*% wStar_sigs_e)
-#-----------------------------------------------
+nab_C <- rep(1, n_vars)
+#------------------------------------
+# Get pct return vec and correlation matrix only over a period equal in length to that of the test period.
+#ind_equal_test <- (nrow(mat_pctDiff) - length(ind_test)):nrow(mat_pctDiff)
+#------------------------------------
+# Correlation matrix
+#cormat <- cor(mat_pctDiff[ind_equal_test, ])
+cormat <- round(cor(mat_pctDiff), 7)
+#cormat_test <- cor(mat_pctDiff_test)
+#cormat <- round(mat_loads_rot_sig %*% t(mat_loads_rot_sig), 7)
+#cormat <- round(mat_loads_sig %*% t(mat_loads_sig), 7)
+# mse <- mean((cor(mat_pctDiff) - cormat)^2)
+# mse
+#------------------------------------
+# Expected returns vector
+#nab_pctRet <- apply(mat_pctDiff[ind_equal_test, ], 2, function(x) prod(1 + x)) - 1
+nab_pctRet <- apply(mat_pctDiff, 2, function(x) prod(1 + x)) - 1
+#nab_pctRet_test <- apply(mat_pctDiff_test, 2, function(x) prod(1 + x)) - 1
+#------------------------------------
+mat_nab <- cbind(nab_pctRet, nab_C)
+n_points_on_frontier <- 50
+#------------------------------------
+list_out <- get_optimal_frontier(cormat, mat_nab,
+                                 Rtarg_limits = c(0.01, 3),
+                                 n_points_on_frontier = n_points_on_frontier,
+                                 utility_interpretation = F,
+                                 backtest_info = NULL,
+                                 frontier_and_budget_plot = T,
+                                 list_groups = list_groups,
+                                 group_names = group_names,
+                                 fig_title = "Figure 8: Optimal portfolio frontier")
+
+df_frontier <- list_out[[2]]
+df_backtest <- list_out[[3]]
+#------------------------------------
 ```
 
 
-```{r, echo=F}
-
-R_vec <- c()
-V_conv_vec <- c()
-lV_conv_vec <- c()
-wStar_conv_list <- list()
-V_sigs_vec <- c()
-lV_sigs_vec <- c()
-wStar_sigs_list <- list()
-backtest_muRet_conv_vec <- c()
-backtest_muRet_sigs_vec <- c()
-backtest_sdRet_conv_vec <- c()
-backtest_sdRet_sigs_vec <- c()
-backtest_muRet_sigs_e_vec <- c()
-backtest_sdRet_sigs_e_vec <- c()
-wStar_sigs_e_list <- list()
-backtest_muRet_conv_e_vec <- c()
-backtest_sdRet_conv_e_vec <- c()
-wStar_conv_e_list <- list()
-Rtarg_vec <- seq(0.001, 0.01, length.out = 50)
-for(i in 1:length(Rtarg_vec)){
-  this_Rtarg <- Rtarg_vec[i]
-  targ_vec <- c(this_Rtarg, C_targ)
-  #targ_vec <- c(this_Rtarg)
-  #-----------------------------------------------
-  cormat <- round(cor(mat_pctDiff_train), 7)
-  #cormat <- round(mat_Loads %*% t(mat_Loads), 7)
-  mat_nab <- cbind(nab_pctRet_in, nab_C)
-  #mat_nab <- cbind(nab_pctRet_in)
-  list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL)
-  wStar_conv <- list_out[[1]]
-  lambdas_conv <- list_out[[2]]
-  #ts_wStar_conv <- list_out[[3]]
-  V_conv <- list_out[[4]]
-  lV_conv <- list_out[[5]]
-  V_conv_vec[i] <- V_conv
-  lV_conv_vec[i] <- lV_conv
-  wStar_conv_list[[i]] <- wStar_conv
-  #backtest_muRet_conv_vec[i] <- mean(ts_wStar_conv)
-  #backtest_sdRet_conv_vec[i] <- sd(ts_wStar_conv)
-  wStar_conv_e <- exp(wStar_conv) / sum(exp(wStar_conv))
-  #ts_wStar_conv_e <- mat_pctDiff_test %*% wStar_conv_e
-  wStar_conv_e_list[[i]] <- wStar_conv_e
-  #backtest_muRet_conv_e_vec[i] <- mean(ts_wStar_conv_e)
-  #backtest_sdRet_conv_e_vec[i] <- sd(ts_wStar_conv_e)
-  #-----------------------------------------------
-  cormat <- cor(mat_pctDiff_train_sig)
-  mat_nab <- cbind(nab_pctRet_sigs, nab_C_sigs)
-  #mat_nab <- cbind(nab_pctRet_sigs)
-  list_out <- optimizePortfolio(cormat, mat_nab, targ_vec, mat_pctDiff_test = NULL)
-  wStar_sigs <- list_out[[1]]
-  lambdas_sigs <- list_out[[2]]
-  #ts_wStar_sigs <- list_out[[3]]
-  V_sigs <- list_out[[4]]
-  lV_sigs <- list_out[[5]]
-  V_sigs_vec[i] <- V_sigs
-  lV_sigs_vec[i] <- lV_sigs
-  wStar_sigs_list[[i]] <- wStar_sigs
-  # backtest_muRet_sigs_vec[i] <- mean(ts_wStar_sigs)
-  # backtest_sdRet_sigs_vec[i] <- sd(ts_wStar_sigs)
-  wStar_sigs_e <- exp(wStar_sigs) / sum(exp(wStar_sigs))
-  # ts_wStar_sigs_e <- mat_pctDiff_test_sig %*% wStar_sigs_e
-  wStar_sigs_e_list[[i]] <- wStar_sigs_e
-  # backtest_muRet_sigs_e_vec[i] <- mean(ts_wStar_sigs_e)
-  # backtest_sdRet_sigs_e_vec[i] <- sd(ts_wStar_sigs_e)
-  #-----------------------------------------------
-  # print(lambdas_conv[2])
-  # print(lambdas_sigs[2])
-  # print(lV_conv)
-  # print(lV_sigs)
-}
-
-df_plot <- data.frame(Return = Rtarg_vec, Conventional = sqrt(V_conv_vec), Experiment = sqrt(V_sigs_vec))
-# df_plot <- data.frame(Return = Rtarg_vec, Conventional = backtest_sdRet_conv_e_vec, Experiment = backtest_sdRet_sigs_e_vec)
-df_plot <- df_plot %>% gather(Type, `Risk (s.d.)`, Conventional:Experiment)
-gg <- ggplot(df_plot, aes(x = `Risk (s.d.)`, y = Return, group = Type, color = Type))
-gg <- gg + geom_point()
-gg
 
 
-df_x1 <- data.frame(R = Rtarg_vec,Conventional = backtest_muRet_conv_e_vec, Experiment = backtest_muRet_sigs_e_vec)
-df_x1 <- df_x1 %>% gather(Type, Backtest_mu, Conventional:Experiment)
-df_x2 <- data.frame(R = Rtarg_vec, Conventional = backtest_sdRet_conv_vec, Experiment = backtest_sdRet_sigs_vec)
-df_x2 <- df_x2 %>% gather(Type, Backtest_sd, Conventional:Experiment)
-df_plot <- merge(df_x1, df_x2, by = c("R", "Type"))
+```{r, fig.width=8, fig.height=6, fig.align='center', echo = FALSE}
 
-gg <- ggplot(df_plot, aes(x = Backtest_sd, y = Backtest_mu, group = Type, color = Type))
-gg <- gg + geom_point()
-gg
+list_out <- get_optimal_frontier(cormat, mat_nab,
+                                 Rtarg_limits = c(0.01, 25),
+                                 n_points_on_frontier = n_points_on_frontier,
+                                 utility_interpretation = T,
+                                 backtest_info = NULL,
+                                 frontier_and_budget_plot = T,
+                                 list_groups = list_groups,
+                                 group_names = group_names,
+                                 fig_title = "Figure 3: Optimal portfolio frontier, utility weights")
 
-# df_plot <- data.frame(Return = Rtarg_vec, Conventional = backtest_muRet_conv_e_vec, Experiment = backtest_muRet_sigs_e_vec)
-# df_plot <- df_plot %>% gather(Type, Backtest, Conventional:Experiment)
-# gg <- ggplot(df_plot, aes(x = Return, y = Backtest, group = Type, color = Type))
-# gg <- gg + geom_point()
-# gg
-# 
-# df_plot <- data.frame(Return = Rtarg_vec, Conventional = backtest_sdRet_conv_e_vec, Experiment = backtest_sdRet_sigs_e_vec)
-# df_plot <- df_plot %>% gather(Type, Backtest, Conventional:Experiment)
-# gg <- ggplot(df_plot, aes(x = Return, y = Backtest, group = Type, color = Type))
-# gg <- gg + geom_point()
-# gg
-
-
-
-# df_x1 <- data.frame(R = Rtarg_vec, Conventional = backtest_sdRet_conv_vec, Experiment = backtest_sdRet_sigs_vec)
-# df_x1 <- df_x1 %>% gather(Type, Backtest_sd, Conventional:Experiment)
-# df_x2 <- data.frame(R = Rtarg_vec, Conventional = sqrt(V_conv_vec), Experiment = sqrt(V_sigs_vec))
-# df_x2 <- df_x2 %>% gather(Type, Calculated_sd, Conventional:Experiment)
-# df_plot <- merge(df_x1, df_x2, by = c("R", "Type"))
-# gg <- ggplot(df_plot, aes(x = Calculated_sd, y = Backtest_sd, group = Type, color = Type))
-# gg <- gg + geom_point()
-# gg
-
-df_look <- data.frame(Return = Rtarg_vec, Conventional = backtest_sdRet_conv_vec, Conventional_sd = sqrt(V_conv_vec), Experiment = backtest_sdRet_sigs_vec, Experiment_sd = sqrt(V_sigs_vec))
-df_look$Conventional / df_look$Conventional_sd
-df_look$Experiment / df_look$Experiment_sd
-
-df_look <- data.frame(Return = Rtarg_vec, Conventional = backtest_muRet_conv_vec, Experiment = backtest_muRet_sigs_vec)
-df_look$Conventional / df_look$Return
-df_look$Experiment / df_look$Return
-
-
-
-
-df_wStack <- data.frame(sd = NA, R = NA, Security = NA, w = NA)
-for(i in 1:length(Rtarg_vec)){df_wStack <- rbind(df_wStack, data.frame(sd = backtest_sdRet_sigs_e_vec[i], R = Rtarg_vec[i], Security = as.character(c(1:n_sigs)), w = c(wStar_sigs_e_list[[i]])))}
-df_wStack <- df_wStack[-1, ]
-
-
-# df_wStack <- data.frame(sd = NA, R = NA, Security = NA, w = NA)
-# for(i in 1:length(Rtarg_vec)){df_wStack <- rbind(df_wStack, data.frame(sd = backtest_sdRet_conv_e_vec[i], R = Rtarg_vec[i], Security = row.names(mat_Loads), w = c(wStar_conv_e_list[[i]])))}
-# df_wStack <- df_wStack[-1, ]
-
-
-gg <- ggplot(df_wStack, aes(x = sd, y = w)) + geom_area(aes(fill = Security))
-#gg <- gg + geom_vline(xintercept = df$Risk[ind_opt], color = "green", lwd = 2)
-gg <- gg + labs(x = "Potfolio Risk (s.d.)", y = "Project Budget Weights")
-#gg <- gg + theme(legend.position = "none")
-gg
-
+df_frontier <- list_out[[2]]
+df_backtest <- list_out[[3]]
 
 ```
+
+
+
+
+
+
+
 
 ## Discussion and conculsions
 
