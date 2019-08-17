@@ -760,7 +760,7 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
   x <- -2 * M_inv %*% targ_vec
   # Risk shadow price
   l_V <- 1 / x[1]
-  if(l_V > 0){l_V <- -l_V}
+  #if(l_V > 0){l_V <- -l_V}
   # Budget shadow price (l_C = lambdas[2], l_R normalized to = 1)
   lambdas <- l_V * x
   l_C <- lambdas[2]
@@ -782,27 +782,27 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
     Rtarg <- t(wStar) %*% mat_nab[, 1]
     V <- t(wStar) %*% cormat %*% wStar
   } 
-  list_out <- list(wStar, Rtarg, V, l_V, l_C)
+    list_out <- list(wStar, Rtarg, V, l_V, l_C)
   return(list_out)
-  
+
 }
 #=======================================================================
 backtest_portfolio <- function(wStar, nab_pctRet_test, cormat_test,
                                include_benchmark = F){
   #----------------------------------------------------
-  # Backtest
-  R_test <- t(wStar) %*% nab_pctRet_test
-  V_test <- t(wStar) %*% cormat_test %*% wStar
-  if(include_benchmark){
+    # Backtest
+    R_test <- t(wStar) %*% nab_pctRet_test
+    V_test <- t(wStar) %*% cormat_test %*% wStar
+    if(include_benchmark){
     # Benchmark portfolio
     n_items <- ncol(cormat)
     wBmark <- rep(1 / n_items, n_items)
     R_test_bMark <- t(wBmark) %*% nab_pctRet_test
     V_test_bMark <- t(wBmark) %*% cormat_test %*% wBmark
-  }else{
+    }else{
     R_test_bMark <- NULL
     V_test_bMark <- NULL
-  }
+    }
   #----------------------------------------------------
   outvec <- c(R_test, V_test, R_test_bMark, V_test_bMark)
   return(outvec)
@@ -811,29 +811,29 @@ backtest_portfolio <- function(wStar, nab_pctRet_test, cormat_test,
 #=======================================================================
 plot_frontier_wBacktest <- function(df_frontier,
                                     df_backtest,
-                                    fig_title = NULL){
+                          fig_title = NULL){
   #-------------------------------------------
   n_points_on_frontier <- nrow(df_frontier)
   color_vec <- c("#56B4E9", "black")
   #-------------------------------------------
   if(is.null(fig_title)){fig_title <- "Optimal Portfolio Frontier"}
-  df_plot1 <- df_frontier[, c("Risk (variance)", "Return target")]
-  df_plot2 <- df_backtest[, c("Risk backtest", "Return backtest")]
-  df_plot1$Type <- "Optimal solution"
-  df_plot2$Type <- "Backtest of solution"
-  colnames(df_plot1)[2] <- "Return"
-  colnames(df_plot2)[1:2] <- c("Risk (variance)", "Return")
-  df_plot <- do.call(rbind, list(df_plot1, df_plot2))
-  gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return`, group = Type, color = Type))
-  gg <- gg + geom_point()
-  gg <- gg + scale_color_manual(values = color_vec)
-  gg <- gg + labs(title = fig_title)
-  gg <- gg + theme(plot.title = element_text(size = 10))
-  gg <- gg + theme(legend.title = element_blank())
-  gg <- gg + coord_cartesian(xlim = c(0, max(df_frontier$`Risk (variance)`)))
-  gg_frontier_wBacktest <- gg
-  print(gg_frontier_wBacktest)
-  
+    df_plot1 <- df_frontier[, c("Risk (variance)", "Return target")]
+    df_plot2 <- df_backtest[, c("Risk backtest", "Return backtest")]
+    df_plot1$Type <- "Optimal solution"
+    df_plot2$Type <- "Backtest of solution"
+    colnames(df_plot1)[2] <- "Return"
+    colnames(df_plot2)[1:2] <- c("Risk (variance)", "Return")
+    df_plot <- do.call(rbind, list(df_plot1, df_plot2))
+    gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return`, group = Type, color = Type))
+    gg <- gg + geom_point()
+    gg <- gg + scale_color_manual(values = color_vec)
+    gg <- gg + labs(title = fig_title)
+    gg <- gg + theme(plot.title = element_text(size = 10))
+    gg <- gg + theme(legend.title = element_blank())
+    gg <- gg + coord_cartesian(xlim = c(0, max(df_frontier$`Risk (variance)`)))
+    gg_frontier_wBacktest <- gg
+    print(gg_frontier_wBacktest)
+
 }
 
 
@@ -851,7 +851,7 @@ plot_frontier_and_budget <- function(df_frontier, df_wStar,
   gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return target`))
   gg <- gg + labs(title = fig_title)
   gg <- gg + theme(axis.title.x = element_blank(),
-                   axis.text.x = element_blank(),
+                     axis.text.x = element_blank(),
                    plot.title = element_text(size = 10))
   gg <- gg + geom_point()
   gg_frontier <- gg
@@ -924,14 +924,14 @@ get_optimal_frontier <- function(cormat, mat_nab,
     lC_vec[i] <- list_out[[5]]
   }
   #-------------------------------------------
-  df_frontier <- data.frame(R_vec, V_vec, lV_vec, lC_vec)
-  colnames(df_frontier) <- c("Return target",
-                             "Risk (variance)",
-                             "Risk shadow price",
-                             "Budget shadow price")
-  df_wStar <- data.frame(V_vec, t(do.call(cbind, list_wStar)))
-  varNames_ordered <- row.names(mat_nab)
-  colnames(df_wStar) <- c("Risk (variance)", varNames_ordered)
+    df_frontier <- data.frame(R_vec, V_vec, lV_vec, lC_vec)
+    colnames(df_frontier) <- c("Return target",
+                               "Risk (variance)",
+                               "Risk shadow price",
+                               "Budget shadow price")
+    df_wStar <- data.frame(V_vec, t(do.call(cbind, list_wStar)))
+    varNames_ordered <- row.names(mat_nab)
+    colnames(df_wStar) <- c("Risk (variance)", varNames_ordered)
   #-------------------------------------------
   # Backtest
   if(!is.null(backtest_info)){
@@ -941,9 +941,9 @@ get_optimal_frontier <- function(cormat, mat_nab,
     for(i in 1:n_points_on_frontier){
       wStar <- list_wStar[[i]]
       outvec <- backtest_portfolio(wStar, nab_pctRet_test, cormat_test,
-                                   include_benchmark = F)
-      list_outTest[[i]] <- outvec
-      
+                               include_benchmark = F)
+    list_outTest[[i]] <- outvec
+
     }
     df_backtest <- as.data.frame(do.call(rbind, list_outTest))
     colnames(df_backtest) <- c("Return backtest", "Risk backtest")
@@ -1010,12 +1010,12 @@ Minimum variance analysis is, in many ways, still a work in progress. A backtest
 
 ```{r, fig.width=8, fig.height=4, fig.align='center', echo = FALSE}
 
-#-------------------------------------------
-# Frontier plot with backtest
+  #-------------------------------------------
+  # Frontier plot with backtest
 plot_frontier_wBacktest(df_frontier,
                         df_backtest,
                         fig_title = "Figure 2: Optimal portfolio solution vs. backtest")
-#-------------------------------------------
+  #-------------------------------------------
 
 
 ```
@@ -1039,8 +1039,8 @@ R_eigen_test <- apply(mat_wEigen, 2, function(x) t(x) %*% nab_pctRet_test)
 n_signals <- ncol(mat_pctDiff_sig_train)
 signal_names[1] <- "US / Emerg. Markets, Energy, Blockchain"
 df_eigenportfolio <- data.frame(Eigen_portfolio = as.character(c(1:n_signals)),
-                                Characteristic = signal_names,
-                                R_eigen, V_eigen,
+                                      Characteristic = signal_names,
+                                      R_eigen, V_eigen,
                                 R_eigen_test, V_eigen_test)
 colnames(df_eigenportfolio) <- c("Eigen-portfolio", "Description",
                                  "Return target", "Risk target",
@@ -1154,12 +1154,12 @@ df_backtest <- list_out[[3]]
 
 
 
-#-------------------------------------------
-# Frontier plot with backtest
+  #-------------------------------------------
+  # Frontier plot with backtest
 plot_frontier_wBacktest(df_frontier,
                         df_backtest,
                         fig_title = "Figure 4: Optimal portfolio solution vs. backtest, utility interpretation")
-#-------------------------------------------
+  #-------------------------------------------
 
 
 
@@ -1211,17 +1211,458 @@ df_backtest <- list_out[[3]]
 
 ```{r, echo=F}
 
-#-------------------------------------------
-# Frontier plot with backtest
+  #-------------------------------------------
+  # Frontier plot with backtest
 plot_frontier_wBacktest(df_frontier,
                         df_backtest,
                         fig_title = "Figure 6: Optimal portfolio solution vs. backtest, utility interpretation, signals")
-#-------------------------------------------
+  #-------------------------------------------
 
 ```
 
 
-## Example 2: Mod-MV analysis to determine optimal investments across strategic objectives in the development context
+## Example 2: Mod-MV analysis to determine optimal investments across strategic objectives in the AR4D context
+
+```{r, echo=F}
+#=======================================================================
+# Define geographic areas of focus
+area_vec <- c("World","Low Income Food Deficit Countries", "Net Food Importing Developing Countries",
+              "Least Developed Countries", "Eastern Africa", "Western Africa", "South America",
+              "Southern Asia", "Southern Africa", "Middle Africa")
+# Define commodities of interest
+cereal_vec <- c("Maize", "Wheat", "Sorghum", "Rice", "Millet") #"Rice, paddy"
+pulses_oilcrops_vec <- c("Beans, dry", "Cow peas, dry", "Chick peas", "Lentils", "Soybeans", "Groundnuts, shelled") #"Groundnuts, with shell"
+RnT_vec <- c("Cassava Equivalent", "Yams", "Potatoes", "Sweet potatoes")#"Cassava"
+item_vec <- c(cereal_vec, pulses_oilcrops_vec, RnT_vec)
+#------------------
+list_groups <- list(cereal_vec, pulses_oilcrops_vec, RnT_vec)
+group_names <- c("Cereals", "Pulses & Oilcrops", "Roots & Tubers")
+#------------------------------
+#Prep export value data
+df_expVal_raw <- read.csv("Trade_Crops_Livestock_E_All_Data.csv", stringsAsFactors = F)
+#colnames(df_expVal_raw)
+df_expVal_raw$Area.Code <- NULL
+df_expVal_raw$Item.Code <- NULL
+df_expVal_raw$Element.Code <-NULL
+u <- colnames(df_expVal_raw)
+#colnames(df_expVal_raw)
+df_expVal_raw <- df_expVal_raw[, -grep("F", u)]
+colnames(df_expVal_raw)[5:ncol(df_expVal_raw)] <- as.character(c(1961:(1961 + ncol(df_expVal_raw) - 5)))
+df_expVal_raw <- gather(df_expVal_raw,Year,Value,`1961`:`2016`)
+#------------------
+#unique(df_expVal_raw$Area)[grep("africa", unique(df_expVal_raw$Area), ignore.case = T)]
+#unique(df_expVal_raw$Item)[grep("cassava", unique(df_expVal_raw$Item), ignore.case = T)]
+#unique(df_expVal_raw$Element)
+#------------------
+df_expVal <- subset(df_expVal_raw, Area %in% area_vec)
+df_expVal <- subset(df_expVal, Item %in% item_vec)
+#unique(df_expVal_raw$Element)
+element_vec <- c("Export Quantity", "Export Value")
+df_expVal <- subset(df_expVal, Element %in% element_vec)
+#df_expVal <- subset(df_expVal, Year > 1961)
+df_expVal$Unit <- NULL
+df_expVal <- df_expVal %>% spread(Element, Value)
+df_expVal$`Export Price` <- df_expVal$`Export Value` / df_expVal$`Export Quantity`
+
+df_expVal$Group <- NA
+u <- df_expVal$Item
+df_expVal$Group[which(u %in% cereal_vec)] <- "Cereals"
+df_expVal$Group[which(u %in% pulses_oilcrops_vec)] <- "Pulses and Oilcrops"
+df_expVal$Group[which(u %in% RnT_vec)] <- "Roots & Tubers"
+df_expVal$Group <- factor(df_expVal$Group)
+
+#------------------
+check_on_data = F
+if(check_on_data){
+  # Export value plots
+df_plot <- subset(df_expVal, Year == 2016)
+df_plot <- subset(df_plot, Area == "World")
+xx <- df_plot$Group
+df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+df_plot <- df_plot %>% gather_("Element", "Value", colnames(df_plot[4:6]))
+gg <- ggplot(df_plot, aes(x = Item, y = Value, fill = Group))
+gg <- gg + geom_bar(stat = "identity", position = "dodge")
+gg <- gg + facet_wrap(~Element, scales = "free_y")
+gg <- gg + theme(axis.title.x = element_blank(),
+                 axis.text.x = element_text(angle = 60, hjust = 1),
+                 axis.title.y = element_blank(),
+                 legend.title = element_blank())
+#gg <- gg + coord_flip()
+gg
+
+df_plot <- subset(df_expVal, Year == 2016)
+df_plot$Area[grep("Least Developed Countries", df_plot$Area)] <- "Least Developed\nCountries"
+df_plot$Area[grep("Low Income Food Deficit Countries", df_plot$Area)] <- "Low Income\nFood Deficit Countries"
+xx <- df_plot$Group
+df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+gg <- ggplot(df_plot, aes(x = Item, y = `Export Price`, fill = Group))
+gg <- gg + geom_bar(stat = "identity", position = "dodge")
+gg <- gg + facet_wrap(~Area)
+gg <- gg + theme(axis.title.y = element_blank(),
+                 axis.text.y = element_text(size = 7))
+gg <- gg + coord_flip()
+gg
+
+
+df_plot <- df_expVal
+df_plot$Year <- as.integer(df_plot$Year)
+xx <- df_plot$Group
+df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+gg <- ggplot(df_plot, aes(x = Year, y = `Export Price`, fill = Item))
+gg <- gg + geom_area(position = "stack")
+gg <- gg + facet_wrap(~Area, scales = "free")
+gg
+df_plot <- as.data.frame(df_plot %>% group_by(Area, Year) %>% mutate(sum_x = sum(`Export Price`)))
+df_plot$`Export Price (share)` <- df_plot$`Export Price` / df_plot$sum_x
+gg <- ggplot(df_plot, aes(x = Year, y = `Export Price (share)`, fill = Item))
+gg <- gg + geom_area(position = "stack")
+gg <- gg + facet_wrap(~Area)
+gg
+
+
+}
+
+# #------------------------------
+# #Prep value of ag production data
+# df_vap_raw <- read.csv("Value_of_Production_E_All_Data.csv", stringsAsFactors = F)
+# colnames(df_vap_raw)
+# df_vap_raw$Area.Code <- NULL
+# df_vap_raw$Item.Code <- NULL
+# df_vap_raw$Element.Code <-NULL
+# u <- colnames(df_vap_raw)
+# colnames(df_vap_raw)
+# df_vap_raw <- df_vap_raw[, -grep("F", u)]
+# colnames(df_vap_raw)[5:ncol(df_vap_raw)] <- as.character(c(1961:(1961 + ncol(df_vap_raw) - 5)))
+# df_vap_raw <- gather(df_vap_raw,Year,Value,`1961`:`2016`)
+# #------------------
+# #unique(df_vap_raw$Area)[grep("africa", unique(df_vap_raw$Area), ignore.case = T)]
+# #unique(df_vap_raw$Item)[grep("potato", unique(df_vap_raw$Item), ignore.case = T)]
+# #------------------
+# df_vap <- subset(df_vap_raw, Area %in% area_vec)
+# df_vap <- subset(df_vap, Item %in% item_vec)
+# #unique(df_vap_raw$Element)
+# element_vec <- c("Gross Production Value (current million US$)")
+# df_vap <- subset(df_vap, Element %in% element_vec)
+# df_vap <- subset(df_vap, Year > 1990)
+# df_vap$Unit <- NULL
+# df_vap$Element <- NULL
+# #---------------
+# df_vap$Group <- NA
+# u <- df_vap$Item
+# df_vap$Group[which(u %in% cereal_vec)] <- "Cereals"
+# df_vap$Group[which(u %in% pulses_oilcrops_vec)] <- "Pulses and Oilcrops"
+# df_vap$Group[which(u %in% RnT_vec)] <- "Roots & Tubers"
+# df_vap$Group <- factor(df_vap$Group)
+# colnames(df_vap)[4] <- "Gross Production Value\n(current million USD)"
+# #---------------
+# # df_plot <- subset(df_vap, Year == 2016 & Area == "World")
+# # xx <- df_plot$Group
+# # df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+# # gg <- ggplot(df_plot, aes(x = Item, y = `Gross Production Value (current million US$)`, fill = Group))
+# # gg <- gg + geom_bar(stat = "identity", position = "dodge")
+# # gg <- gg + coord_flip()
+# # gg
+# 
+# # df_vap$`Gross Production Value (current million US$)` <- 10^6 * df_vap$`Gross Production Value (current million US$)`
+# # colnames(df_vap)[4] <- "Gross Production Value (current USD)"
+# 
+# #------------------------------
+# df_prod_raw <- read.csv("Production_Crops_E_All_Data.csv", stringsAsFactors = F)
+# df_prod_raw <- subset(df_prod_raw, Item.Code != 2928)
+# df_prod_raw$Area.Code <- NULL
+# df_prod_raw$Item.Code <- NULL
+# df_prod_raw$Element.Code <-NULL
+# df_prod_raw$Unit <- NULL
+# u <- colnames(df_prod_raw)
+# df_prod_raw <- df_prod_raw[, -grep("F", u)]
+# last_yr <- (1961 + ncol(df_prod_raw) - 4)
+# colnames(df_prod_raw)[4:ncol(df_prod_raw)] <- as.character(c(1961:last_yr))
+# gathercols <- colnames(df_prod_raw)[4:ncol(df_prod_raw)]
+# df_prod_raw <- gather_(df_prod_raw, "Year", "Value", gathercols)
+# #------------------------------
+# #unique(df_prod_raw$Item)[grep("beans", unique(df_prod_raw$Item), ignore.case = T)]
+# df_prod <- subset(df_prod_raw, Item %in% item_vec)
+# df_prod <- subset(df_prod, Area %in% area_vec)
+# df_prod <- subset(df_prod, Element == "Production")
+# df_prod <- subset(df_prod, Year > 1990)
+# df_prod$Element <- NULL
+# colnames(df_prod)[4] <- "Production"
+# #-----------------------------
+# df_prod$Group <- NA
+# u <- df_prod$Item
+# df_prod$Group[which(u %in% cereal_vec)] <- "Cereals"
+# df_prod$Group[which(u %in% pulses_oilcrops_vec)] <- "Pulses and Oilcrops"
+# df_prod$Group[which(u %in% RnT_vec)] <- "Roots & Tubers"
+# df_prod$Group <- factor(df_prod$Group)
+# #-----------------------------
+# df <- merge(df_vap, df_prod, by = c("Area", "Year", "Group", "Item"))
+# df$`Gross Prod. Value / MT\n(current USD)` <- 10^6 * df$`Gross Production Value\n(current million USD)` / df$Production
+# #-----------------------------
+# # kcalMT_cereals_vec <- c(4.14, )
+# # df_kcal <- data.frame(Item = item_vec, kcal_per_MT = kcalMT_vec)
+# #-----------------------------
+# # VAP Plots
+# check_on_data <- F
+# if(check_on_data){
+# df_plot <- subset(df, Year == 2016)
+# df_plot <- subset(df_plot, Area == "World")
+# xx <- df_plot$Group
+# df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+# df_plot$Production <- NULL
+# df_plot <- df_plot %>% gather_("Element", "Value", colnames(df_plot[5:6]))
+# gg <- ggplot(df_plot, aes(x = Item, y = Value, fill = Group))
+# gg <- gg + geom_bar(stat = "identity", position = "dodge")
+# gg <- gg + facet_wrap(~Element, scales = "free_y")
+# gg <- gg + theme(axis.title.x = element_blank(),
+#                  axis.text.x = element_text(angle = 60, hjust = 1),
+#                  axis.title.y = element_blank(),
+#                  legend.title = element_blank())
+# #gg <- gg + coord_flip()
+# gg
+# #-----------------------------
+# df_plot <- subset(df, Year == 2016)
+# df_plot$Area[grep("Least Developed Countries", df_plot$Area)] <- "Least Developed\nCountries"
+# df_plot$Area[grep("Low Income Food Deficit Countries", df_plot$Area)] <- "Low Income\nFood Deficit Countries"
+# xx <- df_plot$Group
+# df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+# gg <- ggplot(df_plot, aes(x = Item, y = `Gross Prod. Value / MT\n(current USD)`, fill = Group))
+# gg <- gg + geom_bar(stat = "identity", position = "dodge")
+# gg <- gg + facet_wrap(~Area)
+# gg <- gg + theme(axis.title.y = element_blank(),
+#                  axis.text.y = element_text(size = 7))
+# gg <- gg + coord_flip()
+# gg
+# 
+# 
+# df_plot <- subset(df_plot, Area == "World")
+# gg <- ggplot(df_plot, aes(x = Item, y = `Gross Prod. Value / MT\n(current USD)`, fill = Group))
+# gg <- gg + geom_bar(stat = "identity", position = "dodge")
+# #gg <- gg + facet_wrap(~Area)
+# gg <- gg + theme(axis.title.y = element_blank(),
+#                  axis.text.y = element_text(size = 7))
+# #gg <- gg + coord_flip()
+# gg
+# 
+# #-----------------------------
+# df_plot <- df
+# df_plot$Year <- as.integer(df_plot$Year)
+# xx <- df_plot$Group
+# df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+# gg <- ggplot(df_plot, aes(x = Year, y = `Gross Prod. Value / MT (current USD)`, fill = Item))
+# gg <- gg + geom_area(position = "stack")
+# gg <- gg + facet_wrap(~Area)
+# gg
+# df_plot <- as.data.frame(df_plot %>% group_by(Area, Year) %>% mutate(sum_vap = sum(`Gross Prod. Value / MT (current USD)`)))
+# df_plot$`Gross Prod. Value / MT (share)` <- df_plot$`Gross Prod. Value / MT (current USD)` / df_plot$sum_vap
+# gg <- ggplot(df_plot, aes(x = Year, y = `Gross Prod. Value / MT (share)`, fill = Item))
+# gg <- gg + geom_area(position = "stack")
+# gg <- gg + facet_wrap(~Area)
+# gg
+# #-----------------------------
+# # Same on a per kcal basis
+# #.....
+# }
+#-----------------------------
+# Portfolio optimization
+#-----------------------------
+ret_sinceYr <- 1968
+ret_toYr <- 2016
+#-----------------------------
+df2 <- subset(df_expVal, Area == "World")
+list_groups_mod <- list_groups
+#"Net Food Importing Developing Countries"
+#unique(df_expVal$Area)[grep("Africa", unique(df_expVal$Area))]
+# df2 <- subset(df_expVal, Area == "Net Food Importing Developing Countries")
+# list_groups_mod <- list_groups
+#-----------------------------
+# # If looking at Low Income Food Deficit Countries, have to remove Sweet potatoes
+# df2 <- subset(df_expVal, Area == "Low Income Food Deficit Countries" & Item != "Sweet potatoes")
+# list_groups_mod <- list_groups
+# list_groups_mod[[3]] <- list_groups_mod[[3]][which(list_groups_mod[[3]] != "Sweet potatoes")] 
+#-----------------------------
+
+
+df2 <- df2[, c("Item", "Year", "Export Price")]
+df2 <- df2 %>% spread(Item, `Export Price`)
+ind_ret_sinceYr <- which(df2$Year == ret_sinceYr)
+ind_ret_toYr <- which(df2$Year == ret_toYr)
+nab_mu_ret_check <- apply(df2[, -1], 2, function(x) (x[ind_ret_toYr] - x[ind_ret_sinceYr]) / x[ind_ret_sinceYr])
+mat2 <- as.matrix(df2[, -1])
+mat2 <- na.approx(mat2)
+mat_pctDiff <- diff(mat2) / mat2[-nrow(mat2), ]
+year_pctDiff_vec <- df2$Year[-1]
+ind_ret_sinceYr <- which(year_pctDiff_vec == ret_sinceYr)
+ind_ret_toYr <- which(year_pctDiff_vec == ret_toYr)
+nab_mu_ret <- apply(mat_pctDiff, 2, function(x) prod(1 + x[(ind_ret_sinceYr - 1):(ind_ret_toYr - 1)])) - 1
+#nab_mu_ret_check - nab_mu_ret
+row.names(mat_pctDiff) <- year_pctDiff_vec
+mat_PCA_in <- mat_pctDiff
+#=======================================================================
+ind_train <- 1:round(nrow(mat_pctDiff) * 2 / 3)
+ind_test <- setdiff(1:nrow(mat_pctDiff), ind_train)
+mat_pctDiff_train <- mat_pctDiff[ind_train, ]
+mat_pctDiff_test <- mat_pctDiff[ind_test, ]
+#--------------------------------------------------
+list_out <- signals_from_noise(mat_pctDiff_train,
+                               eigenvalue_density_plot = T,
+                               signals_plot = T,
+                               pca_var_plot = T,
+                               pca_ind_plot = T,
+                               list_groups = list_groups_mod,
+                               group_names = group_names,
+                               quietly = F)
+# list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig, eigvals, mat_eigvecs)
+#mat_loads_sig <- list_out[[1]]
+mat_loads_rot_sig_train <- list_out[[2]]
+# mat_loads <- list_out[[3]]
+# mat_laods_rot <- list_out[[4]]
+# mat_pctDiff_sig <- list_out[[5]]
+# eigvals_sig <- list_out[[6]]
+# mat_eigvecs_sig <- list_out[[7]]
+# eigvals <- list_out[[8]]
+# mat_eigvecs <- list_out[[9]]
+
+signal_names <- c(NULL)
+interpret_loadings(mat_loads_rot_sig_train,
+                   list_groups = list_groups,
+                   group_names = group_names,
+                   signal_names = signal_names)
+# Get test data
+list_out <- signals_from_noise(mat_pctDiff_test,
+                               eigenvalue_density_plot = T,
+                               signals_plot = T,
+                               pca_var_plot = T,
+                               pca_ind_plot = T,
+                               list_groups = list_groups,
+                               group_names = group_names,
+                               quietly = F)
+# list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig, eigvals, mat_eigvecs)
+#mat_loads_sig <- list_out[[1]]
+mat_loads_rot_sig_test <- list_out[[2]]
+signal_names <- c(NULL)
+interpret_loadings(mat_loads_rot_sig_test,
+                   list_groups = list_groups,
+                   group_names = group_names,
+                   signal_names = signal_names)
+cormat_test <- cor(mat_pctDiff_test)
+nab_pctRet_test <- apply(mat_pctDiff_test, 2, function(x) prod(1 + x)) - 1
+#=======================================================================
+# Conventional risk-reward frontier
+if(class(mat_loads_rot_sig_train) == "numeric"){n_vars <- length(mat_loads_rot_sig_train)}
+if(class(mat_loads_rot_sig_train) == "matrix"){n_vars <- nrow(mat_loads_rot_sig_train)
+}
+
+C_targ <- 1
+nab_C <- rep(1, n_vars)
+#------------------------------------
+# Correlation matrix
+cormat_train <- cor(mat_pctDiff_train)
+#cormat <- round(mat_loads_rot_sig_train %*% t(mat_loads_rot_sig_train), 7)
+#cormat <- round(mat_loads_sig_train %*% t(mat_loads_sig_train), 7)
+# mse <- mean((cor(mat_pctDiff_train) - cormat)^2)
+# mse
+#------------------------------------
+# Expected returns vector
+#ind_t_ret <- ind_ret_sinceYr:ind_ret_toYr
+nab_pctDiff_train <- apply(mat_pctDiff_train, 2, function(x) prod(1 + x)) - 1
+#------------------------------------
+mat_nab_train <- cbind(nab_pctDiff_train, nab_C)
+n_points_on_frontier <- 50
+#------------------------------------
+list_out <- get_optimal_frontier(cormat_train, mat_nab_train,
+                                 Rtarg_limits = c(0.01, 30),
+                                 n_points_on_frontier = n_points_on_frontier,
+                                 backtest_info = list(nab_pctRet_test, cormat_test),
+                                 utility_interpretation = T,
+                                 frontier_and_budget_plot = T,
+                                 list_groups = NULL,
+                                 group_names = NULL,
+                                 # list_groups = list_groups_mod,
+                                 # group_names = group_names_mod,
+                                 fig_title = NULL)
+
+df_frontier <- list_out[[2]]
+df_backtest <- list_out[[3]]
+
+
+  #-------------------------------------------
+  # Frontier plot with backtest
+plot_frontier_wBacktest(df_frontier,
+                        df_backtest,
+                        fig_title = "Figure 10: Optimal portfolio solution vs. backtest, utility interpretation")
+  #-------------------------------------------
+
+
+```
+
+
+
+
+```{r, echo=F}
+
+
+list_out <- signals_from_noise(mat_pctDiff,
+                               eigenvalue_density_plot = T,
+                               signals_plot = T,
+                               pca_var_plot = T,
+                               pca_ind_plot = T,
+                               list_groups = list_groups_mod,
+                               group_names = group_names,
+                               quietly = F)
+mat_loads_rot_sig <- list_out[[2]]
+signal_names <- c(NULL)
+interpret_loadings(mat_loads_rot_sig,
+                   list_groups = list_groups,
+                   group_names = group_names,
+                   signal_names = signal_names)
+
+#=======================================================================
+# Conventional risk-reward frontier
+if(class(mat_loads_rot_sig) == "numeric"){n_vars <- length(mat_loads_rot_sig)}
+if(class(mat_loads_rot_sig) == "matrix"){n_vars <- nrow(mat_loads_rot_sig)
+}
+
+C_targ <- 1
+nab_C <- rep(1, n_vars)
+#------------------------------------
+# Correlation matrix
+cormat <- cor(mat_pctDiff)
+#cormat <- round(mat_loads_rot_sig %*% t(mat_loads_rot_sig), 7)
+#cormat <- round(mat_loads_sig %*% t(mat_loads_sig), 7)
+# mse <- mean((cor(mat_pctDiff) - cormat)^2)
+# mse
+#------------------------------------
+# Expected returns vector
+#ind_t_ret <- ind_ret_sinceYr:ind_ret_toYr
+nab_pctDiff <- apply(mat_pctDiff, 2, function(x) prod(1 + x)) - 1
+#------------------------------------
+mat_nab <- cbind(nab_pctDiff, nab_C)
+n_points_on_frontier <- 50
+#------------------------------------
+list_out <- get_optimal_frontier(cormat, mat_nab,
+                                 Rtarg_limits = c(0.01, 30),
+                                 n_points_on_frontier = n_points_on_frontier,
+                                 backtest_info = list(nab_pctRet_test, cormat_test),
+                                 utility_interpretation = T,
+                                 frontier_and_budget_plot = T,
+                                 list_groups = NULL,
+                                 group_names = NULL,
+                                 # list_groups = list_groups_mod,
+                                 # group_names = group_names_mod,
+                                 fig_title = NULL)
+
+
+```
+
+
+
+
+
+
+
+
+
+## Example 3: Mod-MV analysis to determine optimal investments across SDGs
 
 
 
@@ -1243,9 +1684,9 @@ WDI_raw$X <- NULL
 colnames(WDI_raw)[1:2] <- c("Country", "Indicator")
 WDI_raw$Country <- as.character(WDI_raw$Country)
 WDI_raw$Indicator <- as.character(WDI_raw$Indicator)
-#unique(WDI_raw$Country[grep("food", WDI_raw$Country)])
+#unique(WDI_raw$Country)
 #unique(WDI_raw$Indicator)
-#unique(WDI_raw$Indicator[grep("child", WDI_raw$Indicator, ignore.case = T)])
+unique(WDI_raw$Indicator[grep("basic", WDI_raw$Indicator, ignore.case = T)])
 colnames(WDI_raw)[3:ncol(WDI_raw)] <- as.character(c(1960:2018))
 WDI_long <- WDI_raw %>% gather(Year, Value, `1960`:`2018`)
 #unique(WDI_raw$Country)
@@ -1270,57 +1711,53 @@ WDI_long$Value[which(is.nan(WDI_long$Value))] <- NA
 
 ```{r, fig.width=10, fig.height=4, fig.align='center', echo = FALSE}
 
-environment_industry <- c("CO2 emissions (metric tons per capita)", 
-                          #"Combustible renewables and waste (% of total energy)",
-                          "CO2 intensity (kg per kg of oil equivalent energy use)",
-                          #"Forest area (% of land area)",
-                          "GDP per unit of energy use (PPP $ per kg of oil equivalent)",
-                          #"Energy intensity level of primary energy (MJ/$2011 PPP GDP)",
-                          "Renewable energy consumption (% of total final energy consumption)",
-                          "Methane emissions in energy sector (thousand metric tons of CO2 equivalent)",
-                          "Nitrous oxide emissions in energy sector (thousand metric tons of CO2 equivalent)"
-                          #"Access to clean fuels and technologies for cooking (% of population)",
-                          
-                          #"Water productivity, total (constant 2010 US$ GDP per cubic meter of total freshwater withdrawal)"
-                          
-)
-#-------------------------------------------------------------
-environment_ag <- c("Agricultural methane emissions (thousand metric tons of CO2 equivalent)",
-                    "Agricultural nitrous oxide emissions (thousand metric tons of CO2 equivalent)",
-                    "Fertilizer consumption (kilograms per hectare of arable land)",
-                    "Fertilizer consumption (% of fertilizer production)"
+environmental_indicators <- c("CO2 emissions (metric tons per capita)", 
+                              #"Combustible renewables and waste (% of total energy)",
+                              "CO2 intensity (kg per kg of oil equivalent energy use)",
+                              "Forest area (% of land area)",
+                              "GDP per unit of energy use (PPP $ per kg of oil equivalent)",
+                              "Energy intensity level of primary energy (MJ/$2011 PPP GDP)",
+                              "Renewable energy consumption (% of total final energy consumption)",
+                              "Agricultural methane emissions (thousand metric tons of CO2 equivalent)",
+                              "Agricultural nitrous oxide emissions (thousand metric tons of CO2 equivalent)",
+                              "Methane emissions in energy sector (thousand metric tons of CO2 equivalent)",
+                              "Nitrous oxide emissions in energy sector (thousand metric tons of CO2 equivalent)",
+                              "Fertilizer consumption (kilograms per hectare of arable land)",
+                              "Fertilizer consumption (% of fertilizer production)",
+                              "Adjusted savings: net forest depletion (% of GNI)",
+                              "Adjusted savings: mineral depletion (% of GNI)",
+                              "Adjusted savings: energy depletion (% of GNI)",
+                              "Level of water stress: freshwater withdrawal as a proportion of available freshwater resources",
+                              #"Access to clean fuels and technologies for cooking (% of population)",
+                              "Renewable internal freshwater resources per capita (cubic meters)"
+                              #"Water productivity, total (constant 2010 US$ GDP per cubic meter of total freshwater withdrawal)"
 )
 #-------------------------------------------------------------
 food_sec_indicators <- c("Agricultural land (% of land area)",
                          "Land under cereal production (hectares)",
                          "Prevalence of undernourishment (% of population)",
                          "Food imports (% of merchandise imports)",
+                         "Agriculture, forestry, and fishing, value added per worker (constant 2010 US$)",
+                         "Agriculture, value added per worker (constant 2010 US$)",
+                         "Agriculture, forestry, and fishing, value added (% of GDP)",
+                         #"Agriculture, forestry, and fishing, value added (annual % growth)",
                          "Food, beverages and tobacco (% of value added in manufacturing)"
 )
 
-#-------------------------------------------------------------
-nat_resource_rents <- c(#"Total natural resources rents (% of GDP)",
+economic_growth_indicators <- c(
   "Oil rents (% of GDP)",
   "Coal rents (% of GDP)",
   "Forest rents (% of GDP)",
+  "Natural gas rents (% of GDP)",
+  #"Total natural resources rents (% of GDP)",
   "Mineral rents (% of GDP)",
-  "Natural gas rents (% of GDP)")
-#-------------------------------------------------------------
-nat_resource_depletion <- c("Adjusted savings: net forest depletion (% of GNI)",
-                            "Adjusted savings: mineral depletion (% of GNI)",
-                            "Adjusted savings: energy depletion (% of GNI)",
-                            "Level of water stress: freshwater withdrawal as a proportion of available freshwater resources",
-                            "Renewable internal freshwater resources per capita (cubic meters)"
-)
-#-------------------------------------------------------------
-economic_growth_indicators <- c(
   #"Foreign direct investment, net (BoP, current US$)",
   "Foreign direct investment, net inflows (BoP, current US$)",
   #"Foreign direct investment, net inflows (% of GDP)",
   #"Export value index (2000 = 100)",
   #"Import value index (2000 = 100)",
   "GDP per capita (current US$)",
-  #"Net ODA received per capita (current US$)", #this guy
+  "Net ODA received per capita (current US$)",
   "Trade (% of GDP)",
   #"GDP growth (annual %)",
   #"GDP per capita growth (annual %)",
@@ -1330,57 +1767,37 @@ economic_growth_indicators <- c(
   #"Manufacturing, value added (annual % growth)",
   "Machinery and transport equipment (% of value added in manufacturing)",
   "Services, value added (% of GDP)",
-  #"Agriculture, forestry, and fishing, value added per worker (constant 2010 US$)",
-  "Agriculture, forestry, and fishing, value added (% of GDP)",
-  
-  #"Agriculture, forestry, and fishing, value added (annual % growth)",
   #"Services, value added (annual % growth)",
-  "Trade in services (% of GDP)"
+  "Trade in services (% of GDP)",
   #"Exports of goods and services (annual % growth)",
   #"Imports of goods and services (annual % growth)",
   #"Medium and high-tech Industry (including construction) (% manufacturing value added)",
   #"Gross capital formation (annual % growth)",
   #"Gross fixed capital formation (annual % growth)",
   #"Final consumption expenditure (annual % growth)",
-  #"Final consumption expenditure (constant 2010 US$)", #this one
-  #"Unemployment, total (% of total labor force) (modeled ILO estimate)",
-)
-#-------------------------------------------------------------
-employment <-c("Employment in agriculture (% of total employment) (modeled ILO estimate)",
+  "Final consumption expenditure (constant 2010 US$)",
+  "Employment in agriculture (% of total employment) (modeled ILO estimate)",
   "Employment in industry (% of total employment) (modeled ILO estimate)",
   "Employment in services (% of total employment) (modeled ILO estimate)",
-  "Labor force participation rate, total (% of total population ages 15+) (modeled ILO estimate)"
-)
-#-------------------------------------------------------------
-
-labor_productivity <- c("Industry, value added per worker (constant 2010 US$)",
-                        "Industry (including construction), value added per worker (constant 2010 US$)",
-                        "Services, value added per worker (constant 2010 US$)",
-                        "Agriculture, forestry, and fishing, value added per worker (constant 2010 US$)"
-)
-#-------------------------------------------------------------
-gender_equality <- c("Ratio of female to male labor force participation rate (%) (modeled ILO estimate)",
-                     "School enrollment, primary (gross), gender parity index (GPI)",
-                     #"School enrollment, primary and secondary (gross), gender parity index (GPI)",
-                     "School enrollment, secondary (gross), gender parity index (GPI)",
-                     "School enrollment, tertiary (gross), gender parity index (GPI)",
-                     "Literacy rate, youth (ages 15-24), gender parity index (GPI)",
-                     #"Age dependency ratio, young (% of working-age population)",
-                     #"Age dependency ratio, old (% of working-age population)",
-                     "Age dependency ratio (% of working-age population)",
-                     "Adolescent fertility rate (births per 1,000 women ages 15-19)"
+  "Labor force participation rate, total (% of total population ages 15+) (modeled ILO estimate)",
+  #"Unemployment, total (% of total labor force) (modeled ILO estimate)",
+  "Industry, value added per worker (constant 2010 US$)",
+  "Industry (including construction), value added per worker (constant 2010 US$)",
+  "Services, value added per worker (constant 2010 US$)"
 )
 #-------------------------------------------------------------
 peaceHRights_indicators <- c("Military expenditure (% of GDP)",
+                             "Ratio of female to male labor force participation rate (%) (modeled ILO estimate)",
                              "Refugee population by country or territory of origin",
                              "Internally displaced persons, new displacement associated with conflict and violence (number of cases)",
                              "Internally displaced persons, total displaced by conflict and violence (number of people)",
                              "Battle-related deaths (number of people)",
-                             "Income share held by lowest 20%",
-                             "Child employment in agriculture (% of economically active children ages 7-14)",
-                             "Child employment in manufacturing (% of economically active children ages 7-14)",
-                             "Child employment in services (% of economically active children ages 7-14)",
-                             "Children in employment, total (% of children ages 7-14)"
+                             "Literacy rate, youth (ages 15-24), gender parity index (GPI)",
+                             "School enrollment, primary (gross), gender parity index (GPI)",
+                             "School enrollment, primary and secondary (gross), gender parity index (GPI)",
+                             "School enrollment, secondary (gross), gender parity index (GPI)",
+                             "School enrollment, tertiary (gross), gender parity index (GPI)",
+                             "Income share held by lowest 20%"
 )
 #-------------------------------------------------------------
 # economic_equality_indicators <- c("Consumer price index (2010 = 100)",
@@ -1427,8 +1844,8 @@ healthPop_indicators <- c("Mortality rate, under-5 (per 1,000 live births)",
                           "Prevalence of HIV, total (% of population ages 15-49)",
                           #"Birth rate, crude (per 1,000 people)",
                           #"Death rate, crude (per 1,000 people)",
-                          #"Urban population (% of total population)",
-                          #"Rural population (% of total population)",
+                          "Urban population (% of total population)",
+                          "Rural population (% of total population)",
                           #"Urban population growth (annual %)",
                           #"Population growth (annual %)",
                           #"Population ages 0-14, total",
@@ -1437,10 +1854,14 @@ healthPop_indicators <- c("Mortality rate, under-5 (per 1,000 live births)",
                           #"Population ages 15-64 (% of total)",
                           #"Population ages 65 and above, total",
                           #"Population ages 65 and above (% of total)",
-                          #"Population density (people per sq. km of land area)",
-                          #"Population growth (annual %)",
-                          "Physicians (per 1,000 people)"
+                          "Population density (people per sq. km of land area)",
+                          "Population growth (annual %)",
+                          "Physicians (per 1,000 people)",
                           # "Population, total",
+                          #"Age dependency ratio, young (% of working-age population)",
+                          #"Age dependency ratio, old (% of working-age population)",
+                          "Age dependency ratio (% of working-age population)",
+                          "Adolescent fertility rate (births per 1,000 women ages 15-19)"
                           
 )
 #-------------------------------------------------------------
@@ -1449,65 +1870,32 @@ educ_indicators <- c("Government expenditure on education, total (% of GDP)",
                      "School enrollment, secondary (% gross)",
                      "School enrollment, tertiary (% gross)",
                      #"Adjusted savings: education expenditure (current US$)",
-                     #"Adjusted savings: education expenditure (% of GNI)",
-                     #"Expenditure on primary education (% of government expenditure on education)",
-                     #"Expenditure on secondary education (% of government expenditure on education)",
-                     #"Expenditure on tertiary education (% of government expenditure on education)",
+                     "Adjusted savings: education expenditure (% of GNI)",
+                     "Expenditure on primary education (% of government expenditure on education)",
+                     "Expenditure on secondary education (% of government expenditure on education)",
+                     "Expenditure on tertiary education (% of government expenditure on education)",
                      "Government expenditure on education, total (% of government expenditure)",
                      "Literacy rate, adult total (% of people ages 15 and above)",
-                     "Literacy rate, youth total (% of people ages 15-24)",
-                     "Children out of school (% of primary school age)"
+                     "Literacy rate, youth total (% of people ages 15-24)"
 )
 #-------------------------------------------------------------
-indicator_vec <- c(healthPop_indicators,
-                   food_sec_indicators,
-                   educ_indicators,
-                   economic_growth_indicators,
-                   employment,
-                   #economic_equality_indicators,
-                   environment_industry,
-                   environment_ag,
-                   nat_resource_rents,
-                   nat_resource_depletion,
-                   gender_equality,
-                   labor_productivity,
-                   peaceHRights_indicators,
+indicator_vec <- c(healthPop_indicators, food_sec_indicators, educ_indicators,
+                   economic_growth_indicators, #economic_equality_indicators,
+                   environmental_indicators, peaceHRights_indicators,
                    infrastructure_indicators)
-list_groups <- list(healthPop_indicators,
-                    food_sec_indicators,
-                    educ_indicators,
-                    economic_growth_indicators,
-                    employment,
-                    #economic_equality_indicators,
-                    environment_industry,
-                    environment_ag,
-                    nat_resource_depletion,
-                    nat_resource_rents,
-                    gender_equality,
-                    labor_productivity,
-                    peaceHRights_indicators,
+list_groups <- list(healthPop_indicators, food_sec_indicators, educ_indicators,
+                    economic_growth_indicators, #economic_equality_indicators,
+                    environmental_indicators, peaceHRights_indicators,
                     infrastructure_indicators)
-group_names <- c("Health",
-                 "Food Security",
-                 "Education",
-                 "Economic Growth",
-                 "Employment",
-                 #"Economic Equality",
-                 "Environmental Sustainability:\nIndustrial Emissions",
-                 "Environmental Sustainability:\nAgricultural Emissions",
-                 "Environmental Sustainability:\nNatural Resource Depletion",
-                 "Natural Resource Rents",
-                 "Gender Equality",
-                 "Labor Productivity",
-                 "Peace, Human Rights",
-                 "Infrastructure")
+group_names <- c("Health/Population", "Food Security", "Education",
+                 "Economic Growth", #"Economic Equality",
+                 "Environmental Sustainability", "Equality, Peace, Human Rights", "Infrastructure")
 names(list_groups) <- group_names
 #-------------------------------------------------------------
 #"Least developed countries: UN classification"
 #"Sub-Saharan Africa (excluding high income)"
 #"Lower middle income"
-#"Low & middle income"
-these_countries <- "Middle income" #"World"
+these_countries <- "World"
 #-------------------------------------------------------------
 df_WDI <- subset(WDI_long, Country %in% c(these_countries))
 df_WDI <- subset(df_WDI, Indicator %in% indicator_vec)
@@ -1535,6 +1923,7 @@ ind_rp <- which(is.na(df_WDI[nrow(df_WDI), ]))
 for(i in 1:length(ind_rp)){
   df_WDI[nrow(df_WDI), ind_rp[i]] <- mean(df_WDI[, ind_rp[i]], na.rm = T)
 }
+
 #df_WDI <- as.data.frame(na.approx(df_WDI[, -c(1, 2)]))
 df_WDI <- as.data.frame(na.approx(df_WDI))
 #class(df_WDI)
@@ -1543,19 +1932,36 @@ table(out)
 #which(as.numeric(out) > 0)
 #colnames(df_WDI)[which(as.numeric(out) > 0)]
 #-----------------------------------------------------------
-# ind_chng <- grep("% of GDP", colnames(df_WDI))
-# df_WDI[, ind_chng] <- df_WDI[, ind_chng] * 0.01 * df_WDI$`GDP per capita (current US$)`
-# colnames(df_WDI)[ind_chng] <- gsub("% of GDP", "current US$ per capita", colnames(df_WDI)[ind_chng])
+track_inverse <- c("Agricultural methane emissions (thousand metric tons of CO2 equivalent)",
+                   "Agricultural nitrous oxide emissions (thousand metric tons of CO2 equivalent)",
+                   "Methane emissions in energy sector (thousand metric tons of CO2 equivalent)",
+                   "Nitrous oxide emissions in energy sector (thousand metric tons of CO2 equivalent)",
+                   "CO2 emissions (metric tons per capita)",
+                   "CO2 intensity (kg per kg of oil equivalent energy use)",
+                   "Adjusted savings: energy depletion (% of GNI)",
+                   "Adjusted savings: net forest depletion (% of GNI)",
+                   "Adjusted savings: mineral depletion (% of GNI)",
+                   "Adolescent fertility rate (births per 1,000 women ages 15-19)",
+                   "Age dependency ratio (% of working-age population)",
+                   "Children out of school (% of primary school age)",
+                   "Military expenditure (% of GDP)",
+                   "Mortality rate, under-5 (per 1,000 live births)",
+                   "Prevalence of undernourishment (% of population)",
+                   "Refugee population by country or territory of origin",
+                   "Prevalence of HIV, total (% of population ages 15-49)")
+ind_track_inverse <- which(colnames(df_WDI) %in% track_inverse)
+df_WDI[, ind_track_inverse] <- 1 / df_WDI[, ind_track_inverse]
+colnames(df_WDI)[ind_track_inverse] <- paste("1 /", colnames(df_WDI)[ind_track_inverse])
+for(i in 1:length(list_groups)){
+  ind_chng <- which(list_groups[[i]] %in% track_inverse)
+  list_groups[[i]][ind_chng] <- paste("1 /", list_groups[[i]][ind_chng])
+
+}
 #-----------------------------------------------------------
-# mat_zWDI <- scale(df_WDI)
-# mat_pctDiff <- mat_zWDI
-# row.names(mat_pctDiff) <- year_vec
-#mat_zWDI <- mat_zWDI - min(mat_zWDI) * 1.05
-#mat_pctDiff <- diff(mat_zWDI) / mat_zWDI[-nrow(mat_zWDI), ]
-mat_pctDiff <- diff(as.matrix(log(df_WDI)))
+#mat_zWDI <- scale(df_WDI)
+#mat_pctDiff <- diff(as.matrix(log(df_WDI)))
+mat_pctDiff <- diff(as.matrix(df_WDI)) / as.matrix(df_WDI[-nrow(df_WDI), ])
 row.names(mat_pctDiff) <- year_vec[-1]
-# #mat_pctDiff <- diff(as.matrix(df_WDI)) / as.matrix(df_WDI[-nrow(df_WDI), ])
-# row.names(mat_pctDiff) <- year_vec[-1]
 # library(tidyquant)
 # ema_per <- 2
 # mat_pctDiff <- apply(df_WDI, 2, function(x) x - EMA(x, ema_per))
@@ -1564,8 +1970,6 @@ row.names(mat_pctDiff) <- year_vec[-1]
 # mat_pctDiff[is.nan(mat_pctDiff)] <- 0
 # mat_pctDiff[is.infinite(mat_pctDiff)] <- 0
 #-----------------------------------------------------------
-check_on_data <- F
-if(check_on_data){
 df_plot <- as.data.frame(mat_pctDiff)
 df_plot$Year <- year_vec[-1]
 df_plot <- df_plot %>% gather_("Indicator", "Value", colnames(df_WDI))
@@ -1585,6 +1989,8 @@ df_plot$Type[which(df_plot$Indicator %in% peaceHRights_indicators)] <- "Equality
 # gg <- gg + theme(legend.position = "none")
 # gg
 #------------------------------------------------------------
+check_on_data <- F
+if(check_on_data){
   this_type <- "Health/Population"
   df_plot2 <- subset(df_plot, Type == this_type)
   gg <- ggplot(df_plot2, aes(x = Year, y = Value, group = Indicator, color = Indicator))
@@ -1712,7 +2118,7 @@ mat_nab <- cbind(nab_pctRet, nab_C)
 n_points_on_frontier <- 50
 #------------------------------------
 list_out <- get_optimal_frontier(cormat, mat_nab,
-                                 Rtarg_limits = c(0.01, 0.3),
+                                 Rtarg_limits = c(0.01, 3),
                                  n_points_on_frontier = n_points_on_frontier,
                                  utility_interpretation = F,
                                  backtest_info = NULL,
@@ -1732,7 +2138,7 @@ df_backtest <- list_out[[3]]
 ```{r, fig.width=8, fig.height=6, fig.align='center', echo = FALSE}
 
 list_out <- get_optimal_frontier(cormat, mat_nab,
-                                 Rtarg_limits = c(0.01, 5),
+                                 Rtarg_limits = c(0.01, 25),
                                  n_points_on_frontier = n_points_on_frontier,
                                  utility_interpretation = T,
                                  backtest_info = NULL,
