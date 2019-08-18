@@ -761,6 +761,7 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
   # Risk shadow price
   l_V <- 1 / x[1]
   #if(l_V > 0){l_V <- -l_V}
+  #print(l_V)
   # Budget shadow price (l_C = lambdas[2], l_R normalized to = 1)
   lambdas <- l_V * x
   l_C <- lambdas[2]
@@ -771,7 +772,9 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
   V <- t(wStar) %*% cormat %*% wStar
   # Rtarg <- targ_vec[1]
   Rtarg <- t(wStar) %*% mat_nab[, 1]
-  #Rtarg1 <- -(l_V * V + l_C)
+  #----------------------------------------------------
+  check <- t(lambdas) %*% targ_vec + 2*l_V * V
+  print(check)
   #----------------------------------------------------
   # Utility function interpretation of equations
   # (Makes all budget weights positive)
@@ -782,6 +785,7 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
     Rtarg <- t(wStar) %*% mat_nab[, 1]
     V <- t(wStar) %*% cormat %*% wStar
   } 
+  #if(l_V > 0){wStar <- rep(NA, length(wStar))}
     list_out <- list(wStar, Rtarg, V, l_V, l_C)
   return(list_out)
 
@@ -823,14 +827,14 @@ plot_frontier_wBacktest <- function(df_frontier,
     df_plot2$Type <- "Backtest of solution"
     colnames(df_plot1)[2] <- "Return"
     colnames(df_plot2)[1:2] <- c("Risk (variance)", "Return")
-    df_plot <- do.call(rbind, list(df_plot1, df_plot2))
+    df_plot <- as.data.frame(do.call(rbind, list(df_plot1, df_plot2)))
     gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return`, group = Type, color = Type))
     gg <- gg + geom_point()
     gg <- gg + scale_color_manual(values = color_vec)
     gg <- gg + labs(title = fig_title)
     gg <- gg + theme(plot.title = element_text(size = 10))
     gg <- gg + theme(legend.title = element_blank())
-    gg <- gg + coord_cartesian(xlim = c(0, max(df_frontier$`Risk (variance)`)))
+    gg <- gg + coord_cartesian(xlim = c(0, max(df_plot$`Risk (variance)`)))
     gg_frontier_wBacktest <- gg
     print(gg_frontier_wBacktest)
 
@@ -1189,7 +1193,7 @@ mat_nab <- cbind(nab_pctRet_train, nab_C)
 row.names(mat_nab) <- signal_names
 #------------------------------------
 list_out <- get_optimal_frontier(cormat, mat_nab,
-                                 Rtarg_limits = c(0.01, 3),
+                                 Rtarg_limits = c(0.1, 0.35),
                                  n_points_on_frontier = n_points_on_frontier,
                                  utility_interpretation = T,
                                  backtest_info = list(nab_pctRet_test, cormat_test),
@@ -1223,6 +1227,8 @@ plot_frontier_wBacktest(df_frontier,
 
 ## Example 2: Mod-MV analysis to determine optimal investments across strategic objectives in the AR4D context
 
+Interpretation of "price" is different from the financial context. This could reflect 1) higher kcals per unit weight, 2) higher quality kcals, 3) higher demand, or 4) some combination of all of the above.
+
 ```{r, echo=F}
 #=======================================================================
 # Define geographic areas of focus
@@ -1250,12 +1256,23 @@ df_expVal_raw <- df_expVal_raw[, -grep("F", u)]
 colnames(df_expVal_raw)[5:ncol(df_expVal_raw)] <- as.character(c(1961:(1961 + ncol(df_expVal_raw) - 5)))
 df_expVal_raw <- gather(df_expVal_raw,Year,Value,`1961`:`2016`)
 #------------------
-#unique(df_expVal_raw$Area)[grep("africa", unique(df_expVal_raw$Area), ignore.case = T)]
 #unique(df_expVal_raw$Item)[grep("cassava", unique(df_expVal_raw$Item), ignore.case = T)]
 #unique(df_expVal_raw$Element)
 #------------------
-df_expVal <- subset(df_expVal_raw, Area %in% area_vec)
-df_expVal <- subset(df_expVal, Item %in% item_vec)
+df_expVal <- subset(df_expVal_raw, Item %in% item_vec)
+df_expVal$Unit <- NULL
+#------------------
+# Create SSA group
+# unique(df_expVal$Area)[grep("africa", unique(df_expVal_raw$Area), ignore.case = T)]
+SSA_vec <- c("South Africa", "Africa", "Eastern Africa", "Middle Africa", "Southern Africa", "Western Africa")
+df_x <- subset(df_expVal, Area %in% SSA_vec)
+df_x <- df_x %>% group_by(Year, Item, Element) %>% summarise(Value = sum(Value))
+df_x$Area <- "Sub-Saharan Africa"
+df_x <- df_x[, colnames(df_expVal)]
+df_expVal <- as.data.frame(rbind(df_expVal, df_x))
+area_vec <- c(area_vec, "Sub-Saharan Africa")
+#------------------
+df_expVal <- subset(df_expVal, Area %in% area_vec)
 #unique(df_expVal_raw$Element)
 element_vec <- c("Export Quantity", "Export Value")
 df_expVal <- subset(df_expVal, Element %in% element_vec)
