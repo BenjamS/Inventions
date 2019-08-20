@@ -170,7 +170,7 @@ library(patchwork)
 #=======================================================================
 # Define functions
 #=======================================================================
-signals_from_noise <- function(mat_PCA_in, fun_env = NULL){
+signals_from_noise <- function(mat_pctDiff, fun_env = NULL){
   
   if(is.null(fun_env)){
     eigenvalue_density_plot = T
@@ -191,7 +191,7 @@ signals_from_noise <- function(mat_PCA_in, fun_env = NULL){
   #---------------------------------------------------------
   # Separate signals from noise
   #---------------------------------------------------------
-  res <- FactoMineR::PCA(mat_PCA_in, ncp = ncol(mat_PCA_in), graph = F)
+  res <- FactoMineR::PCA(mat_pctDiff, ncp = ncol(mat_pctDiff), graph = F)
   eigvals <- as.data.frame(res$eig)$eigenvalue
   eigval_max <- max(eigvals)
   mat_loads <- res$var$coord
@@ -200,8 +200,8 @@ signals_from_noise <- function(mat_PCA_in, fun_env = NULL){
   #---------------------------------------------------------
   # Apply random matrix theory () to determine eigenvalue distribution of a 
   # correlation matrix of random data.
-  n_obs <- nrow(mat_PCA_in)
-  n_items <- ncol(mat_PCA_in)
+  n_obs <- nrow(mat_pctDiff)
+  n_items <- ncol(mat_pctDiff)
   Q <- n_obs / n_items
   s_sq <- 1 - eigval_max / n_items
   #s_sq <- 1
@@ -211,8 +211,8 @@ signals_from_noise <- function(mat_PCA_in, fun_env = NULL){
   eigval_rand_density <- Q / (2 * pi * s_sq) * sqrt((eigval_rand_max - lam) * (lam - eigval_rand_min)) / lam
   df_plot <- data.frame(Eigenvalues = eigvals)
   
-  #   N_t <- nrow(mat_PCA_in)
-  # N_c <- ncol(mat_PCA_in)
+  #   N_t <- nrow(mat_pctDiff)
+  # N_c <- ncol(mat_pctDiff)
   # Q <- N_t / N_c
   # s_sq <- 1 - eigval_max / N_c
   # #s_sq <- 1
@@ -248,7 +248,7 @@ signals_from_noise <- function(mat_PCA_in, fun_env = NULL){
   #---------------------------------------------------------
   # Get dimensionally reduced version of original input data
   mat_eigvecs_sig <- mat_eigvecs[, ind_deviating_from_noise]
-  mat_inData_sig <- mat_PCA_in %*% mat_eigvecs_sig
+  mat_inData_sig <- mat_pctDiff %*% mat_eigvecs_sig
   if(n_signals == 1){
     mat_inData_sig <- mat_inData_sig / eigvals_sig
   }else{
@@ -257,7 +257,7 @@ signals_from_noise <- function(mat_PCA_in, fun_env = NULL){
   #---------------------------------------------------------
   # Set sign of eigenvectors such that they
   # best conform to the input time series
-  inData_avg <- rowMeans(mat_PCA_in)
+  inData_avg <- rowMeans(mat_pctDiff)
   if(n_signals == 1){
     mse <- mean((mat_inData_sig - inData_avg)^2)
     mse_neg <- mean((-mat_inData_sig - inData_avg)^2)
@@ -297,7 +297,7 @@ signals_from_noise <- function(mat_PCA_in, fun_env = NULL){
   #---------------------------------------------------------
   # Plot signal data against average
   if(signals_plot){ 
-    date_vec <- row.names(mat_PCA_in)
+    date_vec <- row.names(mat_pctDiff)
     df_plot1 <- data.frame(Date = date_vec, inData_avg)
     df_plot2 <- data.frame(Date = date_vec, mat_inData_sig)
     df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
@@ -347,15 +347,15 @@ signals_from_noise <- function(mat_PCA_in, fun_env = NULL){
     if(n_signals == 1){
       print("Only 1 signal, can't do PCA plots.")
     }else{
-      res <- FactoMineR::PCA(t(mat_PCA_in), graph = F)
-      gg <- factoextra::fviz_pca_ind(res, habillage = factor(group_vec), addEllipses = T)
+      res <- FactoMineR::PCA(t(mat_pctDiff), graph = F)
+      gg <- factoextra::fviz_pctDiffd(res, habillage = factor(group_vec), addEllipses = T)
       print(gg)
     }
     
   }
   #---------------------------------------------------------
   # Cluster plot using Mclust()
-  # mc <- mclust::Mclust(t(mat_PCA_in))
+  # mc <- mclust::Mclust(t(mat_pctDiff))
   # summary(mc)
   # View(mc$classification)
   # factoextra::fviz_cluster(mc, frame.type = "norm", geom = "text")
@@ -365,11 +365,11 @@ signals_from_noise <- function(mat_PCA_in, fun_env = NULL){
   
 }
 #=======================================================================
-# plot_signals <- function(mat_PCA_in, mat_eigvecs_sig, eigvecs_sig){
+# plot_signals <- function(mat_pctDiff, mat_eigvecs_sig, eigvecs_sig){
 #   #---------------------------------------------------------
-#   inData_avg <- rowMeans(mat_PCA_in)
+#   inData_avg <- rowMeans(mat_pctDiff)
 #   n_signals <- length(eigvecs_sig)
-#   mat_inData_sig <- mat_PCA_in %*% mat_eigvecs_sig
+#   mat_inData_sig <- mat_pctDiff %*% mat_eigvecs_sig
 #   if(n_signals == 1){
 #     mat_inData_sig <- mat_inData_sig / eigvals_sig
 #   }else{
@@ -377,7 +377,7 @@ signals_from_noise <- function(mat_PCA_in, fun_env = NULL){
 #   }
 #   #---------------------------------------------------------
 #   # Plot signal data against average
-#   date_vec <- row.names(mat_PCA_in)
+#   date_vec <- row.names(mat_pctDiff)
 #   df_plot1 <- data.frame(Date = date_vec, inData_avg)
 #   df_plot2 <- data.frame(Date = date_vec, mat_inData_sig)
 #   df_plot1$Date <- factor(format(df_plot1$Date, format = "%y-%m-%d%"), ordered = T)
@@ -596,24 +596,23 @@ sd_ret_mo <- apply(mat_pctDiff_mo, 2, sd)
 # gg
 #----------------------------------------------
 #ind_rm_ema <- 1:(per_ema - 1)
-# mat_PCA_in <- apply(mat_PCA_in, 2, function(x) x - EMA(x, per_ema))
-# mat_PCA_in <- mat_PCA_in[-ind_rm_ema, ]
+# mat_pctDiff <- apply(mat_pctDiff, 2, function(x) x - EMA(x, per_ema))
+# mat_pctDiff <- mat_pctDiff[-ind_rm_ema, ]
 # date_vec <- df$date[-c(ind_rm_ema, ind_rm_na)]
 #----------------------------------------------
 mat_ts_in <- mat_ts_dy
 ts_avg_in <- ts_avg_dy
-mat_pctDiff_in <- mat_pctDiff_dy
 # nab_pctRet_in <- mu_ret_dy
 # sd_ret_in <- sd_ret_dy
 #----------------------------------------------
-mat_PCA_in <- mat_pctDiff_in
-date_vec <- row.names(mat_PCA_in)
+mat_pctDiff <- mat_pctDiff_dy
+date_vec <- row.names(mat_pctDiff)
 #length(date_vec)
-row.names(mat_PCA_in) <- as.character(date_vec)
-colnames(mat_PCA_in) <- as.character(df_symb_detail$detail[order(df_symb_detail$symbol)])
+row.names(mat_pctDiff) <- as.character(date_vec)
+colnames(mat_pctDiff) <- as.character(df_symb_detail$detail[order(df_symb_detail$symbol)])
 check_on_data <- F
 if(check_on_data){
-  df_plot <- as.data.frame(mat_PCA_in)
+  df_plot <- as.data.frame(mat_pctDiff)
   gathercols <- colnames(df_plot)
   df_plot$Date <- date_vec
   df_plot <- df_plot %>% gather_("Security", "Weekly change (%)", gathercols)
@@ -705,10 +704,10 @@ In figure ..., a density plot of the correlation matrix eigenvalues is compared 
 The signal time series are plotted against the data average in figure .... Here it is evident that the first signal reflects the average, while the subsequent signals reflect forces pushing and pulling on the average.
 
 ```{r, fig.width=12, fig.height=8, fig.align='center', echo=FALSE}
-ind_train <- 1:round(nrow(mat_PCA_in) * 2 / 3)
-ind_test <- setdiff(1:nrow(mat_PCA_in), ind_train)
-mat_pctDiff_train <- mat_PCA_in[ind_train, ]
-mat_pctDiff_test <- mat_PCA_in[ind_test, ]
+ind_train <- 1:round(nrow(mat_pctDiff) * 2 / 3)
+ind_test <- setdiff(1:nrow(mat_pctDiff), ind_train)
+mat_pctDiff_train <- mat_pctDiff[ind_train, ]
+mat_pctDiff_test <- mat_pctDiff[ind_test, ]
 ts_avg_test <- ts_avg_in[ind_test]
 date_vec_test <- date_vec[ind_test]
 fun_env = list(eigenvalue_density_plot = T,
@@ -719,15 +718,7 @@ fun_env = list(eigenvalue_density_plot = T,
                quietly = F)
 list_out <- signals_from_noise(mat_pctDiff_train, fun_env)
 # list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig, eigvals, mat_eigvecs)
-mat_loads_sig_train <- list_out[[1]]
 mat_loads_rot_sig_train <- list_out[[2]]
-# mat_loads_train <- list_out[[3]]
-# mat_laods_rot_train <- list_out[[4]]
-mat_pctDiff_sig_train <- list_out[[5]]
-eigvals_sig_train <- list_out[[6]]
-mat_eigvecs_sig_train <- list_out[[7]]
-eigvals_train <- list_out[[8]]
-mat_eigvecs_train <- list_out[[9]]
 ```
 
 
@@ -752,22 +743,21 @@ The train data is 2/3 the whole data. The expected returns are calculated over a
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 
 # Get backtest data
-fun_env <- list(eigenvalue_density_plot = F,
-                signals_plot = F,
+fun_env <- list(eigenvalue_density_plot = T,
+                signals_plot = T,
                 pca_var_plot = F,
                 pca_ind_plot = F,
                 group_info,
-                quietly = T)
-list_out <- signals_from_noise(mat_PCA_in, fun_env)
-mat_loads_sig_test <- list_out[[1]]
+                quietly = F)
+list_out <- signals_from_noise(mat_pctDiff_test, fun_env)
 mat_loads_rot_sig_test <- list_out[[2]]
-mat_pctDiff_sig_test <- list_out[[5]][ind_test, ]
-# mat_pctDiff_sig_test <- mat_pctDiff_test %*% mat_loads_rot_sig_test
-# mat_loads_rot_sig_normd <- apply(mat_loads_rot_sig_test, 2, function(x) x / sum(x))
-# mat_eigenportfolio_test <- mat_pctDiff_test %*% mat_loads_rot_sig_normd
+signal_names <- NULL
+fun_env <- list(group_info, signal_names)
+interpret_loadings(mat_loads_rot_sig_test, fun_env)
 
 
 ```
+
 
 
 ```{r, fig.width=8, fig.height=6, fig.align='center', echo = FALSE}
@@ -868,8 +858,6 @@ plot_frontier_wBacktest <- function(df_frontier,
   print(gg_frontier_wBacktest)
   
 }
-
-
 #=======================================================================
 plot_frontier_and_budget <- function(df_frontier, df_wStar,
                                      n_points_on_frontier,
@@ -1007,87 +995,87 @@ get_optimal_frontier <- function(cormat, mat_nab,
   return(list_out)
 }
 #=======================================================================
-
-
-prepare_optFrontier_inputs <- function(list_mat_pctDiff,
-                                       list_mat_loads_rot_sig,
-                                       signals_replace_items,
-                                       purge_cormat_noise){
-  
-}
-  #-------------------------------------------
-  mat_pctDiff <- list_mat_pctDiff[[1]]
-if(length(list_mat_pctDiff) > 1){
-  mat_pctDiff_test <- list_mat_pctDiff[[2]]
-}
-if(length(list_mat_loads_rot_sig) > 1){
-  mat_loads_rot_sig_test <- list_mat_loads_rot_sig[[2]]
-}
-  #-------------------------------------------
-  # Optimize over signals rather than portfolio items?
-  if(signals_replace_items){
-    if(class(mat_loads_rot_sig) == "numeric"){
-      # (If condition is true, then only one signal could be extracted.)
-      print("Only 1 signal. Too few to replace portfolio items with signals.")
-    }else{
-      if(is.null(fraction_train)){
-        mat_pctDiff <- list_out[[5]]
-        n_items <- ncol(mat_pctDiff)
-      }else{
-        mat_pctDiff <- list_out_train[[5]]
-        mat_pctDiff_test <- list_out_test[[5]]
-      }
-    }
-    
-  }
-  #-------------------------------------------
-  # Define cost target and gradient
-  # (By convention, the budget weights always add up to (a cost target of) 1, so that the cost gradient is equal to a vector of ones the length of portfolio items.)
-  C_targ <- 1
-  nab_C <- rep(1, n_items)
-  #-------------------------------------------
-  # Define expected returns
-  nab_mu_ret <- apply(mat_pctDiff, 2, function(x) prod(1 + x)) - 1
-  if(!is.null(fraction_train)){
-    nab_mu_ret_test <- apply(mat_pctDiff_test, 2, function(x) prod(1 + x)) - 1
-  }
-  #-------------------------------------------
-  # Correlation matrix
-  cormat <- cor(mat_pctDiff)
-  if(purge_cormat_noise){
-    if(signals_replace_items){
-      print("If signals_replace_items = T, then can't also have purge_cormat_noise = T. Using regular correlation matrix.")
-    }else{
-        cormat_data <- cormat
-        cormat <- round(mat_loads_rot_sig %*% t(mat_loads_rot_sig), 7)
-        #cormat <- round(mat_loads_sig %*% t(mat_loads_sig), 7)
-        mse <- round(mean((cormat - cormat_data)^2), 6)
-        print(paste("Purged correlation matrix mse:", mse))
-    if(!is.null(fraction_train)){
-        cormat_data_test <- cor(mat_pctDiff_test)
-        cormat_test <- round(mat_loads_rot_sig_test %*% t(mat_loads_rot_sig_test), 7)
-        #cormat <- round(mat_loads_sig %*% t(mat_loads_sig), 7)
-        mse <- round(mean((cormat_test - cormat_data_test)^2), 6)
-        print(paste("Purged test correlation matrix mse:", mse))
-        print(paste("Test correlation matrix kappa:", kappa(cormat_test)))
-      }
-    }
-  print(paste("Correlation matrix kappa:", kappa(cormat)))
-  #------------------------------------
-  # Expected returns vector
-  #ind_t_ret <- ind_ret_sinceYr:ind_ret_toYr
-  nab_pctDiff <- apply(mat_pctDiff, 2, function(x) prod(1 + x)) - 1
-  #------------------------------------
-  mat_nab <- cbind(nab_pctDiff, nab_C)
-  #------------------------------------
-  
-  
-  list_out <- get_optimal_frontier(cormat, mat_nab,
-                                   Rtarg_limits,
-                                   fig_title = fig_title_frontier_wBudget,
-                                   fun_env_get_optimal_frontier)
-  
-  
+# 
+# 
+# prepare_optFrontier_inputs <- function(list_mat_pctDiff,
+#                                        list_mat_loads_rot_sig,
+#                                        signals_replace_items,
+#                                        purge_cormat_noise){
+#   
+# }
+#   #-------------------------------------------
+#   mat_pctDiff <- list_mat_pctDiff[[1]]
+# if(length(list_mat_pctDiff) > 1){
+#   mat_pctDiff_test <- list_mat_pctDiff[[2]]
+# }
+# if(length(list_mat_loads_rot_sig) > 1){
+#   mat_loads_rot_sig_test <- list_mat_loads_rot_sig[[2]]
+# }
+#   #-------------------------------------------
+#   # Optimize over signals rather than portfolio items?
+#   if(signals_replace_items){
+#     if(class(mat_loads_rot_sig) == "numeric"){
+#       # (If condition is true, then only one signal could be extracted.)
+#       print("Only 1 signal. Too few to replace portfolio items with signals.")
+#     }else{
+#       if(is.null(fraction_train)){
+#         mat_pctDiff <- list_out[[5]]
+#         n_items <- ncol(mat_pctDiff)
+#       }else{
+#         mat_pctDiff <- list_out_train[[5]]
+#         mat_pctDiff_test <- list_out_test[[5]]
+#       }
+#     }
+#     
+#   }
+#   #-------------------------------------------
+#   # Define cost target and gradient
+#   # (By convention, the budget weights always add up to (a cost target of) 1, so that the cost gradient is equal to a vector of ones the length of portfolio items.)
+#   C_targ <- 1
+#   nab_C <- rep(1, n_items)
+#   #-------------------------------------------
+#   # Define expected returns
+#   nab_mu_ret <- apply(mat_pctDiff, 2, function(x) prod(1 + x)) - 1
+#   if(!is.null(fraction_train)){
+#     nab_mu_ret_test <- apply(mat_pctDiff_test, 2, function(x) prod(1 + x)) - 1
+#   }
+#   #-------------------------------------------
+#   # Correlation matrix
+#   cormat <- cor(mat_pctDiff)
+#   if(purge_cormat_noise){
+#     if(signals_replace_items){
+#       print("If signals_replace_items = T, then can't also have purge_cormat_noise = T. Using regular correlation matrix.")
+#     }else{
+#         cormat_data <- cormat
+#         cormat <- round(mat_loads_rot_sig %*% t(mat_loads_rot_sig), 7)
+#         #cormat <- round(mat_loads_sig %*% t(mat_loads_sig), 7)
+#         mse <- round(mean((cormat - cormat_data)^2), 6)
+#         print(paste("Purged correlation matrix mse:", mse))
+#     if(!is.null(fraction_train)){
+#         cormat_data_test <- cor(mat_pctDiff_test)
+#         cormat_test <- round(mat_loads_rot_sig_test %*% t(mat_loads_rot_sig_test), 7)
+#         #cormat <- round(mat_loads_sig %*% t(mat_loads_sig), 7)
+#         mse <- round(mean((cormat_test - cormat_data_test)^2), 6)
+#         print(paste("Purged test correlation matrix mse:", mse))
+#         print(paste("Test correlation matrix kappa:", kappa(cormat_test)))
+#       }
+#     }
+#   print(paste("Correlation matrix kappa:", kappa(cormat)))
+#   #------------------------------------
+#   # Expected returns vector
+#   #ind_t_ret <- ind_ret_sinceYr:ind_ret_toYr
+#   nab_pctDiff <- apply(mat_pctDiff, 2, function(x) prod(1 + x)) - 1
+#   #------------------------------------
+#   mat_nab <- cbind(nab_pctDiff, nab_C)
+#   #------------------------------------
+#   
+#   
+#   list_out <- get_optimal_frontier(cormat, mat_nab,
+#                                    Rtarg_limits,
+#                                    fig_title = fig_title_frontier_wBudget,
+#                                    fun_env_get_optimal_frontier)
+#   
+#   
 #=======================================================================
 #=======================================================================
 # Conventional risk-reward frontier
@@ -1179,6 +1167,122 @@ knitr::kable(df_eigenportfolio)
 
 
 ```
+
+
+Analysis of train test dividing points...
+
+```{r, echo = FALSE}
+
+optimal_divide_objFn <- function(mat_pctDiff, fraction_train = 2 / 3, fraction_N = 1){
+#------------------------------------------------------------
+total_length <- nrow(mat_pctDiff)
+rm_length <- round((1 - fraction_N) * total_length)
+ind_rm <- 1:rm_length
+mat_pctDiff <- mat_pctDiff[-ind_rm, ]
+total_length <- nrow(mat_pctDiff)
+ind_total <- 1:total_length
+ind_train <- 1:round(total_length * fraction_train)
+ind_test <- setdiff(ind_total, ind_train)
+mat_pctDiff_train <- mat_pctDiff[ind_train, ]
+mat_pctDiff_test <- mat_pctDiff[ind_test, ]
+#------------------------------------------------------------
+fun_env = list(eigenvalue_density_plot = F,
+               signals_plot = F,
+               pca_var_plot = F,
+               pctDiffd_plot = F,
+               group_info = NULL,
+               quietly = T)
+#------------------------------------------------------------
+# Get sig loads, train data
+list_out <- signals_from_noise(mat_pctDiff_train, fun_env)
+mat_loads_rot_sig_train <- list_out[[2]]
+#mat_loads_train <- list_out[[3]]
+mat_loads_sig_train <- list_out[[1]]
+#list_out = list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig, eigvals, mat_eigvecs)
+#------------------------------------------------------------
+# Get sig loads, backtest data
+list_out <- signals_from_noise(mat_pctDiff_test, fun_env)
+mat_loads_rot_sig_test <- list_out[[2]]
+mat_loads_sig_test <- list_out[[1]]
+#mat_loads_test <- list_out[[3]]
+#------------------------------------------------------------
+# mse test-train first signal loadings
+n_compare <- min(ncol(mat_loads_rot_sig_test), ncol(mat_loads_rot_sig_train))
+mse_vec <- c()
+for(i in 1:n_compare){
+  mse_vec[i] <- mean((mat_loads_rot_sig_test[, i] - mat_loads_rot_sig_train[, i])^2)
+}
+mse_loads <- mean(mse_vec)
+#------------------------------------------------------------
+# Now for frontier mse
+nab_pctRet_train <- apply(mat_pctDiff_train, 2, function(x) prod(1 + x)) - 1
+nab_pctRet_test <- apply(mat_pctDiff_test, 2, function(x) prod(1 + x)) - 1
+cormat_train <- cor(mat_pctDiff_train)
+cormat_test <- cor(mat_pctDiff_test)
+# cormat_train <- round(mat_loads_sig_train %*% t(mat_loads_sig_train), 7)
+# cormat_test <- round(mat_loads_sig_test %*% t(mat_loads_sig_test), 7)
+n_items <- ncol(mat_pctDiff)
+C_targ <- 1
+nab_C <- rep(1, n_items)
+mat_nab_train <- cbind(nab_pctRet_train, nab_C)
+#------------------------------------------------------------
+fun_env <- list(n_points_on_frontier,
+                utility_interpretation = F,
+                backtest_info = list(nab_pctRet_test, cormat_test),
+                frontier_and_budget_plot = F,
+                group_info = NULL)
+list_out <- get_optimal_frontier(cormat_train, mat_nab_train,
+                                 Rtarg_limits = c(0.01, 0.3),
+                                 fig_title = "Figure 1: Optimal portfolio frontier",
+                                 fun_env)
+df_frontier <- list_out[[2]]
+df_backtest <- list_out[[3]]
+diff_R_sq <- (df_backtest$`Return backtest` - df_frontier$`Return target`)^2
+diff_V_sq <- (df_backtest$`Risk backtest` - df_frontier$`Risk (variance)`)^2
+mse_R <- mean(diff_R_sq)
+mse_V <- mean(diff_V_sq)
+meanEucDist <- mean(sqrt(diff_R_sq + diff_V_sq))
+#------------------------------------------------------------
+out_vec <- c(mse_loads, mse_R, mse_V, meanEucDist)
+return(out_vec)
+
+}
+#============================================================
+seq_fraction_train <- seq(0.45, 0.6, length.out = 50)
+seq_fraction_N <- seq(0.4, 1, length.out = 20)
+list_out <- list()
+t <- 0
+for(i in 1:length(seq_fraction_train)){
+  this_fraction_train <- seq_fraction_train[i]
+    print(this_fraction_train)
+    list_out[[i]] <- optimal_divide_objFn(mat_pctDiff,
+                                        fraction_train = this_fraction_train,
+                                        fraction_N = 1)
+
+  # for(j in 1:length(seq_fraction_N)){
+  #       this_fraction_N <- seq_fraction_N[j]
+  #       print(this_fraction_N)
+  #       t <- t + 1
+  # list_out[[t]] <- optimal_divide_objFn(mat_pctDiff,
+  #                                       fraction_train = 1 / 2,#this_fraction_train,
+  #                                       fraction_N = this_fraction_N)
+  # }
+
+}
+df <- as.data.frame(do.call(rbind, list_out))
+colnames(df) <- c("Loadings MSE", "Return MSE", "Risk MSE", "Euc. Distance")
+df$Fraction <- seq_fraction_train
+#df$Fraction <- seq_fraction_N
+df <- subset(df, `Euc. Distance` < 1)
+hist(df$`Euc. Distance`)
+hist(df$`Return MSE`)
+hist(df$`Risk MSE`)
+# plot(df$Fraction, df$`Euc. Distance`)
+# plot(df$`Loadings MSE`, df$`Euc. Distance`)
+
+```
+
+
 
 #### 4.1.4 Dealing with negative budget weights
 
@@ -1512,7 +1616,7 @@ ind_ret_toYr <- which(year_pctDiff_vec == ret_toYr)
 nab_mu_ret <- apply(mat_pctDiff, 2, function(x) prod(1 + x[(ind_ret_sinceYr - 1):(ind_ret_toYr - 1)])) - 1
 #nab_mu_ret_check - nab_mu_ret
 row.names(mat_pctDiff) <- year_vec
-mat_PCA_in <- mat_pctDiff
+mat_pctDiff <- mat_pctDiff
 #=======================================================================
 ind_train <- 1:round(nrow(mat_pctDiff) * fraction_train)
 ind_test <- setdiff(1:nrow(mat_pctDiff), ind_train)
@@ -1888,7 +1992,7 @@ ind_ret_toYr <- which(year_pctDiff_vec == ret_toYr)
 nab_mu_ret <- apply(mat_pctDiff, 2, function(x) prod(1 + x[(ind_ret_sinceYr - 1):(ind_ret_toYr - 1)])) - 1
 #nab_mu_ret_check - nab_mu_ret
 row.names(mat_pctDiff) <- year_vec
-mat_PCA_in <- mat_pctDiff
+mat_pctDiff <- mat_pctDiff
 
 
 
@@ -2478,7 +2582,7 @@ df_backtest <- list_out[[3]]
 
 ```{r, echo=F}
 
-Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
+Signals_from_noise <- function(mat_pctDiff, varimax_rot = T,
                                list_groups = NULL,
                                group_names = NULL,
                                pca_var_plot = F,
@@ -2488,10 +2592,10 @@ Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
                                sig_ts_plot = F,
                                sig_corr_plot = F,
                                yearly = F){
-  varNames_ordered <- colnames(mat_PCA_in)
-  date_vec <- row.names(mat_PCA_in)
+  varNames_ordered <- colnames(mat_pctDiff)
+  date_vec <- row.names(mat_pctDiff)
   if(yearly){date_vec <- as.integer(date_vec)}
-  n_obs <- ncol(mat_PCA_in)
+  n_obs <- ncol(mat_pctDiff)
   #----
   if(!is.null(list_groups)){
     group_vec <- rep(NA, n_obs)
@@ -2504,27 +2608,27 @@ Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
   }
   #----
   if(pca_ind_plot){
-    res <- FactoMineR::PCA(t(mat_PCA_in), graph = F)
-    gg <- factoextra::fviz_pca_ind(res, habillage = factor(group_vec), addEllipses = T)
+    res <- FactoMineR::PCA(t(mat_pctDiff), graph = F)
+    gg <- factoextra::fviz_pctDiffd(res, habillage = factor(group_vec), addEllipses = T)
     print(gg)
   }
   #----
-  res <- FactoMineR::PCA(mat_PCA_in, ncp = ncol(mat_PCA_in), graph = F)
+  res <- FactoMineR::PCA(mat_pctDiff, ncp = ncol(mat_pctDiff), graph = F)
   #----
   if(pca_var_plot){
     gg <- factoextra::fviz_pca_var(res, habillage = factor(group_vec))
     print(gg)
   }
   # library(mclust)
-  # mc <- Mclust(t(mat_PCA_in))
+  # mc <- Mclust(t(mat_pctDiff))
   # summary(mc)
   # View(mc$classification)
   # factoextra::fviz_cluster(mc, frame.type = "norm", geom = "text")
   #--Extraction of signals (main PCs)
   eigvals <- as.data.frame(res$eig)$eigenvalue
   eigval_max <- max(eigvals)
-  N_t <- nrow(mat_PCA_in)
-  N_c <- ncol(mat_PCA_in)
+  N_t <- nrow(mat_pctDiff)
+  N_c <- ncol(mat_pctDiff)
   Q <- N_t / N_c
   s_sq <- 1 - eigval_max / N_c
   #s_sq <- 1
@@ -2553,7 +2657,7 @@ Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
   n_signals <- length(eigvals_sig)
   print(paste("Number of signals: ", n_signals))
   mat_signal_eigvecs <- mat_eigvecs[, ind_deviating_from_noise]
-  mat_signal_ts <- mat_PCA_in %*% mat_signal_eigvecs
+  mat_signal_ts <- mat_pctDiff %*% mat_signal_eigvecs
   if(n_signals == 1){
     mat_signal_ts <- mat_signal_ts / eigvals_sig
   }else{
@@ -2561,8 +2665,8 @@ Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
   }
   # Set sign of eigenvectors such that they
   # best conform to the input time series
-  #inData_avg <- mat_PCA_in %*% rep(1, n_obs) * 1 / n_obs
-  inData_avg <- rowMeans(mat_PCA_in)
+  #inData_avg <- mat_pctDiff %*% rep(1, n_obs) * 1 / n_obs
+  inData_avg <- rowMeans(mat_pctDiff)
   if(n_signals == 1){
     #sse <- sum((mat_signal_ts - inData_avg)^2)
     #sse_neg <- sum((-mat_signal_ts - inData_avg)^2)
@@ -2672,7 +2776,7 @@ Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
 
 # wStar_normd <- wStar_sig1 / max(abs(wStar_sig1))
 # #w_star_normd <- wStar_trad / max(abs(wStar_trad))
-# varNames_ordered <- colnames(mat_PCA_in)
+# varNames_ordered <- colnames(mat_pctDiff)
 # df_plot <- data.frame(ts_id = varNames_ordered, mat_Loads_rot, wStar_normd)
 # signal_id <- paste("Signal", c(1:n_sigs))
 # colnames(df_plot)[2:(n_sigs + 1)] <- signal_id
@@ -2680,7 +2784,7 @@ Signals_from_noise <- function(mat_PCA_in, varimax_rot = T,
 # gathercols <- colnames(df_plot)[-1]
 # df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
 # #--
-# n_obs <- ncol(mat_PCA_in)
+# n_obs <- ncol(mat_pctDiff)
 # group_vec <- rep(NA, n_obs)
 # for(i in 1:length(list_groups)){
 #   this_group_vec <- list_groups[[i]]
