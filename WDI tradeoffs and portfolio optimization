@@ -170,14 +170,24 @@ library(patchwork)
 #=======================================================================
 # Define functions
 #=======================================================================
-signals_from_noise <- function(mat_PCA_in,
-                               eigenvalue_density_plot = T,
-                               signals_plot = T,
-                               pca_var_plot = F,
-                               pca_ind_plot = F,
-                               list_groups = NULL,
-                               group_names = NULL,
-                               quietly = F){
+signals_from_noise <- function(mat_PCA_in, fun_env = NULL){
+  
+  if(is.null(fun_env)){
+    eigenvalue_density_plot = T
+    signals_plot = T
+    pca_var_plot = T
+    pca_ind_plot = T
+    group_info = NULL
+    quietly = F
+  }else{
+    eigenvalue_density_plot = fun_env[[1]]
+    signals_plot = fun_env[[2]]
+    pca_var_plot = fun_env[[3]]
+    pca_ind_plot = fun_env[[4]]
+    group_info = fun_env[[5]]
+    quietly = fun_env[[6]]
+    
+  }
   #---------------------------------------------------------
   # Separate signals from noise
   #---------------------------------------------------------
@@ -191,9 +201,9 @@ signals_from_noise <- function(mat_PCA_in,
   # Apply random matrix theory () to determine eigenvalue distribution of a 
   # correlation matrix of random data.
   n_obs <- nrow(mat_PCA_in)
-  n_var <- ncol(mat_PCA_in)
-  Q <- n_obs / n_var
-  s_sq <- 1 - eigval_max / n_var
+  n_items <- ncol(mat_PCA_in)
+  Q <- n_obs / n_items
+  s_sq <- 1 - eigval_max / n_items
   #s_sq <- 1
   eigval_rand_max <- s_sq * (1 + 1 / Q + 2 / sqrt(Q))
   eigval_rand_min <- s_sq * (1 + 1 / Q - 2 / sqrt(Q))
@@ -273,8 +283,10 @@ signals_from_noise <- function(mat_PCA_in,
   #---------------------------------------------------------
   # These plots include grouping info, if available
   varNames_ordered <- row.names(mat_loads_sig)
-  if(!is.null(list_groups)){
-    group_vec <- rep(NA, n_var)
+  if(!is.null(group_info)){
+    list_groups <- group_info[[1]]
+    group_names <- group_info[[2]]
+    group_vec <- rep(NA, n_items)
     for(i in 1:length(list_groups)){
       this_group_vec <- list_groups[[i]]
       this_group_name <- group_names[i]
@@ -306,11 +318,14 @@ signals_from_noise <- function(mat_PCA_in,
     if(!eigenvalue_density_plot){
       print(gg_signals)
     }else{
-      gg_together <- ggpubr::ggarrange(gg_eigenval_density, gg_signals,
-                                       #align = "v",
-                                       #labels = c("A", "B"),
-                                       ncol = 2, nrow = 1)
+      # gg_together <- ggpubr::ggarrange(gg_eigenval_density, gg_signals,
+      #                                  #align = "v",
+      #                                  #labels = c("A", "B"),
+      #                                  ncol = 2, nrow = 1)
+      # print(gg_together)
+      gg_together <- gg_eigenval_density + gg_signals + plot_layout(nrow = 1)
       print(gg_together)
+      
     }
   }
   #---------------------------------------------------------
@@ -318,15 +333,25 @@ signals_from_noise <- function(mat_PCA_in,
   #---------------------------------------------------------
   # By variable
   if(pca_var_plot){
-    gg <- factoextra::fviz_pca_var(res, habillage = factor(group_vec))
-    print(gg)
+    if(n_signals == 1){
+      print("Only 1 signal, can't do PCA plots.")
+    }else{
+      gg <- factoextra::fviz_pca_var(res, habillage = factor(group_vec))
+      print(gg)
+    }
+    
   }
   #---------------------------------------------------------
   # By individual
   if(pca_ind_plot){
-    res <- FactoMineR::PCA(t(mat_PCA_in), graph = F)
-    gg <- factoextra::fviz_pca_ind(res, habillage = factor(group_vec), addEllipses = T)
-    print(gg)
+    if(n_signals == 1){
+      print("Only 1 signal, can't do PCA plots.")
+    }else{
+      res <- FactoMineR::PCA(t(mat_PCA_in), graph = F)
+      gg <- factoextra::fviz_pca_ind(res, habillage = factor(group_vec), addEllipses = T)
+      print(gg)
+    }
+    
   }
   #---------------------------------------------------------
   # Cluster plot using Mclust()
@@ -374,14 +399,26 @@ signals_from_noise <- function(mat_PCA_in,
 #   
 # }
 #=======================================================================
-interpret_loadings <- function(mat_loads_rot_sig,
-                               list_groups = NULL,
-                               group_names = NULL,
-                               signal_names = NULL){
+interpret_loadings <- function(mat_loads_rot_sig, fun_env = NULL){
   #---------------------------------------------------------
-  n_var <- nrow(mat_loads_rot_sig)
-  n_signals <- ncol(mat_loads_rot_sig)
-  varNames_ordered <- row.names(mat_loads_rot_sig)
+  if(is.null(fun_env)){
+    group_info = NULL
+    signal_names = NULL
+  }else{
+    group_info = fun_env[[1]]
+    signal_names =fun_env[[2]]
+  }
+  #---------------------------------------------------------
+  if(class(mat_loads_rot_sig) == "numeric"){
+    n_items <- length(mat_loads_rot_sig)
+    n_signals <- 1
+    varNames_ordered <- names(mat_loads_rot_sig)
+  }
+  if(class(mat_loads_rot_sig) == "matrix"){
+    n_items <- nrow(mat_loads_rot_sig)
+    n_signals <- ncol(mat_loads_rot_sig)
+    varNames_ordered <- row.names(mat_loads_rot_sig)
+  }
   #------------------------------------------------------------
   # Plot loadings barcharts
   df_plot <- data.frame(id = varNames_ordered, mat_loads_rot_sig)
@@ -397,11 +434,13 @@ interpret_loadings <- function(mat_loads_rot_sig,
   gathercols <- as.character(signal_id) 
   df_plot <- gather_(df_plot, "Signal", "Loading", gathercols)
   df_plot <- transform(df_plot,
-                       Signal = factor(Signal,levels = gathercols))
+                       Signal = factor(Signal, levels = gathercols))
   #--------------
   # Group the vars if group info is provided
-  if(!is.null(list_groups)){
-    group_vec <- rep(NA, n_var)
+  if(!is.null(group_info)){
+    list_groups <- group_info[[1]]
+    group_names <- group_info[[2]]
+    group_vec <- rep(NA, n_items)
     for(i in 1:length(list_groups)){
       this_group_vec <- list_groups[[i]]
       this_group_name <- group_names[i]
@@ -480,10 +519,13 @@ length(ts_symb_vec)
 #--
 # list_groups <- list(spy_sector_symbs, minerals_symbs, agriculture_symbs, energy_symbs,
 #                      currency_symbs, emerg_mkt_symbs, crypto_symbs, Tbond_symbs)
+#-------------------------------------------
+# Create grouping info for plots (required input into functions)
 list_groups <- list(spy_sector_detail, minerals_detail, agriculture_detail, energy_detail,
                     currency_detail, emerg_mkt_detail, crypto_detail, Tbond_detail)
 group_names <- c("US Sectors", "Minerals", "Agriculture", "Energy", "Major Currency Pairs",
                  "Emerging Markets", "Cryptocurrencies/Blockchain", "T-Bonds")
+group_info <- list(list_groups, group_names)
 #-------------------------------------------
 #per_ema <- 13
 #fromdate = Sys.Date() - 360
@@ -669,14 +711,13 @@ mat_pctDiff_train <- mat_PCA_in[ind_train, ]
 mat_pctDiff_test <- mat_PCA_in[ind_test, ]
 ts_avg_test <- ts_avg_in[ind_test]
 date_vec_test <- date_vec[ind_test]
-list_out <- signals_from_noise(mat_pctDiff_train,
-                               eigenvalue_density_plot = T,
-                               signals_plot = T,
-                               pca_var_plot = F,
-                               pca_ind_plot = F,
-                               list_groups = list_groups,
-                               group_names = group_names,
-                               quietly = F)
+fun_env = list(eigenvalue_density_plot = T,
+               signals_plot = T,
+               pca_var_plot = F,
+               pca_ind_plot = F,
+               group_info,
+               quietly = F)
+list_out <- signals_from_noise(mat_pctDiff_train, fun_env)
 # list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig, eigvals, mat_eigvecs)
 mat_loads_sig_train <- list_out[[1]]
 mat_loads_rot_sig_train <- list_out[[2]]
@@ -697,27 +738,8 @@ Average, mostly US sectors and.... Signal two
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 
 signal_names <- c("US / Emerg. Markets,\nEnergy, Blockchain", "Precious metals", "FOREX", "US Bonds", "Agriculture", "Industrial metals")
-interpret_loadings(mat_loads_rot_sig_train,
-                   list_groups = list_groups,
-                   group_names = group_names,
-                   signal_names = signal_names)
-
-# ind_train <- 1:round(nrow(mat_PCA_in) * 2 / 3)
-# ind_test <- setdiff(1:nrow(mat_PCA_in), ind_train)
-# mat_pctDiff_train <- mat_PCA_in[ind_train, ]
-# mat_pctDiff_test <- mat_PCA_in[ind_test, ]
-# ts_avg_test <- ts_avg_in[ind_test]
-# date_vec_test <- date_vec[ind_test]
-# list_sigs <- Signals_from_noise(mat_pctDiff_train, varimax_rot = T,
-#                                 list_groups = list_groups,
-#                                 group_names = group_names,
-#                                 pca_var_plot = F,
-#                                 pca_ind_plot = F,
-#                                 eigenvalue_density_plot = T,
-#                                 loadings_plot = F,
-#                                 sig_ts_plot = F,
-#                                 sig_corr_plot = F,
-#                                 yearly = F)
+fun_env <- list(group_info, signal_names)
+interpret_loadings(mat_loads_rot_sig_train, fun_env)
 
 ```
 
@@ -730,14 +752,13 @@ The train data is 2/3 the whole data. The expected returns are calculated over a
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 
 # Get backtest data
-list_out <- signals_from_noise(mat_PCA_in,
-                               eigenvalue_density_plot = F,
-                               signals_plot = F,
-                               pca_var_plot = F,
-                               pca_ind_plot = F,
-                               list_groups = list_groups,
-                               group_names = group_names,
-                               quietly = T)
+fun_env <- list(eigenvalue_density_plot = F,
+                signals_plot = F,
+                pca_var_plot = F,
+                pca_ind_plot = F,
+                group_info,
+                quietly = T)
+list_out <- signals_from_noise(mat_PCA_in, fun_env)
 mat_loads_sig_test <- list_out[[1]]
 mat_loads_rot_sig_test <- list_out[[2]]
 mat_pctDiff_sig_test <- list_out[[5]][ind_test, ]
@@ -773,8 +794,8 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
   # Rtarg <- targ_vec[1]
   Rtarg <- t(wStar) %*% mat_nab[, 1]
   #----------------------------------------------------
-  check <- t(lambdas) %*% targ_vec + 2*l_V * V
-  print(check)
+  # check <- t(lambdas) %*% targ_vec + 2*l_V * V
+  # print(check)
   #----------------------------------------------------
   # Utility function interpretation of equations
   # (Makes all budget weights positive)
@@ -786,27 +807,27 @@ optimize_portfolio <- function(cormat, mat_nab, targ_vec,
     V <- t(wStar) %*% cormat %*% wStar
   } 
   #if(l_V > 0){wStar <- rep(NA, length(wStar))}
-    list_out <- list(wStar, Rtarg, V, l_V, l_C)
+  list_out <- list(wStar, Rtarg, V, l_V, l_C)
   return(list_out)
-
+  
 }
 #=======================================================================
 backtest_portfolio <- function(wStar, nab_pctRet_test, cormat_test,
                                include_benchmark = F){
   #----------------------------------------------------
-    # Backtest
-    R_test <- t(wStar) %*% nab_pctRet_test
-    V_test <- t(wStar) %*% cormat_test %*% wStar
-    if(include_benchmark){
+  # Backtest
+  R_test <- t(wStar) %*% nab_pctRet_test
+  V_test <- t(wStar) %*% cormat_test %*% wStar
+  if(include_benchmark){
     # Benchmark portfolio
     n_items <- ncol(cormat)
     wBmark <- rep(1 / n_items, n_items)
     R_test_bMark <- t(wBmark) %*% nab_pctRet_test
     V_test_bMark <- t(wBmark) %*% cormat_test %*% wBmark
-    }else{
+  }else{
     R_test_bMark <- NULL
     V_test_bMark <- NULL
-    }
+  }
   #----------------------------------------------------
   outvec <- c(R_test, V_test, R_test_bMark, V_test_bMark)
   return(outvec)
@@ -815,29 +836,37 @@ backtest_portfolio <- function(wStar, nab_pctRet_test, cormat_test,
 #=======================================================================
 plot_frontier_wBacktest <- function(df_frontier,
                                     df_backtest,
-                          fig_title = NULL){
+                                    fig_title = NULL,
+                                    separate_plots = F){
   #-------------------------------------------
   n_points_on_frontier <- nrow(df_frontier)
   color_vec <- c("#56B4E9", "black")
   #-------------------------------------------
   if(is.null(fig_title)){fig_title <- "Optimal Portfolio Frontier"}
-    df_plot1 <- df_frontier[, c("Risk (variance)", "Return target")]
-    df_plot2 <- df_backtest[, c("Risk backtest", "Return backtest")]
-    df_plot1$Type <- "Optimal solution"
-    df_plot2$Type <- "Backtest of solution"
-    colnames(df_plot1)[2] <- "Return"
-    colnames(df_plot2)[1:2] <- c("Risk (variance)", "Return")
-    df_plot <- as.data.frame(do.call(rbind, list(df_plot1, df_plot2)))
+  df_plot1 <- df_frontier[, c("Risk (variance)", "Return target")]
+  df_plot2 <- df_backtest[, c("Risk backtest", "Return backtest")]
+  df_plot1$Type <- "Optimal solution"
+  df_plot2$Type <- "Backtest of solution"
+  colnames(df_plot1)[2] <- "Return"
+  colnames(df_plot2)[1:2] <- c("Risk (variance)", "Return")
+  df_plot <- as.data.frame(do.call(rbind, list(df_plot1, df_plot2)))
+  if(separate_plots){
+    gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return`))
+  }else{
     gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return`, group = Type, color = Type))
-    gg <- gg + geom_point()
-    gg <- gg + scale_color_manual(values = color_vec)
-    gg <- gg + labs(title = fig_title)
-    gg <- gg + theme(plot.title = element_text(size = 10))
-    gg <- gg + theme(legend.title = element_blank())
-    gg <- gg + coord_cartesian(xlim = c(0, max(df_plot$`Risk (variance)`)))
-    gg_frontier_wBacktest <- gg
-    print(gg_frontier_wBacktest)
-
+  }
+  gg <- gg + geom_point()
+  if(separate_plots){
+    gg <- gg + facet_wrap(~Type, ncol = 1, scales = "free_y")
+  }
+  gg <- gg + scale_color_manual(values = color_vec)
+  gg <- gg + labs(title = fig_title)
+  gg <- gg + theme(plot.title = element_text(size = 10))
+  gg <- gg + theme(legend.title = element_blank())
+  gg <- gg + coord_cartesian(xlim = c(0, max(df_plot$`Risk (variance)`)))
+  gg_frontier_wBacktest <- gg
+  print(gg_frontier_wBacktest)
+  
 }
 
 
@@ -846,8 +875,7 @@ plot_frontier_and_budget <- function(df_frontier, df_wStar,
                                      n_points_on_frontier,
                                      varNames_ordered,
                                      fig_title = NULL,
-                                     list_groups = NULL,
-                                     group_names = NULL){
+                                     group_info = NULL){
   #-------------------------------------------
   # Frontier plot
   if(is.null(fig_title)){fig_title <- "Optimal Portfolio Frontier"}
@@ -855,7 +883,7 @@ plot_frontier_and_budget <- function(df_frontier, df_wStar,
   gg <- ggplot(df_plot, aes(x = `Risk (variance)`, y = `Return target`))
   gg <- gg + labs(title = fig_title)
   gg <- gg + theme(axis.title.x = element_blank(),
-                     axis.text.x = element_blank(),
+                   axis.text.x = element_blank(),
                    plot.title = element_text(size = 10))
   gg <- gg + geom_point()
   gg_frontier <- gg
@@ -867,9 +895,11 @@ plot_frontier_and_budget <- function(df_frontier, df_wStar,
   df_plot$portfolio_id <- 1:n_points_on_frontier
   df_match_V <- df_plot[, c("portfolio_id", "Risk (variance)")]
   df_plot <- df_plot %>% gather_("Item", "Budget weights", gathercols)
-  if(!is.null(list_groups)){
-    n_var <- nrow(mat_nab)
-    group_vec <- rep(NA, n_var)
+  if(!is.null(group_info)){
+    list_groups <- group_info[[1]]
+    group_names <- group_info[[2]]
+    n_items <- nrow(mat_nab)
+    group_vec <- rep(NA, n_items)
     for(i in 1:length(list_groups)){
       this_group_vec <- list_groups[[i]]
       this_group_name <- group_names[i]
@@ -900,14 +930,24 @@ plot_frontier_and_budget <- function(df_frontier, df_wStar,
 #=======================================================================
 get_optimal_frontier <- function(cormat, mat_nab,
                                  Rtarg_limits = c(0.001, 0.3),
-                                 n_points_on_frontier = 50,
-                                 utility_interpretation = F,
-                                 backtest_info = NULL,
-                                 frontier_and_budget_plot = T,
-                                 list_groups = NULL,
-                                 group_names = NULL,
-                                 fig_title = NULL
+                                 fig_title = NULL,
+                                 fun_env = NULL
 ){
+  #-------------------------------------------
+  if(is.null(fun_env)){
+    n_points_on_frontier = 50
+    utility_interpretation = F
+    backtest_info = NULL
+    frontier_and_budget_plot = T
+    group_info = NULL
+  }else{
+    n_points_on_frontier = fun_env[[1]]
+    utility_interpretation = fun_env[[2]]
+    backtest_info = fun_env[[3]]
+    frontier_and_budget_plot = fun_env[[4]]
+    group_info = fun_env[[5]]
+    
+  }
   #-------------------------------------------
   Rtarg_vec <- seq(Rtarg_limits[1], Rtarg_limits[2], length.out = n_points_on_frontier)
   list_wStar <- list()
@@ -928,14 +968,14 @@ get_optimal_frontier <- function(cormat, mat_nab,
     lC_vec[i] <- list_out[[5]]
   }
   #-------------------------------------------
-    df_frontier <- data.frame(R_vec, V_vec, lV_vec, lC_vec)
-    colnames(df_frontier) <- c("Return target",
-                               "Risk (variance)",
-                               "Risk shadow price",
-                               "Budget shadow price")
-    df_wStar <- data.frame(V_vec, t(do.call(cbind, list_wStar)))
-    varNames_ordered <- row.names(mat_nab)
-    colnames(df_wStar) <- c("Risk (variance)", varNames_ordered)
+  df_frontier <- data.frame(R_vec, V_vec, lV_vec, lC_vec)
+  colnames(df_frontier) <- c("Return target",
+                             "Risk (variance)",
+                             "Risk shadow price",
+                             "Budget shadow price")
+  df_wStar <- data.frame(V_vec, t(do.call(cbind, list_wStar)))
+  varNames_ordered <- row.names(mat_nab)
+  colnames(df_wStar) <- c("Risk (variance)", varNames_ordered)
   #-------------------------------------------
   # Backtest
   if(!is.null(backtest_info)){
@@ -945,9 +985,9 @@ get_optimal_frontier <- function(cormat, mat_nab,
     for(i in 1:n_points_on_frontier){
       wStar <- list_wStar[[i]]
       outvec <- backtest_portfolio(wStar, nab_pctRet_test, cormat_test,
-                               include_benchmark = F)
-    list_outTest[[i]] <- outvec
-
+                                   include_benchmark = F)
+      list_outTest[[i]] <- outvec
+      
     }
     df_backtest <- as.data.frame(do.call(rbind, list_outTest))
     colnames(df_backtest) <- c("Return backtest", "Risk backtest")
@@ -960,18 +1000,100 @@ get_optimal_frontier <- function(cormat, mat_nab,
                              n_points_on_frontier = n_points_on_frontier,
                              varNames_ordered = varNames_ordered,
                              fig_title = fig_title,
-                             list_groups = list_groups,
-                             group_names = group_names)
+                             group_info)
   }
   #--------------------------------------
   list_out <- list(df_wStar, df_frontier, df_backtest)
   return(list_out)
 }
 #=======================================================================
+
+
+prepare_optFrontier_inputs <- function(list_mat_pctDiff,
+                                       list_mat_loads_rot_sig,
+                                       signals_replace_items,
+                                       purge_cormat_noise){
+  
+}
+  #-------------------------------------------
+  mat_pctDiff <- list_mat_pctDiff[[1]]
+if(length(list_mat_pctDiff) > 1){
+  mat_pctDiff_test <- list_mat_pctDiff[[2]]
+}
+if(length(list_mat_loads_rot_sig) > 1){
+  mat_loads_rot_sig_test <- list_mat_loads_rot_sig[[2]]
+}
+  #-------------------------------------------
+  # Optimize over signals rather than portfolio items?
+  if(signals_replace_items){
+    if(class(mat_loads_rot_sig) == "numeric"){
+      # (If condition is true, then only one signal could be extracted.)
+      print("Only 1 signal. Too few to replace portfolio items with signals.")
+    }else{
+      if(is.null(fraction_train)){
+        mat_pctDiff <- list_out[[5]]
+        n_items <- ncol(mat_pctDiff)
+      }else{
+        mat_pctDiff <- list_out_train[[5]]
+        mat_pctDiff_test <- list_out_test[[5]]
+      }
+    }
+    
+  }
+  #-------------------------------------------
+  # Define cost target and gradient
+  # (By convention, the budget weights always add up to (a cost target of) 1, so that the cost gradient is equal to a vector of ones the length of portfolio items.)
+  C_targ <- 1
+  nab_C <- rep(1, n_items)
+  #-------------------------------------------
+  # Define expected returns
+  nab_mu_ret <- apply(mat_pctDiff, 2, function(x) prod(1 + x)) - 1
+  if(!is.null(fraction_train)){
+    nab_mu_ret_test <- apply(mat_pctDiff_test, 2, function(x) prod(1 + x)) - 1
+  }
+  #-------------------------------------------
+  # Correlation matrix
+  cormat <- cor(mat_pctDiff)
+  if(purge_cormat_noise){
+    if(signals_replace_items){
+      print("If signals_replace_items = T, then can't also have purge_cormat_noise = T. Using regular correlation matrix.")
+    }else{
+        cormat_data <- cormat
+        cormat <- round(mat_loads_rot_sig %*% t(mat_loads_rot_sig), 7)
+        #cormat <- round(mat_loads_sig %*% t(mat_loads_sig), 7)
+        mse <- round(mean((cormat - cormat_data)^2), 6)
+        print(paste("Purged correlation matrix mse:", mse))
+    if(!is.null(fraction_train)){
+        cormat_data_test <- cor(mat_pctDiff_test)
+        cormat_test <- round(mat_loads_rot_sig_test %*% t(mat_loads_rot_sig_test), 7)
+        #cormat <- round(mat_loads_sig %*% t(mat_loads_sig), 7)
+        mse <- round(mean((cormat_test - cormat_data_test)^2), 6)
+        print(paste("Purged test correlation matrix mse:", mse))
+        print(paste("Test correlation matrix kappa:", kappa(cormat_test)))
+      }
+    }
+  print(paste("Correlation matrix kappa:", kappa(cormat)))
+  #------------------------------------
+  # Expected returns vector
+  #ind_t_ret <- ind_ret_sinceYr:ind_ret_toYr
+  nab_pctDiff <- apply(mat_pctDiff, 2, function(x) prod(1 + x)) - 1
+  #------------------------------------
+  mat_nab <- cbind(nab_pctDiff, nab_C)
+  #------------------------------------
+  
+  
+  list_out <- get_optimal_frontier(cormat, mat_nab,
+                                   Rtarg_limits,
+                                   fig_title = fig_title_frontier_wBudget,
+                                   fun_env_get_optimal_frontier)
+  
+  
+#=======================================================================
+#=======================================================================
 # Conventional risk-reward frontier
-n_vars <- nrow(mat_loads_sig_train)
+n_items <- ncol(mat_pctDiff)
 C_targ <- 1
-nab_C <- rep(1, n_vars)
+nab_C <- rep(1, n_items)
 #------------------------------------
 # Get pct return vec and correlation matrix only over a period equal in length to that of the test period.
 ind_equal_test <- (nrow(mat_pctDiff_train) - length(ind_test)):nrow(mat_pctDiff_train)
@@ -993,15 +1115,16 @@ nab_pctRet_test <- apply(mat_pctDiff_test, 2, function(x) prod(1 + x)) - 1
 mat_nab <- cbind(nab_pctRet_train, nab_C)
 n_points_on_frontier <- 50
 #------------------------------------
+fun_env <- list(n_points_on_frontier,
+                utility_interpretation = F,
+                backtest_info = list(nab_pctRet_test, cormat_test),
+                frontier_and_budget_plot = T,
+                group_info)
+
 list_out <- get_optimal_frontier(cormat, mat_nab,
                                  Rtarg_limits = c(0.01, 0.3),
-                                 n_points_on_frontier = n_points_on_frontier,
-                                 utility_interpretation = F,
-                                 backtest_info = list(nab_pctRet_test, cormat_test),
-                                 frontier_and_budget_plot = T,
-                                 list_groups = list_groups,
-                                 group_names = group_names,
-                                 fig_title = "Figure 1: Optimal portfolio frontier")
+                                 fig_title = "Figure 1: Optimal portfolio frontier",
+                                 fun_env)
 
 df_frontier <- list_out[[2]]
 df_backtest <- list_out[[3]]
@@ -1014,12 +1137,12 @@ Minimum variance analysis is, in many ways, still a work in progress. A backtest
 
 ```{r, fig.width=8, fig.height=4, fig.align='center', echo = FALSE}
 
-  #-------------------------------------------
-  # Frontier plot with backtest
+#-------------------------------------------
+# Frontier plot with backtest
 plot_frontier_wBacktest(df_frontier,
                         df_backtest,
                         fig_title = "Figure 2: Optimal portfolio solution vs. backtest")
-  #-------------------------------------------
+#-------------------------------------------
 
 
 ```
@@ -1043,8 +1166,8 @@ R_eigen_test <- apply(mat_wEigen, 2, function(x) t(x) %*% nab_pctRet_test)
 n_signals <- ncol(mat_pctDiff_sig_train)
 signal_names[1] <- "US / Emerg. Markets, Energy, Blockchain"
 df_eigenportfolio <- data.frame(Eigen_portfolio = as.character(c(1:n_signals)),
-                                      Characteristic = signal_names,
-                                      R_eigen, V_eigen,
+                                Characteristic = signal_names,
+                                R_eigen, V_eigen,
                                 R_eigen_test, V_eigen_test)
 colnames(df_eigenportfolio) <- c("Eigen-portfolio", "Description",
                                  "Return target", "Risk target",
@@ -1086,8 +1209,8 @@ It is possible to enforce positive weights when solving for optimal portfolios u
 # env[["cormat"]] <- cormat_test
 # #------------------------------------
 # out_malschains <- Rmalschains::malschains(function(w_vec) {-portfolio_heuristic_fn(w_vec)},
-#                                           lower = as.vector(rep(0, n_vars)),
-#                                           upper = as.vector(rep(1, n_vars)),
+#                                           lower = as.vector(rep(0, n_items)),
+#                                           upper = as.vector(rep(1, n_items)),
 #                                           verbosity = 0,
 #                                           env = env)
 # w_vec <- out_malschains$sol
@@ -1136,15 +1259,16 @@ Another way, not yet explored in the literature, is to interpret the optimal wei
 
 ```{r, fig.width=8, fig.height=6, fig.align='center', echo = FALSE}
 
+fun_env <- list(n_points_on_frontier,
+                utility_interpretation = T,
+                backtest_info = list(nab_pctRet_test, cormat_test),
+                frontier_and_budget_plot = T,
+                group_info)
+
 list_out <- get_optimal_frontier(cormat, mat_nab,
-                                 Rtarg_limits = c(0.01, 7),
-                                 n_points_on_frontier = n_points_on_frontier,
-                                 utility_interpretation = T,
-                                 backtest_info = list(nab_pctRet_test, cormat_test),
-                                 frontier_and_budget_plot = T,
-                                 list_groups = list_groups,
-                                 group_names = group_names,
-                                 fig_title = "Figure 3: Optimal portfolio frontier, utility weights")
+                                 Rtarg_limits = c(0.01, 4),
+                                 fig_title = "Figure 3: Optimal portfolio frontier, utility weights",
+                                 fun_env)
 
 df_frontier <- list_out[[2]]
 df_backtest <- list_out[[3]]
@@ -1158,12 +1282,12 @@ df_backtest <- list_out[[3]]
 
 
 
-  #-------------------------------------------
-  # Frontier plot with backtest
+#-------------------------------------------
+# Frontier plot with backtest
 plot_frontier_wBacktest(df_frontier,
                         df_backtest,
                         fig_title = "Figure 4: Optimal portfolio solution vs. backtest, utility interpretation")
-  #-------------------------------------------
+#-------------------------------------------
 
 
 
@@ -1192,15 +1316,16 @@ nab_pctRet_test <- apply(mat_pctDiff_sig_test, 2, function(x) prod(1 + x)) - 1
 mat_nab <- cbind(nab_pctRet_train, nab_C)
 row.names(mat_nab) <- signal_names
 #------------------------------------
+fun_env <- list(n_points_on_frontier,
+                utility_interpretation = T,
+                backtest_info = list(nab_pctRet_test, cormat_test),
+                frontier_and_budget_plot = T,
+                group_info = NULL)
+
 list_out <- get_optimal_frontier(cormat, mat_nab,
                                  Rtarg_limits = c(0.1, 0.35),
-                                 n_points_on_frontier = n_points_on_frontier,
-                                 utility_interpretation = T,
-                                 backtest_info = list(nab_pctRet_test, cormat_test),
-                                 frontier_and_budget_plot = T,
-                                 list_groups = NULL,
-                                 group_names = NULL,
-                                 fig_title = "Figure 5: Optimal portfolio frontier, utility weights, signals")
+                                 fig_title = "Figure 5: Optimal portfolio frontier, utility weights, signals",
+                                 fun_env)
 
 df_frontier <- list_out[[2]]
 df_backtest <- list_out[[3]]
@@ -1215,26 +1340,34 @@ df_backtest <- list_out[[3]]
 
 ```{r, echo=F}
 
-  #-------------------------------------------
-  # Frontier plot with backtest
+#-------------------------------------------
+# Frontier plot with backtest
 plot_frontier_wBacktest(df_frontier,
                         df_backtest,
                         fig_title = "Figure 6: Optimal portfolio solution vs. backtest, utility interpretation, signals")
-  #-------------------------------------------
+#-------------------------------------------
 
 ```
 
 
 ## Example 2: Mod-MV analysis to determine optimal investments across strategic objectives in the AR4D context
 
+The aim of investment here is not merely to share in the fortunes of the portfolio items, but rather to play a role in their shaping. High commodity price is an indication of demand outstripping supply. The aim of the CBOE speculator is to prosper from that scarcity and to aggravate it by removing from circulation as much of the commodity as possible, thereby raising the price further, the aim of the AR4D donor is the exact opposite of this. The donor invests in AR4D so as to increase production and quality of the crops and thereby to bring down their price.
+
 Interpretation of "price" is different from the financial context. This could reflect 1) higher kcals per unit weight, 2) higher quality kcals, 3) higher demand, or 4) some combination of all of the above.
+
+based on export price, because there are enough data to permit a backtest. but should really focus on farmgate price
+
+The data is very low resolution. Results vary considerably depending on geographical focus. I do export price first in order to have enough data to apply backtests and then farmgate price. The backtests diverge considerably more from the optimal frontier than in the financial context.
+
 
 ```{r, echo=F}
 #=======================================================================
 # Define geographic areas of focus
 area_vec <- c("World","Low Income Food Deficit Countries", "Net Food Importing Developing Countries",
               "Least Developed Countries", "Eastern Africa", "Western Africa", "South America",
-              "Southern Asia", "Southern Africa", "Middle Africa")
+              "Southern Asia", "Southern Africa", "Middle Africa", "Asia",
+              "Sub-Saharan Africa")
 # Define commodities of interest
 cereal_vec <- c("Maize", "Wheat", "Sorghum", "Rice", "Millet") #"Rice, paddy"
 pulses_oilcrops_vec <- c("Beans, dry", "Cow peas, dry", "Chick peas", "Lentils", "Soybeans", "Groundnuts, shelled") #"Groundnuts, with shell"
@@ -1243,6 +1376,7 @@ item_vec <- c(cereal_vec, pulses_oilcrops_vec, RnT_vec)
 #------------------
 list_groups <- list(cereal_vec, pulses_oilcrops_vec, RnT_vec)
 group_names <- c("Cereals", "Pulses & Oilcrops", "Roots & Tubers")
+group_info <- list(list_groups, group_names)
 #------------------------------
 #Prep export value data
 df_expVal_raw <- read.csv("Trade_Crops_Livestock_E_All_Data.csv", stringsAsFactors = F)
@@ -1266,11 +1400,10 @@ df_expVal$Unit <- NULL
 # unique(df_expVal$Area)[grep("africa", unique(df_expVal_raw$Area), ignore.case = T)]
 SSA_vec <- c("South Africa", "Africa", "Eastern Africa", "Middle Africa", "Southern Africa", "Western Africa")
 df_x <- subset(df_expVal, Area %in% SSA_vec)
-df_x <- df_x %>% group_by(Year, Item, Element) %>% summarise(Value = sum(Value))
+df_x <- as.data.frame(df_x %>% group_by(Year, Item, Element) %>% summarise(Value = sum(Value, na.rm = T)))
 df_x$Area <- "Sub-Saharan Africa"
 df_x <- df_x[, colnames(df_expVal)]
 df_expVal <- as.data.frame(rbind(df_expVal, df_x))
-area_vec <- c(area_vec, "Sub-Saharan Africa")
 #------------------
 df_expVal <- subset(df_expVal, Area %in% area_vec)
 #unique(df_expVal_raw$Element)
@@ -1280,215 +1413,80 @@ df_expVal <- subset(df_expVal, Element %in% element_vec)
 df_expVal$Unit <- NULL
 df_expVal <- df_expVal %>% spread(Element, Value)
 df_expVal$`Export Price` <- df_expVal$`Export Value` / df_expVal$`Export Quantity`
-
+#------------------
+# Create group id variable for plotting
 df_expVal$Group <- NA
 u <- df_expVal$Item
 df_expVal$Group[which(u %in% cereal_vec)] <- "Cereals"
 df_expVal$Group[which(u %in% pulses_oilcrops_vec)] <- "Pulses and Oilcrops"
 df_expVal$Group[which(u %in% RnT_vec)] <- "Roots & Tubers"
 df_expVal$Group <- factor(df_expVal$Group)
-
 #------------------
 check_on_data = F
 if(check_on_data){
   # Export value plots
-df_plot <- subset(df_expVal, Year == 2016)
-df_plot <- subset(df_plot, Area == "World")
-xx <- df_plot$Group
-df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
-df_plot <- df_plot %>% gather_("Element", "Value", colnames(df_plot[4:6]))
-gg <- ggplot(df_plot, aes(x = Item, y = Value, fill = Group))
-gg <- gg + geom_bar(stat = "identity", position = "dodge")
-gg <- gg + facet_wrap(~Element, scales = "free_y")
-gg <- gg + theme(axis.title.x = element_blank(),
-                 axis.text.x = element_text(angle = 60, hjust = 1),
-                 axis.title.y = element_blank(),
-                 legend.title = element_blank())
-#gg <- gg + coord_flip()
-gg
-
-df_plot <- subset(df_expVal, Year == 2016)
-df_plot$Area[grep("Least Developed Countries", df_plot$Area)] <- "Least Developed\nCountries"
-df_plot$Area[grep("Low Income Food Deficit Countries", df_plot$Area)] <- "Low Income\nFood Deficit Countries"
-xx <- df_plot$Group
-df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
-gg <- ggplot(df_plot, aes(x = Item, y = `Export Price`, fill = Group))
-gg <- gg + geom_bar(stat = "identity", position = "dodge")
-gg <- gg + facet_wrap(~Area)
-gg <- gg + theme(axis.title.y = element_blank(),
-                 axis.text.y = element_text(size = 7))
-gg <- gg + coord_flip()
-gg
-
-
-df_plot <- df_expVal
-df_plot$Year <- as.integer(df_plot$Year)
-xx <- df_plot$Group
-df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
-gg <- ggplot(df_plot, aes(x = Year, y = `Export Price`, fill = Item))
-gg <- gg + geom_area(position = "stack")
-gg <- gg + facet_wrap(~Area, scales = "free")
-gg
-df_plot <- as.data.frame(df_plot %>% group_by(Area, Year) %>% mutate(sum_x = sum(`Export Price`)))
-df_plot$`Export Price (share)` <- df_plot$`Export Price` / df_plot$sum_x
-gg <- ggplot(df_plot, aes(x = Year, y = `Export Price (share)`, fill = Item))
-gg <- gg + geom_area(position = "stack")
-gg <- gg + facet_wrap(~Area)
-gg
-
-
+  df_plot <- subset(df_expVal, Year == 2016)
+  df_plot <- subset(df_plot, Area == "World")
+  xx <- df_plot$Group
+  df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+  df_plot <- df_plot %>% gather_("Element", "Value", colnames(df_plot[4:6]))
+  gg <- ggplot(df_plot, aes(x = Item, y = Value, fill = Group))
+  gg <- gg + geom_bar(stat = "identity", position = "dodge")
+  gg <- gg + facet_wrap(~Element, scales = "free_y")
+  gg <- gg + theme(axis.title.x = element_blank(),
+                   axis.text.x = element_text(angle = 60, hjust = 1),
+                   axis.title.y = element_blank(),
+                   legend.title = element_blank())
+  #gg <- gg + coord_flip()
+  gg
+  
+  df_plot <- subset(df_expVal, Year == 2016)
+  df_plot$Area[grep("Least Developed Countries", df_plot$Area)] <- "Least Developed\nCountries"
+  df_plot$Area[grep("Low Income Food Deficit Countries", df_plot$Area)] <- "Low Income\nFood Deficit Countries"
+  xx <- df_plot$Group
+  df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+  gg <- ggplot(df_plot, aes(x = Item, y = `Export Price`, fill = Group))
+  gg <- gg + geom_bar(stat = "identity", position = "dodge")
+  gg <- gg + facet_wrap(~Area)
+  gg <- gg + theme(axis.title.y = element_blank(),
+                   axis.text.y = element_text(size = 7))
+  gg <- gg + coord_flip()
+  gg
+  
+  
+  df_plot <- df_expVal
+  df_plot$Year <- as.integer(df_plot$Year)
+  xx <- df_plot$Group
+  df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+  gg <- ggplot(df_plot, aes(x = Year, y = `Export Price`, fill = Item))
+  gg <- gg + geom_area(position = "stack")
+  gg <- gg + facet_wrap(~Area, scales = "free")
+  gg
+  df_plot <- as.data.frame(df_plot %>% group_by(Area, Year) %>% mutate(sum_x = sum(`Export Price`)))
+  df_plot$`Export Price (share)` <- df_plot$`Export Price` / df_plot$sum_x
+  gg <- ggplot(df_plot, aes(x = Year, y = `Export Price (share)`, fill = Item))
+  gg <- gg + geom_area(position = "stack")
+  gg <- gg + facet_wrap(~Area)
+  gg
+  
+  
 }
 
-# #------------------------------
-# #Prep value of ag production data
-# df_vap_raw <- read.csv("Value_of_Production_E_All_Data.csv", stringsAsFactors = F)
-# colnames(df_vap_raw)
-# df_vap_raw$Area.Code <- NULL
-# df_vap_raw$Item.Code <- NULL
-# df_vap_raw$Element.Code <-NULL
-# u <- colnames(df_vap_raw)
-# colnames(df_vap_raw)
-# df_vap_raw <- df_vap_raw[, -grep("F", u)]
-# colnames(df_vap_raw)[5:ncol(df_vap_raw)] <- as.character(c(1961:(1961 + ncol(df_vap_raw) - 5)))
-# df_vap_raw <- gather(df_vap_raw,Year,Value,`1961`:`2016`)
-# #------------------
-# #unique(df_vap_raw$Area)[grep("africa", unique(df_vap_raw$Area), ignore.case = T)]
-# #unique(df_vap_raw$Item)[grep("potato", unique(df_vap_raw$Item), ignore.case = T)]
-# #------------------
-# df_vap <- subset(df_vap_raw, Area %in% area_vec)
-# df_vap <- subset(df_vap, Item %in% item_vec)
-# #unique(df_vap_raw$Element)
-# element_vec <- c("Gross Production Value (current million US$)")
-# df_vap <- subset(df_vap, Element %in% element_vec)
-# df_vap <- subset(df_vap, Year > 1990)
-# df_vap$Unit <- NULL
-# df_vap$Element <- NULL
-# #---------------
-# df_vap$Group <- NA
-# u <- df_vap$Item
-# df_vap$Group[which(u %in% cereal_vec)] <- "Cereals"
-# df_vap$Group[which(u %in% pulses_oilcrops_vec)] <- "Pulses and Oilcrops"
-# df_vap$Group[which(u %in% RnT_vec)] <- "Roots & Tubers"
-# df_vap$Group <- factor(df_vap$Group)
-# colnames(df_vap)[4] <- "Gross Production Value\n(current million USD)"
-# #---------------
-# # df_plot <- subset(df_vap, Year == 2016 & Area == "World")
-# # xx <- df_plot$Group
-# # df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
-# # gg <- ggplot(df_plot, aes(x = Item, y = `Gross Production Value (current million US$)`, fill = Group))
-# # gg <- gg + geom_bar(stat = "identity", position = "dodge")
-# # gg <- gg + coord_flip()
-# # gg
-# 
-# # df_vap$`Gross Production Value (current million US$)` <- 10^6 * df_vap$`Gross Production Value (current million US$)`
-# # colnames(df_vap)[4] <- "Gross Production Value (current USD)"
-# 
-# #------------------------------
-# df_prod_raw <- read.csv("Production_Crops_E_All_Data.csv", stringsAsFactors = F)
-# df_prod_raw <- subset(df_prod_raw, Item.Code != 2928)
-# df_prod_raw$Area.Code <- NULL
-# df_prod_raw$Item.Code <- NULL
-# df_prod_raw$Element.Code <-NULL
-# df_prod_raw$Unit <- NULL
-# u <- colnames(df_prod_raw)
-# df_prod_raw <- df_prod_raw[, -grep("F", u)]
-# last_yr <- (1961 + ncol(df_prod_raw) - 4)
-# colnames(df_prod_raw)[4:ncol(df_prod_raw)] <- as.character(c(1961:last_yr))
-# gathercols <- colnames(df_prod_raw)[4:ncol(df_prod_raw)]
-# df_prod_raw <- gather_(df_prod_raw, "Year", "Value", gathercols)
-# #------------------------------
-# #unique(df_prod_raw$Item)[grep("beans", unique(df_prod_raw$Item), ignore.case = T)]
-# df_prod <- subset(df_prod_raw, Item %in% item_vec)
-# df_prod <- subset(df_prod, Area %in% area_vec)
-# df_prod <- subset(df_prod, Element == "Production")
-# df_prod <- subset(df_prod, Year > 1990)
-# df_prod$Element <- NULL
-# colnames(df_prod)[4] <- "Production"
-# #-----------------------------
-# df_prod$Group <- NA
-# u <- df_prod$Item
-# df_prod$Group[which(u %in% cereal_vec)] <- "Cereals"
-# df_prod$Group[which(u %in% pulses_oilcrops_vec)] <- "Pulses and Oilcrops"
-# df_prod$Group[which(u %in% RnT_vec)] <- "Roots & Tubers"
-# df_prod$Group <- factor(df_prod$Group)
-# #-----------------------------
-# df <- merge(df_vap, df_prod, by = c("Area", "Year", "Group", "Item"))
-# df$`Gross Prod. Value / MT\n(current USD)` <- 10^6 * df$`Gross Production Value\n(current million USD)` / df$Production
-# #-----------------------------
-# # kcalMT_cereals_vec <- c(4.14, )
-# # df_kcal <- data.frame(Item = item_vec, kcal_per_MT = kcalMT_vec)
-# #-----------------------------
-# # VAP Plots
-# check_on_data <- F
-# if(check_on_data){
-# df_plot <- subset(df, Year == 2016)
-# df_plot <- subset(df_plot, Area == "World")
-# xx <- df_plot$Group
-# df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
-# df_plot$Production <- NULL
-# df_plot <- df_plot %>% gather_("Element", "Value", colnames(df_plot[5:6]))
-# gg <- ggplot(df_plot, aes(x = Item, y = Value, fill = Group))
-# gg <- gg + geom_bar(stat = "identity", position = "dodge")
-# gg <- gg + facet_wrap(~Element, scales = "free_y")
-# gg <- gg + theme(axis.title.x = element_blank(),
-#                  axis.text.x = element_text(angle = 60, hjust = 1),
-#                  axis.title.y = element_blank(),
-#                  legend.title = element_blank())
-# #gg <- gg + coord_flip()
-# gg
-# #-----------------------------
-# df_plot <- subset(df, Year == 2016)
-# df_plot$Area[grep("Least Developed Countries", df_plot$Area)] <- "Least Developed\nCountries"
-# df_plot$Area[grep("Low Income Food Deficit Countries", df_plot$Area)] <- "Low Income\nFood Deficit Countries"
-# xx <- df_plot$Group
-# df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
-# gg <- ggplot(df_plot, aes(x = Item, y = `Gross Prod. Value / MT\n(current USD)`, fill = Group))
-# gg <- gg + geom_bar(stat = "identity", position = "dodge")
-# gg <- gg + facet_wrap(~Area)
-# gg <- gg + theme(axis.title.y = element_blank(),
-#                  axis.text.y = element_text(size = 7))
-# gg <- gg + coord_flip()
-# gg
-# 
-# 
-# df_plot <- subset(df_plot, Area == "World")
-# gg <- ggplot(df_plot, aes(x = Item, y = `Gross Prod. Value / MT\n(current USD)`, fill = Group))
-# gg <- gg + geom_bar(stat = "identity", position = "dodge")
-# #gg <- gg + facet_wrap(~Area)
-# gg <- gg + theme(axis.title.y = element_blank(),
-#                  axis.text.y = element_text(size = 7))
-# #gg <- gg + coord_flip()
-# gg
-# 
-# #-----------------------------
-# df_plot <- df
-# df_plot$Year <- as.integer(df_plot$Year)
-# xx <- df_plot$Group
-# df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
-# gg <- ggplot(df_plot, aes(x = Year, y = `Gross Prod. Value / MT (current USD)`, fill = Item))
-# gg <- gg + geom_area(position = "stack")
-# gg <- gg + facet_wrap(~Area)
-# gg
-# df_plot <- as.data.frame(df_plot %>% group_by(Area, Year) %>% mutate(sum_vap = sum(`Gross Prod. Value / MT (current USD)`)))
-# df_plot$`Gross Prod. Value / MT (share)` <- df_plot$`Gross Prod. Value / MT (current USD)` / df_plot$sum_vap
-# gg <- ggplot(df_plot, aes(x = Year, y = `Gross Prod. Value / MT (share)`, fill = Item))
-# gg <- gg + geom_area(position = "stack")
-# gg <- gg + facet_wrap(~Area)
-# gg
-# #-----------------------------
-# # Same on a per kcal basis
-# #.....
-# }
 #-----------------------------
 # Portfolio optimization
 #-----------------------------
-ret_sinceYr <- 1968
+ret_sinceYr <- 1967
 ret_toYr <- 2016
+fraction_train <- 2 / 3
 #-----------------------------
-df2 <- subset(df_expVal, Area == "World")
-list_groups_mod <- list_groups
+df2 <- subset(df_expVal, Area == "Low Income Food Deficit Countries")
+#"Low Income Food Deficit Countries"
 #"Net Food Importing Developing Countries"
-#unique(df_expVal$Area)[grep("Africa", unique(df_expVal$Area))]
+#"Sub-Saharan Africa"
+#"South America"
+#"Asia"
+#"World"
+#unique(df_expVal$Area)[grep("deficit", unique(df_expVal$Area), ignore.case = T)]
 # df2 <- subset(df_expVal, Area == "Net Food Importing Developing Countries")
 # list_groups_mod <- list_groups
 #-----------------------------
@@ -1503,19 +1501,20 @@ df2 <- df2[, c("Item", "Year", "Export Price")]
 df2 <- df2 %>% spread(Item, `Export Price`)
 ind_ret_sinceYr <- which(df2$Year == ret_sinceYr)
 ind_ret_toYr <- which(df2$Year == ret_toYr)
-nab_mu_ret_check <- apply(df2[, -1], 2, function(x) (x[ind_ret_toYr] - x[ind_ret_sinceYr]) / x[ind_ret_sinceYr])
+df2 <- df2[ind_ret_sinceYr:ind_ret_toYr, ]
+# nab_mu_ret_check <- apply(df2[, -1], 2, function(x) (x[ind_ret_toYr] - x[ind_ret_sinceYr]) / x[ind_ret_sinceYr])
 mat2 <- as.matrix(df2[, -1])
 mat2 <- na.approx(mat2)
 mat_pctDiff <- diff(mat2) / mat2[-nrow(mat2), ]
-year_pctDiff_vec <- df2$Year[-1]
+year_vec <- df2$Year[-1]
 ind_ret_sinceYr <- which(year_pctDiff_vec == ret_sinceYr)
 ind_ret_toYr <- which(year_pctDiff_vec == ret_toYr)
 nab_mu_ret <- apply(mat_pctDiff, 2, function(x) prod(1 + x[(ind_ret_sinceYr - 1):(ind_ret_toYr - 1)])) - 1
 #nab_mu_ret_check - nab_mu_ret
-row.names(mat_pctDiff) <- year_pctDiff_vec
+row.names(mat_pctDiff) <- year_vec
 mat_PCA_in <- mat_pctDiff
 #=======================================================================
-ind_train <- 1:round(nrow(mat_pctDiff) * 2 / 3)
+ind_train <- 1:round(nrow(mat_pctDiff) * fraction_train)
 ind_test <- setdiff(1:nrow(mat_pctDiff), ind_train)
 mat_pctDiff_train <- mat_pctDiff[ind_train, ]
 mat_pctDiff_test <- mat_pctDiff[ind_test, ]
@@ -1525,8 +1524,7 @@ list_out <- signals_from_noise(mat_pctDiff_train,
                                signals_plot = T,
                                pca_var_plot = T,
                                pca_ind_plot = T,
-                               list_groups = list_groups_mod,
-                               group_names = group_names,
+                               group_info,
                                quietly = F)
 # list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig, eigvals, mat_eigvecs)
 #mat_loads_sig <- list_out[[1]]
@@ -1541,8 +1539,7 @@ mat_loads_rot_sig_train <- list_out[[2]]
 
 signal_names <- c(NULL)
 interpret_loadings(mat_loads_rot_sig_train,
-                   list_groups = list_groups,
-                   group_names = group_names,
+                   group_info,
                    signal_names = signal_names)
 # Get test data
 list_out <- signals_from_noise(mat_pctDiff_test,
@@ -1550,27 +1547,25 @@ list_out <- signals_from_noise(mat_pctDiff_test,
                                signals_plot = T,
                                pca_var_plot = T,
                                pca_ind_plot = T,
-                               list_groups = list_groups,
-                               group_names = group_names,
+                               group_info,
                                quietly = F)
 # list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig, eigvals, mat_eigvecs)
 #mat_loads_sig <- list_out[[1]]
 mat_loads_rot_sig_test <- list_out[[2]]
 signal_names <- c(NULL)
 interpret_loadings(mat_loads_rot_sig_test,
-                   list_groups = list_groups,
-                   group_names = group_names,
+                   group_info,
                    signal_names = signal_names)
 cormat_test <- cor(mat_pctDiff_test)
 nab_pctRet_test <- apply(mat_pctDiff_test, 2, function(x) prod(1 + x)) - 1
 #=======================================================================
 # Conventional risk-reward frontier
-if(class(mat_loads_rot_sig_train) == "numeric"){n_vars <- length(mat_loads_rot_sig_train)}
-if(class(mat_loads_rot_sig_train) == "matrix"){n_vars <- nrow(mat_loads_rot_sig_train)
+if(class(mat_loads_rot_sig_train) == "numeric"){n_items <- length(mat_loads_rot_sig_train)}
+if(class(mat_loads_rot_sig_train) == "matrix"){n_items <- nrow(mat_loads_rot_sig_train)
 }
 
 C_targ <- 1
-nab_C <- rep(1, n_vars)
+nab_C <- rep(1, n_items)
 #------------------------------------
 # Correlation matrix
 cormat_train <- cor(mat_pctDiff_train)
@@ -1587,43 +1582,323 @@ mat_nab_train <- cbind(nab_pctDiff_train, nab_C)
 n_points_on_frontier <- 50
 #------------------------------------
 list_out <- get_optimal_frontier(cormat_train, mat_nab_train,
-                                 Rtarg_limits = c(0.01, 30),
+                                 Rtarg_limits = c(3, 70),
                                  n_points_on_frontier = n_points_on_frontier,
                                  backtest_info = list(nab_pctRet_test, cormat_test),
                                  utility_interpretation = T,
                                  frontier_and_budget_plot = T,
-                                 list_groups = NULL,
-                                 group_names = NULL,
-                                 # list_groups = list_groups_mod,
-                                 # group_names = group_names_mod,
+                                 group_info = NULL,
                                  fig_title = NULL)
 
 df_frontier <- list_out[[2]]
 df_backtest <- list_out[[3]]
 
 
-  #-------------------------------------------
-  # Frontier plot with backtest
+#-------------------------------------------
+# Frontier plot with backtest
 plot_frontier_wBacktest(df_frontier,
                         df_backtest,
-                        fig_title = "Figure 10: Optimal portfolio solution vs. backtest, utility interpretation")
-  #-------------------------------------------
+                        fig_title = "Figure 10: Optimal portfolio solution vs. backtest, utility interpretation",
+                        separate_plots = T)
+#-------------------------------------------
 
 
 ```
 
+So, in this back test, real returns to the optimal portfolio were much lower than those indicated by the optimal frontier, but nonetheless substantial (60%-90%). This is probably due to the low resolution of the data and the long time horizons. A lot can happen in 30 years. The usefulness of a backtest is  questionable, since the idea of investment is not merely to ride the fortunes of the portfolio items, but to play a role in shaping them.
 
+The optimal portfolio looking ahead from 2016 (the last year of available data), based on the returns and correlations of the precceding 40 years of data, is computed below.
 
 
 ```{r, echo=F}
 
+#the signals can be used in optimization
+#defining the return window, and whether to define expected return as the return over a recent window or the average of returns over many small windows. In the development context, this 
+#"Gross Prod. Value / MT\n(current USD)"
+sigExtract_and_portfoliOptimization <- function(df_in,
+                                                Rtarg_limit = c(0.1, 5),
+                                                period = NULL,
+                                                purge_cormat_noise = F,
+                                                signals_replace_items = F,
+                                                fraction_train = NULL,
+                                                fig_title_frontier_wBudget = NULL,
+                                                fun_env = NULL
+){
+  #===========================================
+  # Unpack function environments
+  if(is.null(fn_envs)){
+    fun_env_signals_from_noise <- standard_env_signals_from_noise
+    fun_env_interpret_loadings <- standard_env_interpret_loadings
+    fun_env_get_optimal_frontier <- standard_env_get_optimal_frontier
+  }else{
+    fun_env_signals_from_noise <- fun_env[[1]]
+    fun_env_interpret_loadings <- fun_env[[2]]
+    fun_env_get_optimal_frontier <- fun_env[[3]]
+  }
+  #===========================================
+  # Prepare data
+  #-------------------------------------------
+  # df_in must have dimensions nrow = length(time series), ncol = n_items + 1, with the first column as date vec (Year, in the case of FAO data).
+  #-------------------------------------------
+  # Restrict period
+  if(!is.null(period)){
+    ind_ret_sinceYr <- which(df$Year == period[1])
+    ind_ret_toYr <- which(df$Year == period[2])
+    df <- df[ind_ret_sinceYr:ind_ret_toYr, ]
+  }
+  #-------------------------------------------
+  mat <- as.matrix(df[, -1])
+  #-------------------------------------------
+  # Replace NA with interplation
+  mat <- na.approx(mat)
+  #-------------------------------------------
+  # Get percentage difference
+  mat_pctDiff <- diff(mat) / mat[-nrow(mat), ]
+  year_vec <- df$Year[-1]
+  row.names(mat_pctDiff) <- year_vec
+  #-------------------------------------------
+  n_items <- ncol(mat_pctDiff)
+  #===========================================
+  # Extract signals from noise
+  #-------------------------------------------
+  if(is.null(fraction_train)){
+    list_out <- signals_from_noise(mat_pctDiff, fun_env_signals_from_noise)
+    #list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig, eigvals, mat_eigvecs)
+    mat_loads_rot_sig <- list_out[[2]]
+    #-------------------------------------------
+    # Interpret, characterize signals (Which items load the most onto each signal?)
+    interpret_loadings(mat_loads_rot_sig, fun_env_interpret_loadings)
+    #-------------------------------------------
+  }else{
+    #-------------------------------------------
+    ind_train <- 1:round(nrow(mat_pctDiff) * fraction_train)
+    ind_test <- setdiff(1:nrow(mat_pctDiff), ind_train)
+    mat_pctDiff_train <- mat_pctDiff[ind_train, ]
+    mat_pctDiff_test <- mat_pctDiff[ind_test, ]
+    #-------------------------------------------
+    list_out <- signals_from_noise(mat_pctDiff_train, fun_env_signals_from_noise)
+    mat_loads_rot_sig <- list_out[[2]]
+    interpret_loadings(mat_loads_rot_sig, fun_env_interpret_loadings)
+    #-------------------------------------------
+    list_out <- signals_from_noise(mat_pctDiff_test, fun_env_signals_from_noise)
+    mat_loads_rot_sig_test <- list_out[[2]]
+    interpret_loadings(mat_loads_rot_sig_test, fun_env_interpret_loadings)
+    #-------------------------------------------
+    df_loads_train <- data.frame(mat_loads_rot_sig)
+    df_loads_test <- data.frame(mat_loads_rot_sig_test)
+    mse_vec <- c()
+    for(i in 1:min(ncol(df_loads_train), ncol(df_loads_test))){
+      mse_vec[i] <- mean((df_loads_test[, i] - df_loads_train[, i])^2)
+    }
+    print("Test data loadings vs. train data loadings (mse):", mse_vec)
+    mse_loads <- mse_vec[1]
+  }
+  #===========================================
+  # Portfolio optimization
 
-list_out <- signals_from_noise(mat_pctDiff,
+  get_optimal_frontier_wrapper()
+    
+}
+
+
+#=======================================================================
+
+
+```
+
+Now we look at farmgate price.
+
+```{r, echo=F}
+
+#=======================================================================
+# Have to rename some crops because names in the production and value of production datasets differ somewhat from those in the trade dataset used above.
+cereal_vec <- c("Maize", "Wheat", "Sorghum", "Rice, paddy", "Millet")
+pulses_oilcrops_vec <- c("Beans, dry", "Cow peas, dry", "Chick peas", "Lentils", "Soybeans", "Groundnuts, with shell")
+RnT_vec <- c("Cassava", "Yams", "Potatoes", "Sweet potatoes")
+item_vec <- c(cereal_vec, pulses_oilcrops_vec, RnT_vec)
+#------------------------------------
+list_groups <- list(cereal_vec, pulses_oilcrops_vec, RnT_vec)
+group_names <- c("Cereals", "Pulses & Oilcrops", "Roots & Tubers")
+group_info <- list(list_groups, group_names)
+#------------------------------------
+# Get total value of ag production data
+#rm(df_vap_raw, df_vap)
+#gc()
+df_vap_raw <- read.csv("Value_of_Production_E_All_Data.csv", stringsAsFactors = F)
+colnames(df_vap_raw)
+df_vap_raw$Area.Code <- NULL
+df_vap_raw$Item.Code <- NULL
+df_vap_raw$Element.Code <-NULL
+u <- colnames(df_vap_raw)
+colnames(df_vap_raw)
+df_vap_raw <- df_vap_raw[, -grep("F", u)]
+colnames(df_vap_raw)[5:ncol(df_vap_raw)] <- as.character(c(1961:(1961 + ncol(df_vap_raw) - 5)))
+df_vap_raw <- gather(df_vap_raw,Year,Value,`1961`:`2016`)
+#------------------
+#unique(df_vap_raw$Area)[grep("africa", unique(df_vap_raw$Area), ignore.case = T)]
+#unique(df_vap_raw$Item)[grep("potato", unique(df_vap_raw$Item), ignore.case = T)]
+#------------------
+df_vap <- subset(df_vap_raw, Area %in% area_vec)
+df_vap <- subset(df_vap, Item %in% item_vec)
+#unique(df_vap_raw$Element)
+element_vec <- c("Gross Production Value (current million US$)")
+df_vap <- subset(df_vap, Element %in% element_vec)
+df_vap <- subset(df_vap, Year > 1990)
+df_vap$Unit <- NULL
+df_vap$Element <- NULL
+colnames(df_vap)[4] <- "Gross Production Value\n(current million USD)"
+#------------------------------
+# Get production data
+df_prod_raw <- read.csv("Production_Crops_E_All_Data.csv", stringsAsFactors = F)
+df_prod_raw <- subset(df_prod_raw, Item.Code != 2928)
+df_prod_raw$Area.Code <- NULL
+df_prod_raw$Item.Code <- NULL
+df_prod_raw$Element.Code <-NULL
+df_prod_raw$Unit <- NULL
+u <- colnames(df_prod_raw)
+df_prod_raw <- df_prod_raw[, -grep("F", u)]
+last_yr <- (1961 + ncol(df_prod_raw) - 4)
+colnames(df_prod_raw)[4:ncol(df_prod_raw)] <- as.character(c(1961:last_yr))
+gathercols <- colnames(df_prod_raw)[4:ncol(df_prod_raw)]
+df_prod_raw <- gather_(df_prod_raw, "Year", "Value", gathercols)
+#------------------------------
+#unique(df_prod_raw$Item)[grep("beans", unique(df_prod_raw$Item), ignore.case = T)]
+df_prod <- subset(df_prod_raw, Item %in% item_vec)
+df_prod <- subset(df_prod, Area %in% area_vec)
+df_prod <- subset(df_prod, Element == "Production")
+df_prod <- subset(df_prod, Year > 1990)
+df_prod$Element <- NULL
+colnames(df_prod)[4] <- "Production"
+#-----------------------------
+# df_prod$Group <- NA
+# u <- df_prod$Item
+# df_prod$Group[which(u %in% cereal_vec)] <- "Cereals"
+# df_prod$Group[which(u %in% pulses_oilcrops_vec)] <- "Pulses and Oilcrops"
+# df_prod$Group[which(u %in% RnT_vec)] <- "Roots & Tubers"
+# df_prod$Group <- factor(df_prod$Group)
+#-----------------------------
+df <- merge(df_vap, df_prod, by = c("Area", "Year", "Item"))
+#-----------------------------
+# Get SSA region
+df_x <- subset(df, Area %in% SSA_vec)
+df_x <- as.data.frame(df_x %>% group_by(Year, Item) %>% summarise_at(c("Gross Production Value\n(current million USD)", "Production"), sum, na.rm = T))
+df_x$Area <- "Sub-Saharan Africa"
+df_x <- df_x[, colnames(df)]
+df <- as.data.frame(rbind(df, df_x))
+df$`Gross Prod. Value / MT\n(current USD)` <- 10^6 * df$`Gross Production Value\n(current million USD)` / df$Production
+#-----------------------------
+# Get grouping info
+df$Group <- NA
+u <- df$Item
+df$Group[which(u %in% cereal_vec)] <- "Cereals"
+df$Group[which(u %in% pulses_oilcrops_vec)] <- "Pulses and Oilcrops"
+df$Group[which(u %in% RnT_vec)] <- "Roots & Tubers"
+df$Group <- factor(df$Group)
+#-----------------------------
+# kcalMT_cereals_vec <- c(4.14, )
+# df_kcal <- data.frame(Item = item_vec, kcal_per_MT = kcalMT_vec)
+#-----------------------------
+# VAP Plots
+check_on_data <- F
+if(check_on_data){
+  df_plot <- subset(df, Year == 2016)
+  df_plot <- subset(df_plot, Area == "World")
+  xx <- df_plot$Group
+  df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+  df_plot$Production <- NULL
+  df_plot <- df_plot %>% gather_("Element", "Value", colnames(df_plot[5:6]))
+  gg <- ggplot(df_plot, aes(x = Item, y = Value, fill = Group))
+  gg <- gg + geom_bar(stat = "identity", position = "dodge")
+  gg <- gg + facet_wrap(~Element, scales = "free_y")
+  gg <- gg + theme(axis.title.x = element_blank(),
+                   axis.text.x = element_text(angle = 60, hjust = 1),
+                   axis.title.y = element_blank(),
+                   legend.title = element_blank())
+  #gg <- gg + coord_flip()
+  gg
+  #-----------------------------
+  df_plot <- subset(df, Year == 2016)
+  df_plot$Area[grep("Least Developed Countries", df_plot$Area)] <- "Least Developed\nCountries"
+  df_plot$Area[grep("Low Income Food Deficit Countries", df_plot$Area)] <- "Low Income\nFood Deficit Countries"
+  xx <- df_plot$Group
+  df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+  gg <- ggplot(df_plot, aes(x = Item, y = `Gross Prod. Value / MT\n(current USD)`, fill = Group))
+  gg <- gg + geom_bar(stat = "identity", position = "dodge")
+  gg <- gg + facet_wrap(~Area)
+  gg <- gg + theme(axis.title.y = element_blank(),
+                   axis.text.y = element_text(size = 7))
+  gg <- gg + coord_flip()
+  gg
+  
+  
+  df_plot <- subset(df_plot, Area == "World")
+  gg <- ggplot(df_plot, aes(x = Item, y = `Gross Prod. Value / MT\n(current USD)`, fill = Group))
+  gg <- gg + geom_bar(stat = "identity", position = "dodge")
+  #gg <- gg + facet_wrap(~Area)
+  gg <- gg + theme(axis.title.y = element_blank(),
+                   axis.text.y = element_text(size = 7))
+  #gg <- gg + coord_flip()
+  gg
+  #-----------------------------
+  df_plot <- df
+  df_plot$Year <- as.integer(df_plot$Year)
+  xx <- df_plot$Group
+  df_plot$Item <- factor(df_plot$Item, levels = unique(df_plot$Item[order(xx)]))
+  gg <- ggplot(df_plot, aes(x = Year, y = `Gross Prod. Value / MT (current USD)`, fill = Item))
+  gg <- gg + geom_area(position = "stack")
+  gg <- gg + facet_wrap(~Area)
+  gg
+  df_plot <- as.data.frame(df_plot %>% group_by(Area, Year) %>% mutate(sum_vap = sum(`Gross Prod. Value / MT (current USD)`)))
+  df_plot$`Gross Prod. Value / MT (share)` <- df_plot$`Gross Prod. Value / MT (current USD)` / df_plot$sum_vap
+  gg <- ggplot(df_plot, aes(x = Year, y = `Gross Prod. Value / MT (share)`, fill = Item))
+  gg <- gg + geom_area(position = "stack")
+  gg <- gg + facet_wrap(~Area)
+  gg
+  #-----------------------------
+  # Same on a per kcal basis
+  #.....
+}
+
+
+#======================================================
+#"Low Income Food Deficit Countries"
+#"Net Food Importing Developing Countries"
+#"Sub-Saharan Africa"
+#"South America"
+#"Asia"
+#"World"
+vap_area <- "World"
+ret_sinceYr <- 1991
+ret_toYr <- 2016
+#======================================================
+df2 <- subset(df, Area == vap_area)
+if(vap_area == "South America"){df2 <- subset(df2, !(Item %in% c("Cow peas, dry", "Millet")))}
+df2 <- df2[, c("Item", "Year", "Gross Prod. Value / MT\n(current USD)")]
+df2 <- df2 %>% spread(Item, `Gross Prod. Value / MT\n(current USD)`)
+ind_ret_sinceYr <- which(df2$Year == ret_sinceYr)
+ind_ret_toYr <- which(df2$Year == ret_toYr)
+df2 <- df2[ind_ret_sinceYr:ind_ret_toYr, ]
+# nab_mu_ret_check <- apply(df2[, -1], 2, function(x) (x[ind_ret_toYr] - x[ind_ret_sinceYr]) / x[ind_ret_sinceYr])
+mat2 <- as.matrix(df2[, -1])
+mat2 <- na.approx(mat2)
+mat_pctDiff <- diff(mat2) / mat2[-nrow(mat2), ]
+year_vec <- df2$Year[-1]
+ind_ret_sinceYr <- which(year_pctDiff_vec == ret_sinceYr)
+ind_ret_toYr <- which(year_pctDiff_vec == ret_toYr)
+nab_mu_ret <- apply(mat_pctDiff, 2, function(x) prod(1 + x[(ind_ret_sinceYr - 1):(ind_ret_toYr - 1)])) - 1
+#nab_mu_ret_check - nab_mu_ret
+row.names(mat_pctDiff) <- year_vec
+mat_PCA_in <- mat_pctDiff
+
+
+
+#this_ind <- (nrow(mat_pctDiff) - 40):nrow(mat_pctDiff)
+list_out <- signals_from_noise(mat_pctDiff,#[this_ind, ],
                                eigenvalue_density_plot = T,
                                signals_plot = T,
                                pca_var_plot = T,
                                pca_ind_plot = T,
-                               list_groups = list_groups_mod,
+                               list_groups = list_groups,
                                group_names = group_names,
                                quietly = F)
 mat_loads_rot_sig <- list_out[[2]]
@@ -1635,12 +1910,12 @@ interpret_loadings(mat_loads_rot_sig,
 
 #=======================================================================
 # Conventional risk-reward frontier
-if(class(mat_loads_rot_sig) == "numeric"){n_vars <- length(mat_loads_rot_sig)}
-if(class(mat_loads_rot_sig) == "matrix"){n_vars <- nrow(mat_loads_rot_sig)
+if(class(mat_loads_rot_sig) == "numeric"){n_items <- length(mat_loads_rot_sig)}
+if(class(mat_loads_rot_sig) == "matrix"){n_items <- nrow(mat_loads_rot_sig)
 }
 
 C_targ <- 1
-nab_C <- rep(1, n_vars)
+nab_C <- rep(1, n_items)
 #------------------------------------
 # Correlation matrix
 cormat <- cor(mat_pctDiff)
@@ -1656,22 +1931,27 @@ nab_pctDiff <- apply(mat_pctDiff, 2, function(x) prod(1 + x)) - 1
 mat_nab <- cbind(nab_pctDiff, nab_C)
 n_points_on_frontier <- 50
 #------------------------------------
+if(vap_area == "South America"){these_Rtarg_limits <- c(2, 10)}
+if(vap_area == "Sub-Saharan Africa"){these_Rtarg_limits <- c(9, 25)}
+if(vap_area == "Asia"){these_Rtarg_limits <- c(12, 60)}
+if(vap_area == "Low Income Food Deficit Countries"){these_Rtarg_limits <- c(1, 10)}
+if(vap_area == "Net Food Importing Developing Countries"){these_Rtarg_limits <- c(2, 12)}
+if(vap_area == "World"){these_Rtarg_limits <- c(1, 15)}
+this_fig_title <- paste("Optimal Portfolio Frontier,", vap_area)
 list_out <- get_optimal_frontier(cormat, mat_nab,
-                                 Rtarg_limits = c(0.01, 30),
+                                 Rtarg_limits = these_Rtarg_limits,
                                  n_points_on_frontier = n_points_on_frontier,
-                                 backtest_info = list(nab_pctRet_test, cormat_test),
+                                 backtest_info = NULL,
                                  utility_interpretation = T,
                                  frontier_and_budget_plot = T,
                                  list_groups = NULL,
                                  group_names = NULL,
                                  # list_groups = list_groups_mod,
                                  # group_names = group_names_mod,
-                                 fig_title = NULL)
+                                 fig_title = this_fig_title)
 
 
 ```
-
-
 
 
 
@@ -1972,7 +2252,7 @@ colnames(df_WDI)[ind_track_inverse] <- paste("1 /", colnames(df_WDI)[ind_track_i
 for(i in 1:length(list_groups)){
   ind_chng <- which(list_groups[[i]] %in% track_inverse)
   list_groups[[i]][ind_chng] <- paste("1 /", list_groups[[i]][ind_chng])
-
+  
 }
 #-----------------------------------------------------------
 #mat_zWDI <- scale(df_WDI)
@@ -2110,9 +2390,9 @@ interpret_loadings(mat_loads_rot_sig,
 
 #=======================================================================
 # Conventional risk-reward frontier
-n_vars <- nrow(mat_loads_rot_sig)
+n_items <- nrow(mat_loads_rot_sig)
 C_targ <- 1
-nab_C <- rep(1, n_vars)
+nab_C <- rep(1, n_items)
 #------------------------------------
 # Get pct return vec and correlation matrix only over a period equal in length to that of the test period.
 #ind_equal_test <- (nrow(mat_pctDiff) - length(ind_test)):nrow(mat_pctDiff)
