@@ -168,6 +168,10 @@ library(zoo)
 library(tidyquant)
 library(patchwork)
 #=======================================================================
+# Resources:
+# Correlation matrices:
+# http://www.sthda.com/english/wiki/correlation-matrix-a-quick-start-guide-to-analyze-format-and-visualize-a-correlation-matrix-using-r-software
+# https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.html
 #=======================================================================
 # Define functions
 #=======================================================================
@@ -467,56 +471,127 @@ interpret_loadings <- function(mat_loads_rot_sig, fun_env = NULL){
   
 }
 #=======================================================================
-historical_returns_and_corr_plot <- function(mat_pctDiff, 
+
+historical_returns_and_corr_plot <- function(mat_pctDiff,
+                                             mat_pctDiff_test = NULL,
                                              group_info = NULL,
-                                             fig_title = NULL,
-                                             returns_plot = T,
-                                             corr_plot = T,
-                                             corr_coef_size = 0.75){
+                                             returns_plot = F,
+                                             corr_plot = F,
+                                             group_colors = NULL,
+                                             fig_title_returns = NULL,
+                                             fig_title_corrplot = NULL,
+                                             fig_title_corrplot_test = NULL,
+                                             returns_plot_range = NULL,
+                                             corrplot_options = list(
+                                               plot_with_pvals = F,
+                                               plot_with_corrCoefs = F,
+                                               corr_coef_size = 0.75)
+){
   #------------------------------------------------------------
-  if(is.null(fig_title)){title_str <- "Historical Returns"}
-  from_date <- row.names(mat_pctDiff)[1]
-  to_date <- row.names(mat_pctDiff)[nrow(mat_pctDiff)]
-  from_date <- gsub("-", "/", from_date)
-  to_date <- gsub("-", "/", to_date)
-  subtitle_str <- paste(from_date, to_date, sep = " - ")
+  if(is.null(fig_title_returns)){fig_title_returns <- "Historical Returns"}
   #------------------------------------------------------------
   # Group the vars if group info is provided
   if(!is.null(group_info)){
+    if(is.null(group_colors)){
+      group_colors <- randomcoloR::distinctColorPalette(k = length(group_names))
+      #group_colors <- viridis::viridis_pal(option = "D")(length(group_names))
+    }
+    n_groups <- length(list_groups)
     n_items <- ncol(mat_pctDiff)
     varNames_ordered <- colnames(mat_pctDiff)
     list_groups <- group_info[[1]]
     group_names <- group_info[[2]]
     group_vec <- rep(NA, n_items)
-    for(i in 1:length(list_groups)){
+    group_color_vec <- rep(NA, n_items)
+    for(i in 1:n_groups){
       this_group_vec <- list_groups[[i]]
       this_group_name <- group_names[i]
+      this_group_color <- group_colors[i]
       group_vec[which(varNames_ordered %in% this_group_vec)] <- this_group_name
+      group_color_vec[which(varNames_ordered %in% this_group_vec)] <- this_group_color
     }
+    xx <- factor(group_vec)
+    cols_ordered_by_group <- as.character(colnames(mat_pctDiff)[order(xx)])
+    group_color_vec <- group_color_vec[order(xx)]
   }
+  
+  
+  for(i in 1:length(list_groups)){
+    this_group_vec <- list_groups[[i]]
+    this_group_color <- group_colors[i]
+    label_colors[which(cols_ordered_by_group %in% this_group_vec)] <- this_group_color
+  }
+  
+  
   #------------------------------------------------------------
+  from_date <- row.names(mat_pctDiff)[1]
+  to_date <- row.names(mat_pctDiff)[nrow(mat_pctDiff)]
+  from_date <- gsub("-", "/", from_date)
+  to_date <- gsub("-", "/", to_date)
+  date_interval <- paste(from_date, to_date, sep = " - ")
+  fig_subtitle_returns <- date_interval
   nab_pctRet <- apply(mat_pctDiff, 2, function(x) prod(1 + x)) - 1
+  #------------------------------------------------------------
   df_plot <- data.frame(Returns = nab_pctRet)
   df_plot$id <- row.names(df_plot)
+  if(!is.null(group_info)){
+    df_plot$Type <- factor(group_vec)
+    xx <- df_plot$Type
+    df_plot$id <- factor(df_plot$id, levels = cols_ordered_by_group)
+  }
+  #------------------------------------------------------------
+  if(!is.null(mat_pctDiff_test)){
+    #------
+    data_type_train <- paste("Train data ", date_interval)
+    df_plot$Data <- data_type_train
+    #------
+    from_date <- row.names(mat_pctDiff_test)[1]
+    to_date <- row.names(mat_pctDiff_test)[nrow(mat_pctDiff_test)]
+    from_date <- gsub("-", "/", from_date)
+    to_date <- gsub("-", "/", to_date)
+    date_interval <- paste(from_date, to_date, sep = " - ")
+    data_type_test <- paste("Backtest data ", date_interval)
+    nab_pctRet_test <- apply(mat_pctDiff_test, 2, function(x) prod(1 + x)) - 1
+    #------------------------------------------------------------
+    df_plot_test <- data.frame(Returns = nab_pctRet_test, Data = data_type_test)
+    df_plot_test$id <- row.names(df_plot_test)
+    if(!is.null(group_info)){
+      df_plot_test$Type <- factor(group_vec)
+      xx <- df_plot_test$Type
+      df_plot_test$id <- factor(df_plot_test$id, levels = cols_ordered_by_group)
+    }
+    df_plot <- as.data.frame(rbind(df_plot, df_plot_test))
+    
+    df_plot$Data <- factor(df_plot$Data, levels = c(data_type_train, data_type_test))
+    
+  }
+  
   #------------------------------------------------------------
   # Historical returns plot
   if(returns_plot){
     
     if(!is.null(group_info)){
-      df_plot$Type <- factor(group_vec)
-      xx <- df_plot$Type
-      df_plot$id <- factor(df_plot$id, levels = unique(df_plot$id[order(xx)]))
       gg <- ggplot(df_plot, aes(x = id, y = Returns, fill = Type))
+      #gg <- gg + scale_color_brewer(palette = "Dark2")
+      gg <- gg + scale_fill_manual(values = group_colors)
     }else{
       gg <- ggplot(df_plot, aes(x = id, y = Returns))
     }
-    gg <- gg + geom_bar(stat = "identity", position = "dodge")
-    gg <- gg + labs(title = title_str, subtitle = subtitle_str)
+    gg <- gg + geom_bar(stat = "identity", color = "black", position = "dodge")
+    if(!is.null(mat_pctDiff_test)){
+      gg <- gg + facet_wrap(~Data, ncol = 1)
+      gg <- gg + labs(title = fig_title_returns)
+    }else{
+      gg <- gg + labs(title = fig_title_returns, subtitle = fig_subtitle_returns)
+    }
     gg <- gg + theme(axis.text.x = element_text(face = "bold", size = 10, angle = 60, hjust = 1),
                      axis.text.y = element_text(face = "bold", size = 10),
                      axis.title.x = element_blank(),
                      axis.title.y = element_text(face = "bold", size = 10),
                      plot.title = element_text(size = 11))
+    if(!is.null(returns_plot_range)){
+      gg <- gg + coord_cartesian(ylim = returns_plot_range)
+    }
     #  gg <- gg + coord_equal()
     #  gg <- gg + coord_flip()
     print(gg)
@@ -525,25 +600,74 @@ historical_returns_and_corr_plot <- function(mat_pctDiff,
   #------------------------------------------------------------
   # Correlation matrix plot
   if(corr_plot){
+    if(is.null(fig_title_corrplot)){fig_title_corrplot <- "Correlation matrix"}
+    plot_with_pvals <- corrplot_options[["plot_with_pvals"]]
+    plot_with_corrCoefs <- corrplot_options[["plot_with_corrCoefs"]]
+    corr_coef_size <- corrplot_options[["corr_coef_size"]]
     if(!is.null(group_info)){
-      cols_ordered_by_group <- as.character(df_plot$id[order(xx)])
       mat_pctDiff_corrplot <- mat_pctDiff[, cols_ordered_by_group]
-      group_colors <- viridis::viridis_pal(option = "D")(length(group_names))
-      label_colors <- c()
-      for(i in 1:length(list_groups)){
-        this_group_vec <- list_groups[[i]]
-        this_group_color <- group_colors[i]
-        label_colors[which(cols_ordered_by_group %in% this_group_vec)] <- this_group_color
+      if(!is.null(mat_pctDiff_test)){
+        mat_pctDiff_corrplot_test <- mat_pctDiff_test[, cols_ordered_by_group]
+      }else{
+        mat_pctDiff_corrplot_test <- NULL
       }
       
     }else{
       mat_pctDiff_corrplot <- mat_pctDiff
+      if(!is.null(mat_pctDiff_test)){
+        mat_pctDiff_corrplot_test <- mat_pctDiff_test
+      }else{
+        mat_pctDiff_corrplot_test <- NULL
+      }
+      
       label_colors <- "black"
     }
-    cormat <- cor(mat_pctDiff_corrplot)
-    #corrplot::corrplot(cormat, type = "lower", tl.col = label_colors, tl.srt = 45)
-    corrplot::corrplot.mixed(cormat, tl.pos = "lt", tl.col = label_colors,
-                             tl.srt = 45, number.cex = corr_coef_size)
+    #-------------------
+    corr_colorRamp <- colorRampPalette(c("orange", "white", "deepskyblue"))(50)
+    #-------------------
+    xx <- Hmisc::rcorr(mat_pctDiff_corrplot)
+    cormat <- xx$r
+    if(plot_with_pvals){
+      pvals <- xx$P
+    }else{
+      pvals <- NULL
+    }
+    
+    if(plot_with_corrCoefs){
+      corrplot::corrplot.mixed(cormat, tl.pos = "lt", tl.col = group_color_vec,
+                               tl.srt = 45, p.mat = pvals, number.cex = corr_coef_size,
+                               title = fig_title_corrplot,
+                               col = corr_colorRamp)
+    }else{
+      corrplot::corrplot(cormat, type = "lower", tl.col = group_color_vec, tl.srt = 45,
+                         p.mat = pvals, title = fig_title_corrplot,
+                         col = corr_colorRamp)
+    }
+    #-------------------
+    if(!is.null(mat_pctDiff_corrplot_test)){
+      if(is.null(fig_title_corrplot_test)){
+        fig_title_corrplot_test <- "Correlation matrix, test data"
+      }
+      xx <- Hmisc::rcorr(mat_pctDiff_corrplot_test)
+      cormat <- xx$r
+      if(plot_with_pvals){
+        pvals <- xx$P
+      }else{
+        pvals <- NULL
+      }
+      if(plot_with_corrCoefs){
+        corrplot::corrplot.mixed(cormat, tl.pos = "lt", tl.col = group_color_vec,
+                                 tl.srt = 45, p.mat = pvals, number.cex = corr_coef_size,
+                                 title = fig_title_corrplot_test,
+                                 col = corr_colorRamp)
+      }else{
+        corrplot::corrplot(cormat, type = "lower", tl.col = group_color_vec, tl.srt = 45,
+                           p.mat = pvals, title = fig_title_corrplot_test,
+                           col = corr_colorRamp)
+      }
+      
+    }
+    
   }
   #------------------------------------------------------------
   
@@ -594,6 +718,7 @@ list_groups <- list(spy_sector_detail, minerals_detail, agriculture_detail, ener
 group_names <- c("US Sectors", "Minerals", "Agriculture", "Energy", "Major Currency Pairs",
                  "Emerging Markets", "Cryptocurrencies/Blockchain", "T-Bonds")
 group_info <- list(list_groups, group_names)
+n_groups <- length(group_names)
 #-------------------------------------------
 #per_ema <- 13
 #fromdate = Sys.Date() - 360
@@ -678,6 +803,7 @@ date_vec <- row.names(mat_pctDiff)
 #length(date_vec)
 row.names(mat_pctDiff) <- as.character(date_vec)
 colnames(mat_pctDiff) <- as.character(df_symb_detail$detail[order(df_symb_detail$symbol)])
+#----------------------------------------------
 check_on_data <- F
 if(check_on_data){
   df_plot <- as.data.frame(mat_pctDiff)
@@ -763,7 +889,58 @@ if(check_on_data){
 
 ## 4. Application to real world data
 
-### 4.1 An example from the financial context
+```{r, fig.width=11, fig.height=6, fig.align='center', echo=FALSE}
+ind_train <- 1:round(nrow(mat_pctDiff) * 2 / 3)
+ind_test <- setdiff(1:nrow(mat_pctDiff), ind_train)
+mat_pctDiff_train <- mat_pctDiff[ind_train, ]
+mat_pctDiff_test <- mat_pctDiff[ind_test, ]
+# ts_avg_test <- ts_avg_in[ind_test]
+# date_vec_test <- date_vec[ind_test]
+#group_colors <- RColorBrewer::brewer.pal(n = n_groups, "Dark2")
+# "Darjeeling"
+group_colors <- wesanderson::wes_palette("Darjeeling1", n = n_groups, type = "continuous")
+this_fig_title <- "Figure 1: Historical returns"
+historical_returns_and_corr_plot(mat_pctDiff_train, mat_pctDiff_test, group_info,
+                                 returns_plot = T,
+                                 corr_plot = F,
+                                 group_colors = group_colors,
+                                 fig_title_returns = this_fig_title)
+
+
+```
+
+```{r, fig.width=12, fig.height=12, fig.align='center', echo=FALSE}
+
+# (mat_pctDiff,
+#                                              mat_pctDiff_test = NULL,
+#                                              group_info = NULL,
+#                                              returns_plot = F,
+#                                              corr_plot = F,
+#                                              fig_title_returns = NULL,
+#                                              fig_title_corrplot = NULL,
+#                                              fig_title_corrplot_test = NULL,
+#                                              returns_plot_range = NULL,
+#                                              corrplot_options = list(
+#                                                plot_with_pvals = F,
+#                                                plot_with_corrCoefs = F,
+#                                                corr_coef_size = 0.75)
+# )
+
+corrplot_options = list(plot_with_pvals = F, plot_with_corrCoefs = F, corr_coef_size = 0.75)
+fig_title_corrplot <- "Figure 2: Correlation matrix, train data"
+fig_title_corrplot_test <- "Figure 3: Correlation matrix, test data"
+historical_returns_and_corr_plot(mat_pctDiff_train, mat_pctDiff_test, group_info,
+                                 returns_plot = F, 
+                                 corr_plot = T, 
+                                 group_colors = group_colors, 
+                                 fig_title_corrplot = fig_title_corrplot,
+                                 fig_title_corrplot_test = fig_title_corrplot_test,
+                                 corrplot_options = corrplot_options)
+
+
+
+```
+### 4.1 The financial context
 
 #### 4.1.1 Extraction of signals from noise
 
@@ -772,12 +949,6 @@ In figure ..., a density plot of the correlation matrix eigenvalues is compared 
 The signal time series are plotted against the data average in figure .... Here it is evident that the first signal reflects the average, while the subsequent signals reflect forces pushing and pulling on the average.
 
 ```{r, fig.width=12, fig.height=8, fig.align='center', echo=FALSE}
-ind_train <- 1:round(nrow(mat_pctDiff) * 2 / 3)
-ind_test <- setdiff(1:nrow(mat_pctDiff), ind_train)
-mat_pctDiff_train <- mat_pctDiff[ind_train, ]
-mat_pctDiff_test <- mat_pctDiff[ind_test, ]
-ts_avg_test <- ts_avg_in[ind_test]
-date_vec_test <- date_vec[ind_test]
 fun_env = list(eigenvalue_density_plot = T,
                signals_plot = T,
                pca_var_plot = F,
