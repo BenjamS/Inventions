@@ -2704,6 +2704,8 @@ group_names <- c("Health/Population", "Food Security", "Education",
                  "Economic Growth", #"Economic Equality",
                  "Environmental Sustainability", "Equality, Peace, Human Rights", "Infrastructure")
 names(list_groups) <- group_names
+group_info <- list(list_groups, group_names)
+n_groups <- length(group_names)
 #-------------------------------------------------------------
 #"Least developed countries: UN classification"
 #"Sub-Saharan Africa (excluding high income)"
@@ -2771,10 +2773,14 @@ for(i in 1:length(list_groups)){
   
 }
 #-----------------------------------------------------------
-#mat_zWDI <- scale(df_WDI)
+mat_zWDI <- scale(df_WDI)
+mat_pctDiff <- mat_zWDI
+row.names(mat_pctDiff) <- year_vec
 #mat_pctDiff <- diff(as.matrix(log(df_WDI)))
-mat_pctDiff <- diff(as.matrix(df_WDI)) / as.matrix(df_WDI[-nrow(df_WDI), ])
-row.names(mat_pctDiff) <- year_vec[-1]
+
+# mat_pctDiff <- diff(as.matrix(df_WDI)) / as.matrix(df_WDI[-nrow(df_WDI), ])
+# row.names(mat_pctDiff) <- year_vec[-1]
+
 # library(tidyquant)
 # ema_per <- 2
 # mat_pctDiff <- apply(df_WDI, 2, function(x) x - EMA(x, ema_per))
@@ -2873,34 +2879,50 @@ if(check_on_data){
 
 ```
 
-```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
+```{r, fig.align='center', echo=FALSE}
 #------------------------------------------------------------
-list_out <- signals_from_noise(mat_pctDiff,
-                               eigenvalue_density_plot = T,
-                               signals_plot = T,
-                               pca_var_plot = F,
-                               pca_ind_plot = F,
-                               list_groups = list_groups,
-                               group_names = group_names,
-                               quietly = F)
-#list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_inData_sig, eigvals_sig, mat_eigvecs_sig)
+fun_env = list(eigenvalue_density_plot = T,
+               pca_var_plot = F,
+               pca_ind_plot = F,
+               group_info,
+               quietly = F)
+this_fig_title <- NULL
+list_out <- signals_from_noise(mat_pctDiff, fig_title_eigDens = this_fig_title, fun_env)
+# list_out <- list(mat_loads_sig, mat_loads_rot_sig, mat_loads, mat_loads_rot, mat_inData_sig, eigvals_sig, mat_eigvecs_sig, eigvals, mat_eigvecs)
 mat_loads_sig <- list_out[[1]]
 mat_loads_rot_sig <- list_out[[2]]
+mat_pctDiff_sig <- list_out[[5]]
+mat_eigvecs_sig <- list_out[[7]]
 
+
+```
+
+
+
+```{r, fig.width=7, fig.height=12, fig.align='center', echo=FALSE}
+
+this_fig_title <- NULL
+plot_signals_against_avg(mat_pctDiff_sig, mat_pctDiff,
+                         fig_title = this_fig_title,
+                         facet_ncol = 1)
 
 ```
 
 
 ```{r, fig.width=15, fig.height=12, fig.align='center', echo=FALSE}
 
-signal_names <- c("")
-interpret_loadings(mat_loads_rot_sig,
-                   list_groups = list_groups,
-                   group_names = group_names,
-                   signal_names = NULL)
 
+#group_colors <- RColorBrewer::brewer.pal(n = n_groups, "Dark2")
+# "Darjeeling"
+group_colors <- wesanderson::wes_palette("Darjeeling1", n = n_groups, type = "continuous")
+# signal_names <- c("US / Emerg. Markets,\nEnergy, Blockchain", "Precious metals", "FOREX", "US Bonds", "Agriculture", "Industrial metals")
+signal_names <- NULL
+fun_env <- list(group_info, signal_names, group_colors)
+this_fig_title <- NULL
+interpret_loadings(mat_loads_sig, fig_title = this_fig_title, fun_env)
 
 ```
+
 
 ```{r, fig.width=8, fig.height=6, fig.align='center', echo = FALSE}
 
